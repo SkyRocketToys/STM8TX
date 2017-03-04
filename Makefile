@@ -1,9 +1,10 @@
 CC=sdcc
-CFLAGS=-lstm8 -mstm8
+CFLAGS=-lstm8 -mstm8 -Iinclude
 LD=sdld
 CHIP=stm8s105c6
 
-SRC=util.c uart.c test.c printfl.c
+LIB=lib/util.c lib/uart.c lib/printfl.c
+SRC=$(LIB) test.c 
 
 OBJ = $(SRC:%.c=%.rel)
 HEX = test.ihx
@@ -11,12 +12,12 @@ HEX = test.ihx
 .PHONY: all clean
 
 %.rel: %.c
-	$(CC) -c $(CFLAGS) $^
+	$(CC) -c $(CFLAGS) $^ -o $*.rel
 
 all: $(OBJ) $(HEX)
 
 clean:
-	rm -f $(OBJ) $(HEX)
+	rm -f $(OBJ) $(HEX) *.map *.asm *.lst *.rst *.sym *.lk *.cdb *.ihx *.rel
 
 flash: $(HEX)
 	stm8flash -cstlinkv2 -p$(CHIP) -w $(HEX)

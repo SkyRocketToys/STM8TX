@@ -6,6 +6,11 @@ void chip_init(void)
 {
     CLK_DIVR = 0x00; // Set the frequency to 16 MHz
     CLK_PCKENR1 = 0xFF; // Enable peripherals
+
+    // setup power enable
+    PB_DDR = 0x10;
+    PB_CR1 = 0x10;
+    PB_ODR = 0x10;
 }
 
 void led_init(void)
