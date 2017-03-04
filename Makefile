@@ -3,7 +3,7 @@ CFLAGS=-lstm8 -mstm8
 LD=sdld
 CHIP=stm8s105c6
 
-SRC=util.c uart.c test.c
+SRC=util.c uart.c test.c printfl.c
 
 OBJ = $(SRC:%.c=%.rel)
 HEX = test.ihx

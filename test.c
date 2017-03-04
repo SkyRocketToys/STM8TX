@@ -2,7 +2,9 @@
 #include "util.h"
 #include "uart.h"
 
-int main() {
+int main()
+{
+    int i;
     
     chip_init();
     led_init();
@@ -12,11 +14,13 @@ int main() {
     delay_ms(1);
     
     uart2_init();
-    
+
+    i = -10;
     do {
         led_green_toggle();
         led_yellow_toggle();
-        uart2_write("hello world\n");
+        printf("hello world '%d'\n", i);
         delay_ms(500);
+        i++;
     } while(1);
 }

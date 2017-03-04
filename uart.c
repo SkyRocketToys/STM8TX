@@ -37,3 +37,9 @@ void uart2_write(const char *str)
         USART2_DR = *str++;
     }
 }
+
+void uart2_putchar(char c)
+{
+    while(!(USART2_SR & USART_SR_TXE)) ;
+    USART2_DR = c;
+}

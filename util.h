@@ -13,3 +13,6 @@ void led_yellow_toggle(void);
 
 // timing functions
 void delay_ms(uint16_t d);
+
+void printf(const char *fmt, ...);
+
