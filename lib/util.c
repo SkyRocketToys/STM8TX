@@ -4,8 +4,7 @@
 
 void chip_init(void)
 {
-    CLK_DIVR = 0x00; // Set the frequency to 16 MHz
-    CLK_PCKENR1 = 0xFF; // Enable peripherals
+    CLK_SPCKENR1 = 0xFF; // Enable all peripherals
 
     // setup power enable
     PB_DDR = 0x10;

@@ -1,5 +1,5 @@
 CC=sdcc
-CFLAGS=-lstm8 -mstm8 -Iinclude
+CFLAGS=-lstm8 -mstm8 -Iinclude -DSTM8S105=1
 LD=sdld
 CHIP=stm8s105c6
 
