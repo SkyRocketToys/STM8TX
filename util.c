@@ -2,6 +2,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+void chip_init(void)
+{
+    CLK_DIVR = 0x00; // Set the frequency to 16 MHz
+    CLK_PCKENR1 = 0xFF; // Enable peripherals
+}
+
 void led_init(void)
 {
     // green LED on PD7, yellow on PD3
