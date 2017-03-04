@@ -3,7 +3,7 @@ CFLAGS=-lstm8 -mstm8 -Iinclude -DSTM8S105=1
 LD=sdld
 CHIP=stm8s105c6
 
-LIB=lib/util.c lib/uart.c lib/printfl.c lib/adc.c
+LIB=lib/util.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c
 SRC=$(LIB) test.c 
 
 OBJ = $(SRC:%.c=%.rel)

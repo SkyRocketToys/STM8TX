@@ -50,6 +50,7 @@ void led_yellow_toggle(void)
 
 void delay_ms(uint16_t d)
 {
-        uint32_t counter=d*50;
-        while (counter--) {}
+    // empirically tuned
+    uint32_t counter=d*65;
+    while (counter--) {}
 }

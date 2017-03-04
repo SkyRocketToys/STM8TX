@@ -2,6 +2,7 @@
 #include "util.h"
 #include "uart.h"
 #include "adc.h"
+#include "spi.h"
 
 
 // ADC1 interrupt
@@ -17,6 +18,7 @@ int main()
     chip_init();
     led_init();
     adc_init();
+    spi_init();
 
     // start out of sync
     led_green_toggle();
@@ -27,10 +29,14 @@ int main()
     enableInterrupts();
     
     do {
+        uint8_t b = 42;
+        uint8_t x[1] = { 1 };
+        
         led_green_toggle();
         led_yellow_toggle();
-        printf("test: '%d' ADC=[%u %u %u %u]\n", i,
-               adc_value(0), adc_value(1), adc_value(2), adc_value(3));
+        printf("test: '%d' ADC=[%u %u %u %u]\n", i, adc_value(0), adc_value(1), adc_value(2), adc_value(3));
+
+        spi_transfer(sizeof(x), x, x);
         
         delay_ms(500);
         i++;
