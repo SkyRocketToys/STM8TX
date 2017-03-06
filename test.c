@@ -3,6 +3,7 @@
 #include "uart.h"
 #include "adc.h"
 #include "spi.h"
+#include "cypress.h"
 
 
 // ADC1 interrupt
@@ -27,6 +28,8 @@ int main()
     uart2_init();
 
     enableInterrupts();
+
+    cypress_init();
     
     do {
         uint8_t b = 42;
