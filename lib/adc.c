@@ -12,7 +12,7 @@ void adc_irq(void)
     v |= ADC_DRH << 8;
     values[chan] = v;
     ADC_CSR &= 0x3f; // clear EOC & AWD flags
-    chan = (chan + 1) % NUM_CHANS;
+    chan = (chan + 1) & (NUM_CHANS-1);
     ADC_CSR = 0x20 | chan;
 }
 

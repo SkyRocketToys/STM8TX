@@ -24,6 +24,9 @@
 #ifndef __STM8L_H__
 #define __STM8L_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
 typedef unsigned char U8;
 typedef unsigned int U16;
 typedef unsigned long U32;
@@ -47,6 +50,15 @@ typedef unsigned long U32;
 /*
  * Registers map is shown in short datasheet, page 26
  */
+
+struct gpio_regs {
+    uint8_t ODR;
+    uint8_t IDR;
+    uint8_t DDR;
+    uint8_t CR1;
+    uint8_t CR2;
+};
+
 /* GPIO */
 #define PA_ODR *(unsigned char*)0x5000
 #define PA_IDR *(unsigned char*)0x5001
@@ -104,6 +116,18 @@ typedef unsigned long U32;
 #define PI_CR2 *(unsigned char*)0x502C
 #endif // STM8S105
 
+enum gpio_port {
+    PORTA=0,
+    PORTB=1,
+    PORTC=2,
+    PORTD=3,
+    PORTE=4,
+    PORTF=5,
+    PORTG=6,
+    PORTH=7,
+    PORTI=8
+};
+
 /* GPIO bits */
 #define GPIO_PIN0		(1 << 0)
 #define GPIO_PIN1		(1 << 1)
@@ -113,6 +137,17 @@ typedef unsigned long U32;
 #define GPIO_PIN5		(1 << 5)
 #define GPIO_PIN6		(1 << 6)
 #define GPIO_PIN7		(1 << 7)
+
+enum gpio_config {
+    GPIO_INPUT_FLOAT            =0x0,
+    GPIO_INPUT_PULLUP           =0x2,
+    GPIO_INPUT_FLOAT_IRQ        =0x1,
+    GPIO_INPUT_PULLUP_IRQ       =0x3,
+    GPIO_OUTPUT_OPEN_DRAIN      =0x0,
+    GPIO_OUTPUT_PUSHPULL        =0x6,
+    GPIO_OUTPUT_OPEN_DRAIN_FAST =0x5,
+    GPIO_OUTPUT_PUSHPULL_FAST   =0x7,
+};
 
 /* -------------------- FLASH/EEPROM -------------------- */
 #define FLASH_CR1	*(unsigned char*)0x505A
@@ -173,6 +208,11 @@ typedef unsigned long U32;
 #define SPI_CRCPR		*(unsigned char*)0x5205
 #define SPI_RXCRCR		*(unsigned char*)0x5206
 #define SPI_TXCRCR		*(unsigned char*)0x5207
+
+#define SPI_CR1_MODE0           0x00
+#define SPI_CR1_MODE1           0x01
+#define SPI_CR1_MODE2           0x02
+#define SPI_CR1_MODE3           0x03
 
 /* ------------------- I2C ------------------- */
 #define I2C_CR1			*(unsigned char*)0x5210

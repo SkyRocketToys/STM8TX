@@ -14,5 +14,11 @@ void led_yellow_toggle(void);
 // timing functions
 void delay_ms(uint16_t d);
 
+// time since boot in microseconds
+uint32_t micros(void);
+
+// time since boot in milliseconds
+uint32_t millis(void);
+    
 void printf(const char *fmt, ...);
 
