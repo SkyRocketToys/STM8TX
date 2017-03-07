@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "stm8l.h"
 #include <spi.h>
 #include <gpio.h>
@@ -47,7 +48,7 @@ void spi_force_chip_select(bool set)
         forced_chip_select = true;
         spi_radio_cs_low();
     } else if (!set && forced_chip_select) {
-        forced_chip_select = true;
+        forced_chip_select = false;
         spi_radio_cs_high();
     }
 }
@@ -66,27 +67,30 @@ uint8_t spi_read1(void)
     return v;
 }
 
+static uint8_t dummy[32];
+
 void spi_transfer(uint8_t n, const uint8_t *sendbuf, uint8_t *recvbuf)
 {
     if (!forced_chip_select) {
         spi_radio_cs_low();
     }
 
+    if (sendbuf == NULL) {
+        sendbuf = dummy;
+        memset(dummy, 0, n);
+    }
+    if (recvbuf == NULL) {
+        recvbuf = dummy;
+    }
+    
     while (n--) {
         // wait for tx buffer to be empty
         while ((SPI_SR & 0x02) == 0) ;
-        if (sendbuf == NULL) {
-            SPI_DR = 0;
-        } else {
-            SPI_DR = *sendbuf++;
-        }
+        SPI_DR = *sendbuf++;
+
         while ((SPI_SR & 0x01) == 0) ;
-        if (recvbuf == NULL) {
-            (void)SPI_DR;
-        } else {
-            // wait for incoming byte
-            *recvbuf++ = SPI_DR;
-        }
+        // wait for incoming byte
+        *recvbuf++ = SPI_DR;
     }
 
     if (!forced_chip_select) {
