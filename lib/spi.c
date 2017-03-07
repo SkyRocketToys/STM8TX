@@ -62,7 +62,7 @@ void spi_write(uint8_t n, const uint8_t *buf)
 // read one byte
 uint8_t spi_read1(void)
 {
-    uint8_t v;
+    uint8_t v=0;
     spi_transfer(1, NULL, &v);
     return v;
 }
