@@ -51,14 +51,6 @@ typedef unsigned long U32;
  * Registers map is shown in short datasheet, page 26
  */
 
-struct gpio_regs {
-    uint8_t ODR;
-    uint8_t IDR;
-    uint8_t DDR;
-    uint8_t CR1;
-    uint8_t CR2;
-};
-
 /* GPIO */
 #define PA_ODR *(unsigned char*)0x5000
 #define PA_IDR *(unsigned char*)0x5001
@@ -115,37 +107,6 @@ struct gpio_regs {
 #define PI_CR1 *(unsigned char*)0x502B
 #define PI_CR2 *(unsigned char*)0x502C
 #endif // STM8S105
-
-#define GPIO_PORTA              0x000
-#define GPIO_PORTB              0x100
-#define GPIO_PORTC              0x200
-#define GPIO_PORTD              0x300
-#define GPIO_PORTE              0x400
-#define GPIO_PORTF              0x500
-#define GPIO_PORTG              0x600
-#define GPIO_PORTH              0x700
-#define GPIO_PORTI              0x800
-
-/* GPIO bits */
-#define GPIO_PIN0		(1 << 0)
-#define GPIO_PIN1		(1 << 1)
-#define GPIO_PIN2		(1 << 2)
-#define GPIO_PIN3		(1 << 3)
-#define GPIO_PIN4		(1 << 4)
-#define GPIO_PIN5		(1 << 5)
-#define GPIO_PIN6		(1 << 6)
-#define GPIO_PIN7		(1 << 7)
-
-enum gpio_config {
-    GPIO_INPUT_FLOAT            =0x0,
-    GPIO_INPUT_PULLUP           =0x2,
-    GPIO_INPUT_FLOAT_IRQ        =0x1,
-    GPIO_INPUT_PULLUP_IRQ       =0x3,
-    GPIO_OUTPUT_OPEN_DRAIN      =0x0,
-    GPIO_OUTPUT_PUSHPULL        =0x6,
-    GPIO_OUTPUT_OPEN_DRAIN_FAST =0x5,
-    GPIO_OUTPUT_PUSHPULL_FAST   =0x7,
-};
 
 /* -------------------- FLASH/EEPROM -------------------- */
 #define FLASH_CR1	*(unsigned char*)0x505A

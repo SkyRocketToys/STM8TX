@@ -14,6 +14,7 @@
 #include <util.h>
 #include <spi.h>
 #include <gpio.h>
+#include <timer.h>
 
 #define DISABLE_CRC 1
 #define is_DSM2() is_dsm2
@@ -336,12 +337,12 @@ static struct {
     uint8_t last_sop_code[8];
     uint8_t last_data_code[16];
     
-    uint32_t receive_start_us;
-    uint32_t receive_timeout_usec;
+    uint32_t receive_start_ms;
+    uint32_t receive_timeout_ms;
     
-    uint32_t last_recv_us;
+    uint32_t last_recv_ms;
     uint32_t last_recv_chan;
-    uint32_t last_chan_change_us;
+    uint32_t last_chan_change_ms;
     uint16_t num_channels;
     uint16_t pwm_channels[MAX_CHANNELS];
     bool need_bind_save;
@@ -378,6 +379,9 @@ void cypress_init(void)
     // setup radio CE
     gpio_config(RADIO_CE, GPIO_OUTPUT_PUSHPULL);
     gpio_set(RADIO_CE);
+
+    // setup interrupt
+    gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
     
     cypress_reset();
 
@@ -694,7 +698,7 @@ static void process_packet(const uint8_t *pkt, uint8_t len)
         }
         if (ok) {
             dsm.last_recv_chan = dsm.current_channel;
-            dsm.last_recv_us = micros();
+            dsm.last_recv_ms = timer_get_ms();
             if (dsm.crc_errors > 2) {
                 dsm.crc_errors -= 2;
             }
@@ -714,6 +718,8 @@ static void process_packet(const uint8_t *pkt, uint8_t len)
 }
 
 
+static void irq_timeout(void);
+
 /*
   start packet receive
  */
@@ -724,14 +730,15 @@ static void start_receive(void)
     write_register(CYRF_RX_IRQ_STATUS, CYRF_RXOW_IRQ);
     write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN | CYRF_RXE_IRQEN);
 
-    dsm.receive_start_us = micros();
+    dsm.receive_start_ms = timer_get_ms();
     if (state == STATE_BIND) {
-        dsm.receive_timeout_usec = 15000;
+        dsm.receive_timeout_ms = 15;
     } else {
-        dsm.receive_timeout_usec = 23000;
+        dsm.receive_timeout_ms = 23;
     }
-    //dsm.receive_timeout_usec = 45000;
-    //hrt_call_after(&wait_call, dsm.receive_timeout_usec, (hrt_callout)irq_timeout_trampoline, nullptr);
+
+    dsm.receive_timeout_ms = 45;
+    timer_call_after_ms(dsm.receive_timeout_ms, irq_timeout);
 }
 
 /*
@@ -785,12 +792,14 @@ void irq_handler_recv(uint8_t rx_status)
 /*
   IRQ handler
  */
-static void irq_handler(void)
+void cypress_irq(void)
 {
     // always read both rx and tx status. This ensure IRQ is cleared
     uint8_t rx_status = read_status_debounced(CYRF_RX_IRQ_STATUS);
     read_status_debounced(CYRF_TX_IRQ_STATUS);
 
+    printf("rx_status=%u\n", rx_status);
+    
     switch (state) {
     case STATE_RECV:
     case STATE_BIND:
@@ -851,29 +860,29 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
  */
 static void dsm_choose_channel(void)
 {
-    uint32_t now = micros();
-    uint32_t dt = now - dsm.last_recv_us;
+    uint32_t now = timer_get_ms();
+    uint32_t dt = now - dsm.last_recv_ms;
     
-    const uint32_t cycle_time = 11000;
+    const uint32_t cycle_time = 11;
     uint8_t next_channel;
     uint8_t chan_count;
     uint16_t seed;
     
     if (state == STATE_BIND) {
-        if (now - dsm.last_chan_change_us > 15000) {
+        if (now - dsm.last_chan_change_ms > 15) {
             // always use odd channel numbers for bind
             dsm.current_rf_channel |= 1;
             dsm.current_rf_channel = (dsm.current_rf_channel+2) % DSM_MAX_CHANNEL;
-            dsm.last_chan_change_us = now;
+            dsm.last_chan_change_ms = now;
         }
         set_channel(dsm.current_rf_channel);
         return;
     }
 
     if (is_DSM2() && dsm.sync < DSM2_OK) {
-        if (now - dsm.last_chan_change_us > 15000) {
+        if (now - dsm.last_chan_change_ms > 15) {
             dsm.current_rf_channel = (dsm.current_rf_channel+1) % DSM_MAX_CHANNEL;
-            dsm.last_chan_change_us = now;
+            dsm.last_chan_change_ms = now;
         }
         //hal.console->printf("%u chan=%u\n", AP_HAL::micros(), dsm.current_rf_channel);
         dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
@@ -882,7 +891,7 @@ static void dsm_choose_channel(void)
         return;
     }
     
-    if (dt < 1000) {
+    if (dt <= 1) {
         // normal channel advance
         next_channel = dsm.last_recv_chan + 1;
     } else if (dt > 10*cycle_time) {
@@ -892,7 +901,7 @@ static void dsm_choose_channel(void)
         // predict next channel
         next_channel = dsm.last_recv_chan + 1;
         next_channel += (dt / cycle_time) * 2;
-        if (dt % cycle_time > 5000) {
+        if (dt % cycle_time > 5) {
             next_channel++;
         }
     }
@@ -914,7 +923,7 @@ static void dsm_choose_channel(void)
     }
 
     if (is_DSM2()) {
-        if (now - dsm.last_recv_us > 5000000) {
+        if (now - dsm.last_recv_ms > 5000) {
             printf("DSM2 resync\n");
             dsm.sync = DSM2_SYNC_A;
         }
@@ -927,7 +936,7 @@ static void dsm_choose_channel(void)
 /*
   setup radio for bind
  */
-static void start_recv_bind(void)
+void cypress_start_bind(void)
 {
     uint8_t data_code[16];
     printf("Cypress: start_recv_bind\n");

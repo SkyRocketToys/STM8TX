@@ -53,8 +53,3 @@ void delay_ms(uint16_t d)
     uint32_t counter=((uint32_t)d)*DELAY_MS_LOOP_SCALE;
     while (counter--) {}
 }
-
-uint32_t micros(void)
-{
-    return 0;
-}
