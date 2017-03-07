@@ -2,7 +2,8 @@ CC=sdcc
 CFLAGS=-lstm8 -mstm8 -Iinclude -DSTM8S105=1
 LD=sdld
 CHIP=stm8s105c6
-STLINK=stlink
+#STLINK=stlink
+STLINK=stlinkv2
 
 LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c
 
