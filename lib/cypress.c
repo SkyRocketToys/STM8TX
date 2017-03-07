@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "stm8l.h"
+#include <config.h>
 #include <util.h>
 #include <spi.h>
 #include <gpio.h>
@@ -322,7 +323,6 @@ static const struct reg_config cyrf_transfer_config[] = {
         {CYRF_RX_OVERRIDE, 0x00},                                                // Reset RX overrides
 };
 
-#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 #define MAX_CHANNELS 16
 
 static struct {
@@ -358,9 +358,9 @@ static void radio_init(void);
 static void cypress_reset(void)
 {
     // hold reset high for 500ms
-    gpio_set(PORTD, GPIO_PIN0);
+    gpio_set(RADIO_RST);
     delay_ms(500);
-    gpio_clear(PORTD, GPIO_PIN0);
+    gpio_clear(RADIO_RST);
     delay_ms(500);
 }
 
@@ -369,15 +369,15 @@ void cypress_init(void)
     printf("cypress_init\n");
 
     // setup RST pin on PD0
-    gpio_config(PORTD, GPIO_PIN0, GPIO_OUTPUT_PUSHPULL);
+    gpio_config(RADIO_RST, GPIO_OUTPUT_PUSHPULL);
 
     // setup TXEN
-    gpio_config(PORTC, GPIO_PIN2, GPIO_OUTPUT_PUSHPULL);
-    gpio_set(PORTC, GPIO_PIN2);
+    gpio_config(RADIO_TXEN, GPIO_OUTPUT_PUSHPULL);
+    gpio_set(RADIO_TXEN);
 
     // setup radio CE
-    gpio_config(PORTD, GPIO_PIN2, GPIO_OUTPUT_PUSHPULL);
-    gpio_set(PORTD, GPIO_PIN2);
+    gpio_config(RADIO_CE, GPIO_OUTPUT_PUSHPULL);
+    gpio_set(RADIO_CE);
     
     cypress_reset();
 

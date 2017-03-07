@@ -33,7 +33,7 @@ int main()
     
     do {
         uint8_t b = 42;
-        uint8_t x[3] = { 1, 2, 3 };
+        uint8_t x[1] = { 1 };
         
         led_green_toggle();
         led_yellow_toggle();

@@ -22,3 +22,4 @@ uint32_t millis(void);
     
 void printf(const char *fmt, ...);
 
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))

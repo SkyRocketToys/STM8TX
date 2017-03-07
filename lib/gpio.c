@@ -3,41 +3,49 @@
 
 static struct gpio_regs *gpio = (struct gpio_regs *)0x5000;
 
-void gpio_config(enum gpio_port port, uint8_t pins, enum gpio_config config)
+void gpio_config(uint16_t pins, enum gpio_config config)
 {
+    uint8_t port = (pins >> 8);
+    uint8_t pin = pins & 0xFF;
     struct gpio_regs *g = &gpio[(uint8_t)port];
     uint8_t c = (uint8_t)config;
     if (c & 1) {
-        g->CR2 |= pins;
+        g->CR2 |= pin;
     } else {
-        g->CR2 &= ~pins;
+        g->CR2 &= ~pin;
     }
     if (c & 2) {
-        g->CR1 |= pins;
+        g->CR1 |= pin;
     } else {
-        g->CR1 &= ~pins;
+        g->CR1 &= ~pin;
     }
     if (c & 4) {
-        g->DDR |= pins;
+        g->DDR |= pin;
     } else {
-        g->DDR &= ~pins;
+        g->DDR &= ~pin;
     }
 }
 
-void gpio_set(enum gpio_port port, uint8_t pins)
+void gpio_set(uint16_t pins)
 {
+    uint8_t port = (pins >> 8);
+    uint8_t pin = pins & 0xFF;
     struct gpio_regs *g = &gpio[(uint8_t)port];
-    g->ODR |= pins;
+    g->ODR |= pin;
 }
 
-void gpio_clear(enum gpio_port port, uint8_t pins)
+void gpio_clear(uint16_t pins)
 {
+    uint8_t port = (pins >> 8);
+    uint8_t pin = pins & 0xFF;
     struct gpio_regs *g = &gpio[(uint8_t)port];
-    g->ODR &= ~pins;
+    g->ODR &= ~pin;
 }
 
-void gpio_toggle(enum gpio_port port, uint8_t pins)
+void gpio_toggle(uint16_t pins)
 {
+    uint8_t port = (pins >> 8);
+    uint8_t pin = pins & 0xFF;
     struct gpio_regs *g = &gpio[(uint8_t)port];
-    g->ODR ^= pins;
+    g->ODR ^= pin;
 }

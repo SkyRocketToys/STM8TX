@@ -116,17 +116,15 @@ struct gpio_regs {
 #define PI_CR2 *(unsigned char*)0x502C
 #endif // STM8S105
 
-enum gpio_port {
-    PORTA=0,
-    PORTB=1,
-    PORTC=2,
-    PORTD=3,
-    PORTE=4,
-    PORTF=5,
-    PORTG=6,
-    PORTH=7,
-    PORTI=8
-};
+#define GPIO_PORTA              0x000
+#define GPIO_PORTB              0x100
+#define GPIO_PORTC              0x200
+#define GPIO_PORTD              0x300
+#define GPIO_PORTE              0x400
+#define GPIO_PORTF              0x500
+#define GPIO_PORTG              0x600
+#define GPIO_PORTH              0x700
+#define GPIO_PORTI              0x800
 
 /* GPIO bits */
 #define GPIO_PIN0		(1 << 0)

@@ -3,6 +3,7 @@
 #include "stm8l.h"
 #include <spi.h>
 #include <gpio.h>
+#include <config.h>
 
 static bool forced_chip_select = false;
 
@@ -11,31 +12,33 @@ void spi_init(void)
     // enable SPI clock
     CLK_SPCKENR1 |= 0x20;
 
-    // enable pullup on PC5, PC6, PC7 (SCK, MOSI, MISO)
-    PC_CR1 |= 0xE0;
+    gpio_config(SPI_SCK, GPIO_OUTPUT_PUSHPULL);
+    gpio_config(SPI_MOSI, GPIO_OUTPUT_PUSHPULL);
+    gpio_config(SPI_MISO, GPIO_INPUT_PULLUP);
 
-    // enable pullup on PC4, PC3 (RADIO_CS, RADIO_INT)
-    PC_CR1 |= 0x18;
+    gpio_config(RADIO_NCS, GPIO_OUTPUT_PUSHPULL);
+    gpio_config(RADIO_INT, GPIO_INPUT_PULLUP);
     
     // setup mode, clock, master
-    SPI_CR1 = SPI_CR1_MODE0;
+#if CLOCK_DIV == CLOCK_DIV_16MHZ
+    SPI_CR1 = (0x2<<3) | SPI_CR1_MODE0; // mode0, 2MHz
+#else
+    SPI_CR1 = (0x1<<3) | SPI_CR1_MODE0; // mode0, 1MHz
+#endif
     SPI_CR2 = 0x00;
     SPI_CR1 |= 0x04; // master
     
     SPI_CR1 |= 0x40; // enable spi peripheral
-
-    // setup radio CS on PC4, initial high
-    gpio_config(PORTC, GPIO_PIN4, GPIO_OUTPUT_PUSHPULL);
 }
 
 static void spi_radio_cs_high(void)
 {
-    gpio_set(PORTC, GPIO_PIN4);
+    gpio_set(SPI_NCS_PIN);
 }
 
 static void spi_radio_cs_low(void)
 {
-    gpio_clear(PORTC, GPIO_PIN4);
+    gpio_clear(SPI_NCS_PIN);
 }
 
 void spi_force_chip_select(bool set)

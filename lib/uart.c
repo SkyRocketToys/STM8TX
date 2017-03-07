@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "stm8l.h"
+#include "config.h"
 
 void uart2_init(void)
 {
@@ -11,8 +12,13 @@ void uart2_init(void)
     UART2_CR3 &= ~(UART_CR3_STOP1 | UART_CR3_STOP2); // 1 stop bit
 
     // set 57600 baudrate
+#if CLOCK_DIV == CLOCK_DIV_2MHZ
     UART2_BRR2 = 0x03;
     UART2_BRR1 = 0x02;
+#else // 16MHz fMASTER
+    UART2_BRR2 = 0x06;
+    UART2_BRR1 = 0x11;
+#endif
 }
 
 void uart2_putchar(char c)
