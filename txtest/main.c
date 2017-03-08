@@ -47,7 +47,8 @@ int main()
 
     enableInterrupts();
 
-    cypress_start_bind_send();
+    //cypress_start_bind_send();
+    cypress_start_send();
     
     do {
         printf("test: '%d' ADC=[%u %u %u %u] t=%lu\n", i, adc_value(0), adc_value(1), adc_value(2), adc_value(3),

@@ -15,6 +15,7 @@
 #include <spi.h>
 #include <gpio.h>
 #include <timer.h>
+#include <adc.h>
 
 #define DISABLE_CRC 1
 #define is_DSM2() is_dsm2
@@ -22,6 +23,7 @@
 static bool is_dsm2 = true;
 
 static enum {
+    STATE_NONE,
     STATE_RECV,
     STATE_BIND_RECV,
     STATE_BIND_SEND,
@@ -358,6 +360,7 @@ static struct {
     enum dsm2_sync sync;
     uint32_t crc_errors;
     uint32_t rssi_sum;
+    uint32_t bind_send_end_ms;
 } dsm;
 
 static void start_receive(void);
@@ -543,6 +546,37 @@ static void dsm_setup_transfer_dsmx(void)
     dsm.data_col = 7 - dsm.sop_col;
 
     dsm_generate_channels_dsmx(dsm.mfg_id, dsm.channels);
+    printf("Setup for DSMX send\n");
+}
+
+/*
+  setup for DSM2 transfers
+ */
+static void dsm_setup_transfer_dsm2(void)
+{
+    dsm.current_channel = 0;
+
+    dsm.crc_seed = ~((dsm.mfg_id[0] << 8) + dsm.mfg_id[1]);
+    dsm.sop_col = (dsm.mfg_id[0] + dsm.mfg_id[1] + dsm.mfg_id[2] + 2) & 0x07;
+    dsm.data_col = 7 - dsm.sop_col;
+
+    // needs listening on channels for noise
+    dsm.channels[0] = 15;
+    dsm.channels[1] = 65;
+
+    printf("Setup for DSM2 send\n");
+}
+
+/*
+  setup for DSM transfers
+ */
+static void dsm_setup_transfer(void)
+{
+    if (is_DSM2()) {
+        dsm_setup_transfer_dsm2();
+    } else {
+        dsm_setup_transfer_dsmx();
+    }
 }
 
 /*
@@ -573,21 +607,16 @@ static void radio_init(void)
     write_register(CYRF_RX_OVERRIDE, CYRF_DIS_RXCRC);
 #endif
     
-    dsm_setup_transfer_dsmx();
+    dsm_setup_transfer();
 
     write_register(CYRF_XTAL_CTRL,0x80);  // XOUT=BitSerial
     force_initial_state();
     write_register(CYRF_PWR_CTRL,0x20);   // Disable PMU
 
-    // start in RECV state
-    state = STATE_RECV;
+    // start in NONE state
+    state = STATE_NONE;
 
     printf("Cypress: radio_init done\n");
-
-    start_receive();
-
-    // setup handler for rising edge of IRQ pin
-    //stm32_gpiosetevent(CYRF_IRQ_INPUT, true, false, false, irq_radio_trampoline);
 }
 
 /*
@@ -652,7 +681,7 @@ static void process_bind(const uint8_t *pkt, uint8_t len)
         write_register(CYRF_RX_OVERRIDE, CYRF_DIS_RXCRC);
 #endif
 
-        dsm_setup_transfer_dsmx();
+        dsm_setup_transfer();
 
         printf("BIND OK: mfg_id={0x%x, 0x%x, 0x%x, 0x%x} N=%u P=0x%x DSM2=%u\n",
                mfg_id[0], mfg_id[1], mfg_id[2], mfg_id[3],
@@ -735,6 +764,7 @@ static void start_receive(void)
     timer_call_after_ms(dsm.receive_timeout_ms, irq_timeout);
 }
 
+
 /*
   handle a receive IRQ
  */
@@ -787,7 +817,9 @@ void irq_handler_recv(uint8_t rx_status)
  */
 void irq_handler_send(uint8_t rx_status)
 {
-    printf("irq_send 0x%x\n", rx_status);
+    if (state == STATE_SEND) {
+        printf("irq_send 0x%x\n", rx_status);
+    }
 }
 
 
@@ -809,6 +841,7 @@ void cypress_irq(void)
         break;
 
     case STATE_BIND_SEND:
+    case STATE_SEND:
         irq_handler_send(tx_status);
         break;
         
@@ -822,12 +855,14 @@ void cypress_irq(void)
  */
 static void irq_timeout(void)
 {
-    stats.timeouts++;
+    if (state == STATE_RECV || state == STATE_BIND_RECV) {
+        stats.timeouts++;
 
-    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
-    write_register(CYRF_RX_ABORT, 0);
-
-    start_receive();
+        write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
+        write_register(CYRF_RX_ABORT, 0);
+        
+        start_receive();
+    }
 }
 
 
@@ -890,7 +925,6 @@ static void dsm_choose_channel(void)
             dsm.current_rf_channel = (dsm.current_rf_channel+1) % DSM_MAX_CHANNEL;
             dsm.last_chan_change_ms = now;
         }
-        //hal.console->printf("%u chan=%u\n", AP_HAL::micros(), dsm.current_rf_channel);
         dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
                         dsm.sop_col, dsm.data_col,
                         dsm.sync==DSM2_SYNC_B?~dsm.crc_seed:dsm.crc_seed);
@@ -969,6 +1003,61 @@ void cypress_start_bind_recv(void)
 }
 
 
+static uint16_t pkt_count;
+
+/*
+  send a normal packet
+ */
+static void send_normal_packet(void)
+{
+    uint8_t pkt[16];
+    uint8_t i;
+    uint8_t chan_count = is_DSM2()?2:23;
+    uint16_t seed;
+    
+    memset(pkt, 0, 16);
+    
+    if (is_DSM2()) {
+        pkt[0] = ~dsm.mfg_id[2];
+        pkt[1] = ~dsm.mfg_id[3];
+    } else {
+        pkt[0] = dsm.mfg_id[2];
+        pkt[1] = dsm.mfg_id[3];
+    }
+
+    for (i=0; i<7; i++) {
+        int16_t v;
+        if (i < 4) {
+            v = adc_value(i);
+        } else {
+            v = 500;
+        }
+        v = (((v - 500) * 27 / 32) + 512) * 2;
+        v |= (((uint16_t)i)<<11);
+        pkt[2*(i+1)+1] = v & 0xFF;
+        pkt[2*(i+1)] = v >> 8;
+    }
+
+
+    dsm.current_channel = (dsm.current_channel + 1);
+    dsm.current_channel %= chan_count;
+
+    dsm.current_rf_channel = dsm.channels[dsm.current_channel];
+    
+    seed = dsm.crc_seed;
+    if (dsm.current_channel & 1) {
+        seed = ~seed;
+    }
+
+    dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
+                    dsm.sop_col, dsm.data_col, seed);
+    
+    cypress_transmit16(pkt);
+
+    timer_call_after_ms(11, send_normal_packet);    
+}
+
+
 /*
    Read the MFG id from the chip
  */
@@ -979,16 +1068,30 @@ static void get_mfg_id(uint8_t mfg_id[6])
     write_register(CYRF_MFG_ID, 0x00);
 }
 
+/*
+  start normal send pattern
+ */
+static void start_normal_send(void)
+{
+    state = STATE_SEND;
+    radio_set_config(cyrf_transfer_config, ARRAY_SIZE(cyrf_transfer_config));
+    dsm_setup_transfer();
+    timer_call_after_ms(10, send_normal_packet);
+}
+
+/*
+  send a bind packet
+ */
 static void send_bind_packet(void)
 {
     uint8_t pkt[16];
     uint16_t bind_sum = 384 - 0x10;
     uint8_t i;
     
-    pkt[0] = pkt[4] = dsm.mfg_id[0];
-    pkt[1] = pkt[5] = dsm.mfg_id[1];
-    pkt[2] = pkt[6] = dsm.mfg_id[2];
-    pkt[3] = pkt[7] = dsm.mfg_id[3];
+    pkt[0] = pkt[4] = ~dsm.mfg_id[0];
+    pkt[1] = pkt[5] = ~dsm.mfg_id[1];
+    pkt[2] = pkt[6] = ~dsm.mfg_id[2];
+    pkt[3] = pkt[7] = ~dsm.mfg_id[3];
 
     // Calculate the sum
     for (i = 0; i < 8; i++) {
@@ -1010,8 +1113,15 @@ static void send_bind_packet(void)
     pkt[15] = (bind_sum&0xFF);
 
     cypress_transmit16(pkt);
-    
-    timer_call_after_ms(10, send_bind_packet);    
+
+    if (timer_get_ms() > dsm.bind_send_end_ms) {
+        // finished bind send, go to transmit mode
+        printf("Switching to normal send\n");
+        start_normal_send();
+    } else {
+        // send bind every 10ms
+        timer_call_after_ms(10, send_bind_packet);
+    }
 }
 
 /*
@@ -1020,11 +1130,11 @@ static void send_bind_packet(void)
 void cypress_start_bind_send(void)
 {
     uint8_t data_code[16];
+    uint32_t rr;
+    
     printf("Cypress: start_bind_send\n");
 
     get_mfg_id(dsm.mfg_id);
-    printf("mfg_id={0x%x, 0x%x, 0x%x, 0x%x}\n",
-           dsm.mfg_id[0], dsm.mfg_id[1], dsm.mfg_id[2], dsm.mfg_id[3]);
     
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
@@ -1042,9 +1152,37 @@ void cypress_start_bind_send(void)
     memcpy(&data_code[8], pn_bind, 8);
     write_multiple(CYRF_DATA_CODE, 16, data_code);
 
-    dsm.current_rf_channel = 17; // should be random
+    rr = adc_value(0) + adc_value(1) + adc_value(2) + adc_value(3);
+    dsm.current_rf_channel = rr % DSM_MAX_CHANNEL;
 
+    dsm.bind_send_end_ms = timer_get_ms() + 5000;
+
+    printf("mfg_id={0x%x, 0x%x, 0x%x, 0x%x} chan=%u\n",
+           dsm.mfg_id[0], dsm.mfg_id[1], dsm.mfg_id[2], dsm.mfg_id[3],
+           dsm.current_rf_channel);
+    
+    set_channel(dsm.current_rf_channel);
+    
     send_bind_packet();
+}
+
+
+/*
+  setup radio for normal sending
+ */
+void cypress_start_send(void)
+{
+    printf("Cypress: start_send\n");
+
+    get_mfg_id(dsm.mfg_id);
+    
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
+    write_register(CYRF_RX_ABORT, 0);
+    
+    printf("send start: mfg_id={0x%x, 0x%x, 0x%x, 0x%x}\n",
+           dsm.mfg_id[0], dsm.mfg_id[1], dsm.mfg_id[2], dsm.mfg_id[3]);
+
+    start_normal_send();
 }
 
 /*
