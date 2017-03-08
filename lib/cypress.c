@@ -550,6 +550,34 @@ static void dsm_setup_transfer_dsmx(void)
 }
 
 /*
+  scan for best channels
+ */
+static void scan_channels(void)
+{
+    uint8_t i;
+    
+    write_register(CYRF_XACT_CFG, CYRF_MODE_RX | CYRF_FRC_END);
+    write_register(CYRF_RX_ABORT, 0);
+    delay_ms(1);
+
+    for (i=0; i<DSM_MAX_CHANNEL; i+=2) {
+        uint16_t samples = 2000;
+        uint8_t highest = 0;
+        
+        set_channel(i);
+        while (samples--) {
+            uint8_t r = read_register(CYRF_RSSI) & 0x1F;
+            if (r > highest) {
+                highest = r;
+            }
+        }
+        
+        printf("%u:%u ", i, highest);
+    }
+    printf("\n");
+}
+
+/*
   setup for DSM2 transfers
  */
 static void dsm_setup_transfer_dsm2(void)
@@ -560,9 +588,11 @@ static void dsm_setup_transfer_dsm2(void)
     dsm.sop_col = (dsm.mfg_id[0] + dsm.mfg_id[1] + dsm.mfg_id[2] + 2) & 0x07;
     dsm.data_col = 7 - dsm.sop_col;
 
+    scan_channels();
+    
     // needs listening on channels for noise
-    dsm.channels[0] = 15;
-    dsm.channels[1] = 65;
+    dsm.channels[0] = 26;
+    dsm.channels[1] = 76;
 
     printf("Setup for DSM2 send\n");
 }
@@ -920,7 +950,7 @@ static void dsm_choose_channel(void)
         return;
     }
 
-    if (is_DSM2() && dsm.sync < DSM2_OK) {
+    if (state == STATE_RECV && is_DSM2() && dsm.sync < DSM2_OK) {
         if (now - dsm.last_chan_change_ms > 15) {
             dsm.current_rf_channel = (dsm.current_rf_channel+1) % DSM_MAX_CHANNEL;
             dsm.last_chan_change_ms = now;
@@ -1003,8 +1033,6 @@ void cypress_start_bind_recv(void)
 }
 
 
-static uint16_t pkt_count;
-
 /*
   send a normal packet
  */
@@ -1040,7 +1068,12 @@ static void send_normal_packet(void)
 
 
     dsm.current_channel = (dsm.current_channel + 1);
-    dsm.current_channel %= chan_count;
+    if (dsm.current_channel >= chan_count) {
+        dsm.current_channel %= chan_count;
+        if (!is_DSM2()) {
+            dsm.crc_seed = ~dsm.crc_seed;
+        }
+    }
 
     dsm.current_rf_channel = dsm.channels[dsm.current_channel];
     
@@ -1054,7 +1087,11 @@ static void send_normal_packet(void)
     
     cypress_transmit16(pkt);
 
-    timer_call_after_ms(11, send_normal_packet);    
+    if (dsm.current_channel & 1) {
+        timer_call_after_ms(4, send_normal_packet);    
+    } else {
+        timer_call_after_ms(7, send_normal_packet);
+    }
 }
 
 
