@@ -23,7 +23,8 @@ static bool is_dsm2 = true;
 
 static enum {
     STATE_RECV,
-    STATE_BIND,
+    STATE_BIND_RECV,
+    STATE_BIND_SEND,
     STATE_SEND
 } state;
 
@@ -31,6 +32,14 @@ enum dsm2_sync {
     DSM2_SYNC_A,
     DSM2_SYNC_B,
     DSM2_OK
+};
+
+enum dsm_protocol {
+    DSM_NONE   = 0,      // not bound yet
+    DSM_DSM2_1 = 0x01,   // The original DSM2 protocol with 1 packet of data
+    DSM_DSM2_2 = 0x02,   // The original DSM2 protocol with 2 packets of data
+    DSM_DSMX_1 = 0xA2,   // The original DSMX protocol with 1 packet of data
+    DSM_DSMX_2 = 0xB2,   // The original DSMX protocol with 2 packets of data
 };
 
 static struct stats {
@@ -354,6 +363,7 @@ static struct {
 static void start_receive(void);
 static void dsm_choose_channel(void);
 static void radio_init(void);
+static void cypress_transmit16(const uint8_t data[16]);
 
 
 static void cypress_reset(void)
@@ -580,22 +590,6 @@ static void radio_init(void)
     //stm32_gpiosetevent(CYRF_IRQ_INPUT, true, false, false, irq_radio_trampoline);
 }
 
-static void dump_registers(uint8_t n)
-{
-    uint8_t i;
-    for (i=0; i<n; i++) {
-        uint8_t v = read_register(i);
-        printf("%02x:%02x ", i, v);
-        if ((i+1) % 16 == 0) {
-            printf("\n");
-        }
-    }
-    if (n % 16 != 0) {
-        printf("\n");
-    }
-}
-
-
 /*
   write multiple bytes
  */
@@ -660,7 +654,7 @@ static void process_bind(const uint8_t *pkt, uint8_t len)
 
         dsm_setup_transfer_dsmx();
 
-        printf("BIND OK: mfg_id={0x%02x, 0x%02x, 0x%02x, 0x%02x} N=%u P=0x%02x DSM2=%u\n",
+        printf("BIND OK: mfg_id={0x%x, 0x%x, 0x%x, 0x%x} N=%u P=0x%x DSM2=%u\n",
                mfg_id[0], mfg_id[1], mfg_id[2], mfg_id[3],
                num_chan,
                protocol,
@@ -731,7 +725,7 @@ static void start_receive(void)
     write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN | CYRF_RXE_IRQEN);
 
     dsm.receive_start_ms = timer_get_ms();
-    if (state == STATE_BIND) {
+    if (state == STATE_BIND_RECV) {
         dsm.receive_timeout_ms = 15;
     } else {
         dsm.receive_timeout_ms = 23;
@@ -788,6 +782,14 @@ void irq_handler_recv(uint8_t rx_status)
     start_receive();
 }
 
+/*
+  handle a receive IRQ
+ */
+void irq_handler_send(uint8_t rx_status)
+{
+    printf("irq_send 0x%x\n", rx_status);
+}
+
 
 /*
   IRQ handler
@@ -796,14 +798,18 @@ void cypress_irq(void)
 {
     // always read both rx and tx status. This ensure IRQ is cleared
     uint8_t rx_status = read_status_debounced(CYRF_RX_IRQ_STATUS);
-    read_status_debounced(CYRF_TX_IRQ_STATUS);
+    uint8_t tx_status = read_status_debounced(CYRF_TX_IRQ_STATUS);
 
     //printf("rx_status=%u\n", rx_status);
     
     switch (state) {
     case STATE_RECV:
-    case STATE_BIND:
+    case STATE_BIND_RECV:
         irq_handler_recv(rx_status);
+        break;
+
+    case STATE_BIND_SEND:
+        irq_handler_send(tx_status);
         break;
         
     default:
@@ -868,7 +874,7 @@ static void dsm_choose_channel(void)
     uint8_t chan_count;
     uint16_t seed;
     
-    if (state == STATE_BIND) {
+    if (state == STATE_BIND_RECV) {
         if (now - dsm.last_chan_change_ms > 15) {
             // always use odd channel numbers for bind
             dsm.current_rf_channel |= 1;
@@ -934,17 +940,17 @@ static void dsm_choose_channel(void)
 }
 
 /*
-  setup radio for bind
+  setup radio for bind on receive side
  */
-void cypress_start_bind(void)
+void cypress_start_bind_recv(void)
 {
     uint8_t data_code[16];
-    printf("Cypress: start_recv_bind\n");
+    printf("Cypress: start_bind_recv\n");
 
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
     
-    state = STATE_BIND;
+    state = STATE_BIND_RECV;
 
     radio_set_config(cyrf_bind_config, ARRAY_SIZE(cyrf_bind_config));
 
@@ -960,6 +966,85 @@ void cypress_start_bind(void)
     dsm.current_rf_channel = 1;
 
     start_receive();
+}
+
+
+/*
+   Read the MFG id from the chip
+ */
+static void get_mfg_id(uint8_t mfg_id[6])
+{
+    write_register(CYRF_MFG_ID, 0xFF);
+    spi_read_registers(CYRF_MFG_ID, mfg_id, 6);
+    write_register(CYRF_MFG_ID, 0x00);
+}
+
+static void send_bind_packet(void)
+{
+    uint8_t pkt[16];
+    uint16_t bind_sum = 384 - 0x10;
+    uint8_t i;
+    
+    pkt[0] = pkt[4] = dsm.mfg_id[0];
+    pkt[1] = pkt[5] = dsm.mfg_id[1];
+    pkt[2] = pkt[6] = dsm.mfg_id[2];
+    pkt[3] = pkt[7] = dsm.mfg_id[3];
+
+    // Calculate the sum
+    for (i = 0; i < 8; i++) {
+        bind_sum += pkt[i];
+    }
+    
+    pkt[8] = (bind_sum>>8);
+    pkt[9] = (bind_sum&0xFF);
+    pkt[10] = 0x01;
+    pkt[11] = 6; // num_channels
+    pkt[12] = DSM_DSMX_2;
+    pkt[13] = 0;
+
+    for (i = 8; i < 14; i++) {
+        bind_sum += pkt[i];
+    }
+    
+    pkt[14] = (bind_sum>>8);
+    pkt[15] = (bind_sum&0xFF);
+
+    cypress_transmit16(pkt);
+    
+    timer_call_after_ms(10, send_bind_packet);    
+}
+
+/*
+  setup radio for bind on send side
+ */
+void cypress_start_bind_send(void)
+{
+    uint8_t data_code[16];
+    printf("Cypress: start_bind_send\n");
+
+    get_mfg_id(dsm.mfg_id);
+    printf("mfg_id={0x%x, 0x%x, 0x%x, 0x%x}\n",
+           dsm.mfg_id[0], dsm.mfg_id[1], dsm.mfg_id[2], dsm.mfg_id[3]);
+    
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
+    write_register(CYRF_RX_ABORT, 0);
+    
+    state = STATE_BIND_SEND;
+
+    radio_set_config(cyrf_bind_config, ARRAY_SIZE(cyrf_bind_config));
+
+    write_register(CYRF_CRC_SEED_LSB, 0);
+    write_register(CYRF_CRC_SEED_MSB, 0);
+
+    write_multiple(CYRF_SOP_CODE, 8, pn_codes[0][0]);
+
+    memcpy(data_code, pn_codes[0][8], 8);
+    memcpy(&data_code[8], pn_bind, 8);
+    write_multiple(CYRF_DATA_CODE, 16, data_code);
+
+    dsm.current_rf_channel = 17; // should be random
+
+    send_bind_packet();
 }
 
 /*
@@ -979,3 +1064,15 @@ static void load_bind_info(void)
     printf("NI: load_bind_info\n");
 }
 
+/*
+  transmit a 16 byte packet
+  this is a blind send, not waiting for ack or completion
+*/
+static void cypress_transmit16(const uint8_t data[16])
+{
+    write_register(CYRF_TX_LENGTH, 16);
+    write_register(CYRF_TX_CTRL, CYRF_TX_CLR);
+
+    write_multiple(CYRF_TX_BUFFER, 16, data);
+    write_register(CYRF_TX_CTRL, CYRF_TX_GO);
+}
