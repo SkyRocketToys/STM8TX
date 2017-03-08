@@ -16,7 +16,7 @@ void chip_init(void)
 
 void led_init(void)
 {
-    gpio_config(LED_GREEN|LED_YELLOW, GPIO_OUTPUT_PUSHPULL);
+    gpio_config(LED_GREEN|LED_YELLOW, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
 }
 
 void led_green_set(bool set)
