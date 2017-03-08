@@ -1,5 +1,6 @@
 #include <timer.h>
 #include <stm8l.h>
+#include <util.h>
 
 static volatile uint32_t g_time_ms;
 static volatile uint32_t g_callback_t_ms;
