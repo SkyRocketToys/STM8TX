@@ -5,8 +5,12 @@
 #include <spi.h>
 #include <gpio.h>
 #include <config.h>
+#include <util.h>
+#include <uart.h>
 
 static bool forced_chip_select = false;
+
+static volatile uint8_t dummy;
 
 void spi_init(void)
 {
@@ -16,8 +20,9 @@ void spi_init(void)
     gpio_config(SPI_SCK, GPIO_OUTPUT_PUSHPULL);
     gpio_config(SPI_MOSI, GPIO_OUTPUT_PUSHPULL);
     gpio_config(SPI_MISO, GPIO_INPUT_PULLUP);
+    gpio_config(SPI_NSS_HW, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
 
-    gpio_config(RADIO_NCS, GPIO_OUTPUT_PUSHPULL);
+    gpio_config(RADIO_NCS, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
     gpio_config(RADIO_INT, GPIO_INPUT_PULLUP);
     
     // setup mode, clock, master
@@ -27,9 +32,15 @@ void spi_init(void)
     SPI_CR1 = (0x1<<3) | SPI_CR1_MODE0; // mode0, 1MHz
 #endif
     SPI_CR2 = 0x00;
+    SPI_SR = 0; // clear errors
     SPI_CR1 |= 0x04; // master
+    SPI_ICR = 0; // no interrupts please
     
     SPI_CR1 |= 0x40; // enable spi peripheral
+
+    // clear overruns
+    dummy = SPI_DR;
+    dummy = SPI_SR;
 }
 
 static void spi_radio_cs_high(void)
@@ -67,30 +78,29 @@ uint8_t spi_read1(void)
     return v;
 }
 
-static uint8_t dummy[32];
-
 void spi_transfer(uint8_t n, const uint8_t *sendbuf, uint8_t *recvbuf)
 {
     if (!forced_chip_select) {
         spi_radio_cs_low();
     }
 
-    if (sendbuf == NULL) {
-        sendbuf = dummy;
-        memset(dummy, 0, n);
-    }
-    if (recvbuf == NULL) {
-        recvbuf = dummy;
-    }
-    
     while (n--) {
         // wait for tx buffer to be empty
         while ((SPI_SR & 0x02) == 0) ;
-        SPI_DR = *sendbuf++;
+        if (sendbuf == NULL) {
+            SPI_DR = dummy;
+        } else {
+            SPI_DR = *sendbuf++;
+        }
 
         while ((SPI_SR & 0x01) == 0) ;
+
         // wait for incoming byte
-        *recvbuf++ = SPI_DR;
+        if (recvbuf == NULL) {
+            dummy = SPI_DR;
+        } else {
+            *recvbuf++ = SPI_DR;
+        }
     }
 
     if (!forced_chip_select) {
