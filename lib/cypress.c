@@ -798,7 +798,7 @@ void cypress_irq(void)
     uint8_t rx_status = read_status_debounced(CYRF_RX_IRQ_STATUS);
     read_status_debounced(CYRF_TX_IRQ_STATUS);
 
-    printf("rx_status=%u\n", rx_status);
+    //printf("rx_status=%u\n", rx_status);
     
     switch (state) {
     case STATE_RECV:
