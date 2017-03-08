@@ -1,5 +1,5 @@
 CC=sdcc
-CFLAGS=-lstm8 -mstm8 -Iinclude -DSTM8S105=1
+CFLAGS=-mstm8 -Iinclude -DSTM8S105=1 --opt-code-speed
 LD=sdld
 CHIP=stm8s105c6
 #STLINK=stlink
@@ -16,20 +16,29 @@ pintest: pintest.ihx
 .PHONY: all clean
 
 %.rel: %.c
-	$(CC) -c $(CFLAGS) $^ -o $*.rel
+	@echo Building $^
+	@$(CC) -c $(CFLAGS) $^ -o $*.rel
 
-%.ihx: %/main.rel $(LIBOBJ)
-	$(CC) $(CFLAGS) -o $*.ihx --out-fmt-ihx $^
+lib/%.rel: lib/%.c
+	@echo Building lib source $^
+	@$(CC) -c $(CFLAGS) $^ -o lib/$*.rel
+
+%.ihx: %/main.c $(LIBOBJ)
+	@echo Building binary $*
+	@$(CC) $(CFLAGS) -o $*.ihx --out-fmt-ihx $^
 
 all: txtest pintest
 
 clean:
-	rm -f $(OBJ) $(HEX) *.map *.asm *.lst *.rst *.sym *.lk *.cdb *.ihx *.rel */*.rel
+	@echo Cleaning
+	@rm -f $(OBJ) $(HEX) *.map *.asm *.lst *.rst *.sym *.lk *.cdb *.ihx *.rel */*.rel
 
 txtest.flash: txtest.ihx
-	stm8flash -c$(STLINK) -p$(CHIP) -w $^
+	@echo Flashing $^ to $(STLINK)
+	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
 
 pintest.flash: pintest.ihx
-	stm8flash -c$(STLINK) -p$(CHIP) -w $^
+	@echo Flashing $^ to $(STLINK)
+	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
 
 $(HEX) : $(OBJ)
