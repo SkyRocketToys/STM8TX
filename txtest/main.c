@@ -50,16 +50,9 @@ int main()
     cypress_start_bind();
     
     do {
-        uint8_t b = 42;
-        //uint8_t x[3] = { 1, 2, 3 };
-        
-        led_green_toggle();
-        led_yellow_toggle();
         printf("test: '%d' ADC=[%u %u %u %u] t=%lu\n", i, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
                timer_get_ms());
 
-        //spi_transfer(sizeof(x), x, x);
-        
         delay_ms(500);
         i++;
     } while(1);
