@@ -7,13 +7,15 @@ STLINK=stlinkv2
 
 LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c lib/timer.c
 
-LIBOBJ = $(LIBSRC:%.c=%.rel)
+RELOBJ = $(LIBSRC:%.c=%.rel)
 
 txtest: txtest.ihx
 
 pintest: pintest.ihx
 
 .PHONY: all clean
+
+.PRECIOUS: lib/%.rel
 
 %.rel: %.c
 	@echo Building $^
@@ -23,7 +25,7 @@ lib/%.rel: lib/%.c
 	@echo Building lib source $^
 	@$(CC) -c $(CFLAGS) $^ -o lib/$*.rel
 
-%.ihx: %/main.c $(LIBOBJ)
+%.ihx: %/main.c $(RELOBJ)
 	@echo Building binary $*
 	@$(CC) $(CFLAGS) -o $*.ihx --out-fmt-ihx $^
 
@@ -40,5 +42,3 @@ txtest.flash: txtest.ihx
 pintest.flash: pintest.ihx
 	@echo Flashing $^ to $(STLINK)
 	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
-
-$(HEX) : $(OBJ)
