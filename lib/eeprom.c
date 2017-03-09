@@ -1,0 +1,28 @@
+#include <stm8l.h>
+
+static void eeprom_unlock(void)
+{
+    uint8_t counter = 200;
+    while ((FLASH_IAPSR & 0x08) == 0 && counter--) {
+        FLASH_DUKR = EEPROM_KEY1;
+        FLASH_DUKR = EEPROM_KEY2;
+    }
+}
+
+static void eeprom_lock(void)
+{
+    // clear DUL
+    FLASH_IAPSR &= ~0x08;
+}
+
+void eeprom_write(uint16_t offset, uint8_t value)
+{
+    eeprom_unlock();
+    (EEPROM_START_ADDR)[offset] = value;
+    eeprom_lock();
+}
+
+uint8_t eeprom_read(uint16_t offset)
+{
+    return (EEPROM_START_ADDR)[offset];
+}
