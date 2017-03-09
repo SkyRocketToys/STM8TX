@@ -40,3 +40,11 @@
 #else
 # define DELAY_US_LOOP_SCALE 1
 #endif
+
+
+// buttons
+#define PIN_SW1  (GPIO_PORTE|GPIO_PIN5)
+#define PIN_SW2  (GPIO_PORTC|GPIO_PIN1)
+#define PIN_SW3  (GPIO_PORTA|GPIO_PIN2)
+#define PIN_SW4  (GPIO_PORTA|GPIO_PIN1)
+#define PIN_USER (GPIO_PORTB|GPIO_PIN5)

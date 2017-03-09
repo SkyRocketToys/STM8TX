@@ -10,8 +10,15 @@ void chip_init(void)
     CLK_CKDIVR = CLOCK_DIV;
     CLK_SPCKENR1 = 0xFF; // Enable all peripherals
 
-    gpio_config(PIN_POWER, GPIO_OUTPUT_PUSHPULL);
-    gpio_set(PIN_POWER);
+    // power button
+    gpio_config(PIN_POWER, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
+
+    // switches. 
+    gpio_config(PIN_SW1, GPIO_INPUT_PULLUP);
+    gpio_config(PIN_SW2, GPIO_INPUT_PULLUP);
+    gpio_config(PIN_SW3, GPIO_INPUT_PULLUP);
+    gpio_config(PIN_SW4, GPIO_INPUT_PULLUP);
+    gpio_config(PIN_USER, GPIO_INPUT_FLOAT);
 }
 
 void led_init(void)

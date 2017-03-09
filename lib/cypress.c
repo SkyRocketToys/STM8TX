@@ -1067,10 +1067,33 @@ static void send_normal_packet(void)
 
     for (i=0; i<7; i++) {
         int16_t v;
-        if (i < 4) {
+        switch (i) {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
             v = adc_value(i);
-        } else {
-            v = 500;
+            break;
+        case 4:
+            v = gpio_get(PIN_SW3)?1000:0;
+            break;
+        case 5:
+            v = gpio_get(PIN_SW4)?1000:0;
+            break;
+        case 6:
+            // encode 3 switches onto final channel
+            v = 0;
+            if (gpio_get(PIN_SW1)) {
+                v |= 1;
+            }
+            if (gpio_get(PIN_SW2)) {
+                v |= 2;
+            }
+            if (gpio_get(PIN_USER)) {
+                v |= 4;
+            }
+            v *= 100;
+            break;
         }
         v = (((v - 500) * 27 / 32) + 512) * 2;
         v |= (((uint16_t)i)<<11);
