@@ -36,12 +36,12 @@ void timer_irq(void)
     TIM4_SR = 0;
 }
 
-uint32_t timer_get_ms(void)
+uint32_t timer_get_ms(void) __critical
 {
     return g_time_ms;
 }
 
-void timer_call_after_ms(uint16_t dt_ms, timer_callback_t callback)
+void timer_call_after_ms(uint16_t dt_ms, timer_callback_t callback) __critical
 {
     g_callback = callback;
     g_callback_t_ms = g_time_ms + dt_ms;

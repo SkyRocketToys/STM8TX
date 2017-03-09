@@ -29,7 +29,7 @@ void adc_init(void)
     ADC_CR1 = 0x73; // turn on ADC (this needs second write operation)
 }
 
-uint16_t adc_value(uint8_t chan)
+uint16_t adc_value(uint8_t chan) __critical
 {
     return values[chan];
 }
