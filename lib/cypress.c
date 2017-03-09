@@ -1037,6 +1037,7 @@ void cypress_start_bind_recv(void)
 
 // order of channels in DSMX packet
 static const uint8_t chan_order[7] = { 1, 5, 2, 4, 6, 0, 3 };
+static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
 
 /*
   send a normal packet
@@ -1092,9 +1093,18 @@ static void send_normal_packet(void)
         case 0:
         case 1:
         case 2:
-        case 3:
-            v = adc_value(chan);
+        case 3: {
+            uint8_t stick = stick_map[chan];
+            v = adc_value(stick);
+            if (v > 1000) {
+                v = 1000;
+            }
+            if (stick != STICK_THROTTLE) {
+                // fix reversals
+                v = 1000 - v;
+            }
             break;
+        }
         case 4:
             v = gpio_get(PIN_SW3)?1000:0;
             break;
