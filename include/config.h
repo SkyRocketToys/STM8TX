@@ -33,3 +33,10 @@
 #else
 # define DELAY_MS_LOOP_SCALE 70
 #endif
+
+// loop scaling for delay_us()
+#if CLOCK_DIV == CLOCK_DIV_16MHZ
+# define DELAY_US_LOOP_SCALE 2
+#else
+# define DELAY_US_LOOP_SCALE 1
+#endif

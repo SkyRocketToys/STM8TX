@@ -53,3 +53,10 @@ void delay_ms(uint16_t d)
     uint32_t counter=((uint32_t)d)*DELAY_MS_LOOP_SCALE;
     while (counter--) {}
 }
+
+void delay_us(uint16_t d)
+{
+    // empirically tuned
+    uint16_t counter=((uint16_t)d)*DELAY_US_LOOP_SCALE;    
+    while (counter--) {}
+}
