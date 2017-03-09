@@ -20,7 +20,9 @@ void spi_init(void)
     gpio_config(SPI_SCK, GPIO_OUTPUT_PUSHPULL);
     gpio_config(SPI_MOSI, GPIO_OUTPUT_PUSHPULL);
     gpio_config(SPI_MISO, GPIO_INPUT_PULLUP);
-    gpio_config(SPI_NSS_HW, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
+
+    // we don't use the HW NSS, pin for SPI, it is a user switch instead
+    gpio_config(SPI_NSS_HW, GPIO_INPUT_PULLUP);
 
     gpio_config(RADIO_NCS, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
     gpio_config(RADIO_INT, GPIO_INPUT_PULLUP);
@@ -31,7 +33,10 @@ void spi_init(void)
 #else
     SPI_CR1 = (0x1<<3) | SPI_CR1_MODE0; // mode0, 1MHz
 #endif
-    SPI_CR2 = 0x00;
+
+    // setup for software CS
+    SPI_CR2 = 0x03;
+    
     SPI_SR = 0; // clear errors
     SPI_CR1 |= 0x04; // master
     SPI_ICR = 0; // no interrupts please
