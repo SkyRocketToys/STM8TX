@@ -641,8 +641,6 @@ static void radio_init(void)
     write_register(CYRF_RX_OVERRIDE, CYRF_DIS_RXCRC);
 #endif
     
-    dsm_setup_transfer();
-
     write_register(CYRF_XTAL_CTRL,0x80);  // XOUT=BitSerial
     force_initial_state();
     write_register(CYRF_PWR_CTRL,0x20);   // Disable PMU
@@ -1169,12 +1167,14 @@ static void send_bind_packet(void)
 /*
   setup radio for bind on send side
  */
-void cypress_start_bind_send(void)
+void cypress_start_bind_send(bool use_dsm2)
 {
     uint8_t data_code[16];
     uint32_t rr;
+
+    is_dsm2 = use_dsm2;
     
-    printf("Cypress: start_bind_send\n");
+    printf("Cypress: start_bind_send DSM2=%u\n", is_dsm2);
 
     get_mfg_id(dsm.mfg_id);
     
@@ -1212,9 +1212,11 @@ void cypress_start_bind_send(void)
 /*
   setup radio for normal sending
  */
-void cypress_start_send(void)
+void cypress_start_send(bool use_dsm2)
 {
-    printf("Cypress: start_send\n");
+    is_dsm2 = use_dsm2;
+
+    printf("Cypress: start_send DSM2=%u\n", is_dsm2);
 
     get_mfg_id(dsm.mfg_id);
     
