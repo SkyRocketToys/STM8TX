@@ -20,7 +20,7 @@
 #define DISABLE_CRC 1
 #define is_DSM2() is_dsm2
 
-static bool is_dsm2 = true;
+static bool is_dsm2 = false;
 
 static enum {
     STATE_NONE,
@@ -361,6 +361,7 @@ static struct {
     uint32_t crc_errors;
     uint32_t rssi_sum;
     uint32_t bind_send_end_ms;
+    bool invert_seed;
 } dsm;
 
 static void start_receive(void);
@@ -468,6 +469,9 @@ static void set_channel(uint8_t channel)
 {
     //printf("chan %u\n", channel);
     write_register(CYRF_CHANNEL, channel);
+
+    // wait worst case time for synthesiser to settle (listed as 270us in datasheet)
+    delay_us(280);
 }
 
 static void radio_set_config(const struct reg_config *conf, uint8_t size)
@@ -1042,6 +1046,16 @@ static void send_normal_packet(void)
     uint8_t i;
     uint8_t chan_count = is_DSM2()?2:23;
     uint16_t seed;
+
+    // we setup the new callback before we set the channel as setting
+    // the channel takes 300us for the synthesiser to settle (worst
+    // case)
+    if (dsm.invert_seed) {
+        // odd channels are sent every 4ms, even channels every 7ms, total frame time 11ms
+        timer_call_after_ms(4, send_normal_packet);    
+    } else {
+        timer_call_after_ms(7, send_normal_packet);
+    }
     
     memset(pkt, 0, 16);
     
@@ -1067,18 +1081,15 @@ static void send_normal_packet(void)
     }
 
 
+    dsm.invert_seed = !dsm.invert_seed;
+    
     dsm.current_channel = (dsm.current_channel + 1);
-    if (dsm.current_channel >= chan_count) {
-        dsm.current_channel %= chan_count;
-        if (!is_DSM2()) {
-            dsm.crc_seed = ~dsm.crc_seed;
-        }
-    }
+    dsm.current_channel %= chan_count;
 
     dsm.current_rf_channel = dsm.channels[dsm.current_channel];
     
     seed = dsm.crc_seed;
-    if (dsm.current_channel & 1) {
+    if (dsm.invert_seed) {
         seed = ~seed;
     }
 
@@ -1086,12 +1097,6 @@ static void send_normal_packet(void)
                     dsm.sop_col, dsm.data_col, seed);
     
     cypress_transmit16(pkt);
-
-    if (dsm.current_channel & 1) {
-        timer_call_after_ms(4, send_normal_packet);    
-    } else {
-        timer_call_after_ms(7, send_normal_packet);
-    }
 }
 
 
@@ -1250,4 +1255,6 @@ static void cypress_transmit16(const uint8_t data[16])
 
     write_multiple(CYRF_TX_BUFFER, 16, data);
     write_register(CYRF_TX_CTRL, CYRF_TX_GO);
+    led_yellow_toggle();
+    led_yellow_toggle();
 }
