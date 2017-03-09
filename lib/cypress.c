@@ -362,6 +362,7 @@ static struct {
     uint32_t rssi_sum;
     uint32_t bind_send_end_ms;
     bool invert_seed;
+    uint8_t zero_counter;
 } dsm;
 
 static void start_receive(void);
@@ -1034,6 +1035,8 @@ void cypress_start_bind_recv(void)
     start_receive();
 }
 
+// order of channels in DSMX packet
+static const uint8_t chan_order[7] = { 1, 5, 2, 4, 6, 0, 3 };
 
 /*
   send a normal packet
@@ -1044,13 +1047,27 @@ static void send_normal_packet(void)
     uint8_t i;
     uint8_t chan_count = is_DSM2()?2:23;
     uint16_t seed;
+    bool send_zero = false;
+
+    /*
+      when sending 7 channels with the DSMX_2 protocol we need to
+      occasionally send a zero bit in the leading channel high bit in
+      order to successfully connect with DSMX receivers
+     */
+    dsm.zero_counter++;
+    if (dsm.zero_counter < 23 && (dsm.current_channel % 4 == 2)) {
+        send_zero = true;
+    }
+    if (dsm.zero_counter > 70) {
+        dsm.zero_counter = 0;
+    }
 
     // we setup the new callback before we set the channel as setting
     // the channel takes 300us for the synthesiser to settle (worst
     // case)
     if (dsm.invert_seed) {
-        // odd channels are sent every 4ms, even channels every 7ms, total frame time 11ms
-        timer_call_after_ms(4, send_normal_packet);    
+        // odd channels are sent every 3ms, even channels every 7ms, total frame time 10ms
+        timer_call_after_ms(3, send_normal_packet);    
     } else {
         timer_call_after_ms(7, send_normal_packet);
     }
@@ -1067,12 +1084,16 @@ static void send_normal_packet(void)
 
     for (i=0; i<7; i++) {
         int16_t v;
-        switch (i) {
+        uint8_t chan = i;
+        if (!is_DSM2()) {
+            chan = chan_order[i];
+        }
+        switch (chan) {
         case 0:
         case 1:
         case 2:
         case 3:
-            v = adc_value(i);
+            v = adc_value(chan);
             break;
         case 4:
             v = gpio_get(PIN_SW3)?1000:0;
@@ -1096,12 +1117,14 @@ static void send_normal_packet(void)
             break;
         }
         v = (((v - 500) * 27 / 32) + 512) * 2;
-        v |= (((uint16_t)i)<<11);
+        v |= (((uint16_t)chan)<<11);
+        if (i == 0 && !send_zero) {
+            v |= 0x8000;
+        }
         pkt[2*(i+1)+1] = v & 0xFF;
         pkt[2*(i+1)] = v >> 8;
     }
-
-
+    
     dsm.invert_seed = !dsm.invert_seed;
     
     dsm.current_channel = (dsm.current_channel + 1);
@@ -1164,8 +1187,12 @@ static void send_bind_packet(void)
     pkt[8] = (bind_sum>>8);
     pkt[9] = (bind_sum&0xFF);
     pkt[10] = 0x01;
-    pkt[11] = 6; // num_channels
-    pkt[12] = DSM_DSMX_2;
+    pkt[11] = 7; // num_channels
+    if (is_DSM2()) {
+        pkt[12] = DSM_DSM2_2;
+    } else {
+        pkt[12] = DSM_DSMX_2;
+    }
     pkt[13] = 0;
 
     for (i = 8; i < 14; i++) {
@@ -1218,7 +1245,7 @@ void cypress_start_bind_send(bool use_dsm2)
     write_multiple(CYRF_DATA_CODE, 16, data_code);
 
     rr = adc_value(0) + adc_value(1) + adc_value(2) + adc_value(3);
-    dsm.current_rf_channel = rr % DSM_MAX_CHANNEL;
+    dsm.current_rf_channel = (rr % DSM_MAX_CHANNEL) | 1;
 
     dsm.bind_send_end_ms = timer_get_ms() + 5000;
 
