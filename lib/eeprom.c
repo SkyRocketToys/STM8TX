@@ -1,6 +1,6 @@
 #include <stm8l.h>
 
-static void eeprom_unlock(void)
+void eeprom_unlock(void)
 {
     uint8_t counter = 200;
     while ((FLASH_IAPSR & 0x08) == 0 && counter--) {
@@ -9,7 +9,7 @@ static void eeprom_unlock(void)
     }
 }
 
-static void eeprom_lock(void)
+void eeprom_lock(void)
 {
     // clear DUL
     FLASH_IAPSR &= ~0x08;

@@ -6,6 +6,7 @@
 #include "cypress.h"
 #include "timer.h"
 #include "eeprom.h"
+#include "buzzer.h"
 
 #define EEPROM_DSMPROT_OFFSET 0
 
@@ -59,13 +60,15 @@ int main()
 
     cypress_init();
 
+    buzzer_init();
+    
     EXTI_CR1 = (1<<6) | (1<<4) | (1<<2) | (1<<0); // rising edge interrupts
 
     enableInterrupts();
 
     // wait for initial stick inputs
     delay_ms(200);
-    
+
     if (bind_stick_check_dsm2()) {
         printf("DSM2 bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
@@ -78,6 +81,9 @@ int main()
         bool use_dsm2 = eeprom_read(EEPROM_DSMPROT_OFFSET);
         cypress_start_send(use_dsm2);
     }
+
+    buzzer_tune(TONE_STARTUP_TUNE);
+    buzzer_tune(8);
     
     do {
         printf("test: '%d' ADC=[%u %u %u %u] t=%lu\n", i, adc_value(0), adc_value(1), adc_value(2), adc_value(3),

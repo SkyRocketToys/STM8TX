@@ -1,11 +1,11 @@
 CC=sdcc
-CFLAGS=-mstm8 -Iinclude -DSTM8S105=1 --opt-code-speed
+CFLAGS=-mstm8 -Iinclude -DSTM8S105=1 --opt-code-size
 LD=sdld
 CHIP=stm8s105c6
 #STLINK=stlink
 STLINK=stlinkv2
 
-LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c lib/timer.c lib/eeprom.c
+LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c lib/timer.c lib/eeprom.c lib/buzzer.c
 
 RELOBJ = $(LIBSRC:%.c=%.rel)
 
