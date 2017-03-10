@@ -83,7 +83,6 @@ int main()
     }
 
     buzzer_tune(TONE_STARTUP_TUNE);
-    buzzer_tune(8);
     
     do {
         printf("test: '%d' ADC=[%u %u %u %u] t=%lu\n", i, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
