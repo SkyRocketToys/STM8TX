@@ -82,7 +82,8 @@ int main()
         cypress_start_send(use_dsm2);
     }
 
-    buzzer_tune(TONE_STARTUP_TUNE);
+    //buzzer_tune(TONE_STARTUP_TUNE);
+    buzzer_tune(TONE_STARWARS);
     
     do {
         printf("test: '%d' ADC=[%u %u %u %u] t=%lu\n", i, adc_value(0), adc_value(1), adc_value(2), adc_value(3),

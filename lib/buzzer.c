@@ -5,10 +5,11 @@
 #include <eeprom.h>
 #include <timer.h>
 #include <uart.h>
-#include <ctype.h>
 
 #define OPTION_BYTE2 *(volatile uint8_t *)0x4803
 #define OPTION_NBYTE2 *(volatile uint8_t *)0x4804
+
+#define isdigit(c) ((c)>='0' && (c)<='9')
 
 /*
   tune playing code based on ToneAlarm code from ArduPilot
@@ -21,7 +22,7 @@ static int8_t prev_tune_num;
 static bool tune_changed;
 static uint16_t cur_note;
 static uint32_t prev_time;
-static uint16_t duration;
+static uint32_t duration;
 static bool tune_comp;
 static uint16_t wholenote;
 static uint8_t default_oct;
@@ -40,16 +41,18 @@ static const char *tune[TONE_NUMBER_OF_TUNES] = {
     "batt_war_fast:d=4,o=6,b=512:8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a",
     "GPS_war:d=4,o=6,b=512:a,a,a,1f#",
     "Arm_fail:d=4,o=4,b=512:b,a,p",
-    "para_rel:d=16,o=6,b=512:a,g,a,g,a,g,a,g"
+    "para_rel:d=16,o=6,b=512:a,g,a,g,a,g,a,g",
+    "starwars:d=4,o=5,b=45:32p,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#.6,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#6"
 };
 
 //Tune Repeat true: play rtttl tune in loop, false: play only once
 static bool tune_repeat[TONE_NUMBER_OF_TUNES] = {false,true,false,false,false,false,true,true,false,false,false};
 
 // map 49 tones onto 30 available frequencies.
-static const uint8_t note_map[49] = { 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7,
-                                      7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 13, 14,
-                                      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 };
+static const uint8_t note_map[49] = { 30, 30, 29, 29, 28, 28, 27, 27, 26, 26, 25, 25, 24, 24,
+                                      23, 23, 22, 22, 21, 21, 20, 20, 19, 19, 18, 18, 17, 17,
+                                      16, 16, 15, 15, 14, 14, 13, 13, 12, 11, 10, 9,   8,  7,
+                                       6,  5,  4,  3,  2,  1,  0 };
 
 /*
   playe a note. The note number is from 0 to 48. We map this to a
@@ -63,7 +66,7 @@ static void play_note(uint8_t note)
         note = sizeof(note_map)-1;
     }
     prescale = note_map[note];
-    BEEP_CSR = (((uint8_t)BEEP_1KHZ)<<6) | prescale;
+    BEEP_CSR = (((uint8_t)BEEP_2KHZ)<<6) | prescale;
     BEEP_CSR |= 0x20;
 }
 
@@ -85,7 +88,7 @@ static bool play()
         tune_changed = true;
         return true;
     }
-    if (cur_note != 0){
+    if (cur_note != 0) {
         play_note(cur_note);
         cur_note =0;
         prev_time = cur_time;
@@ -112,7 +115,7 @@ static bool play()
 static bool set_note()
 {
     // first, get note duration, if available
-    uint16_t scale,note,num =0;
+    uint32_t scale,note,num =0;
     char c;
 
     if (tune_num < 0) {
@@ -270,8 +273,7 @@ static bool init_tune()
         tune_pos++;                   // skip colon
     }
 
-    // BPM usually expresses the number of quarter notes per minute
-    wholenote = (60 * 1000LL / bpm) * 4;  // this is the time for whole note (in milliseconds)
+    wholenote = (60 * ((uint32_t)1000) / bpm) * 4; 
     return true;
 }
 
@@ -316,6 +318,6 @@ void buzzer_tune(uint8_t t)
     tune_comp = 0;
     while (!tune_comp) {
         tune_tick();
-        delay_ms(8);
+        delay_ms(6);
     }
 }
