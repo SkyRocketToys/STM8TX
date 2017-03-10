@@ -10,6 +10,10 @@
 #define OPTION_BYTE2 *(volatile uint8_t *)0x4803
 #define OPTION_NBYTE2 *(volatile uint8_t *)0x4804
 
+/*
+  tune playing code based on ToneAlarm code from ArduPilot
+ */
+
 static uint8_t state;
 static int8_t tune_num;
 static uint8_t tune_pos;
