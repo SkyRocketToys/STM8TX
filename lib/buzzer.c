@@ -318,6 +318,6 @@ void buzzer_tune(uint8_t t)
     tune_comp = 0;
     while (!tune_comp) {
         tune_tick();
-        delay_ms(6);
+        delay_ms(1);
     }
 }
