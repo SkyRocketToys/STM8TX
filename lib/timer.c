@@ -46,3 +46,11 @@ void timer_call_after_ms(uint16_t dt_ms, timer_callback_t callback)
     g_callback = callback;
     g_callback_t_ms = g_time_ms + dt_ms;
 }
+
+void timer_delay_ms(uint16_t ms)
+{
+    uint32_t end = timer_get_ms() + ms;
+    while (timer_get_ms() < end) {
+        // nop
+    }
+}
