@@ -16,6 +16,7 @@
 #include <gpio.h>
 #include <timer.h>
 #include <adc.h>
+#include <crc.h>
 
 #define DISABLE_CRC 0
 #define is_DSM2() is_dsm2
@@ -50,6 +51,26 @@ static struct stats {
     uint32_t lost_packets;
     uint32_t timeouts;
 } stats;
+
+enum telem_type {
+    TELEM_STATUS=0, // a telem_status packet
+};
+
+struct telem_status {
+    uint8_t pps; // packets per second received
+    uint8_t rssi; // lowpass rssi
+};
+    
+struct telem_packet {
+    uint8_t crc; // simple CRC
+    enum telem_type type;
+    union {
+        uint8_t pkt[14];
+        struct telem_status status;
+    } payload;
+};
+
+static struct telem_status t_status;
 
 /* The SPI interface defines */
 enum {
@@ -666,15 +687,6 @@ void write_multiple(uint8_t reg, uint8_t n, const uint8_t *data)
     spi_force_chip_select(false);
 }
 
-void cypress_debug(void)
-{
-    static uint32_t last_tr, last_tx;
-    
-    printf(" TR:%lu TX:%lu\n", dsm.telem_recv_count - last_tr, dsm.send_count - last_tx);
-    last_tr = dsm.telem_recv_count;
-    last_tx = dsm.send_count;
-}
-
 /*
   start telemetry receive
  */
@@ -687,13 +699,23 @@ static void start_telem_receive(void)
     write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN);
 }
 
+static void process_telem_packet(const struct telem_packet *pkt)
+{
+    switch (pkt->type) {
+    case TELEM_STATUS:
+        memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
+        break;
+    }
+}
+
 /*
   handle a receive IRQ
  */
 static void irq_handler_recv(uint8_t rx_status)
 {
-    uint8_t pkt[16];
+    struct telem_packet pkt;
     uint8_t rlen;
+    uint8_t crc;
     
     if ((rx_status & (CYRF_RXC_IRQ | CYRF_RXE_IRQ)) == 0) {
         // nothing interesting yet
@@ -705,12 +727,13 @@ static void irq_handler_recv(uint8_t rx_status)
         rlen = 16;
     }
     if (rlen > 0) {
-        spi_read_registers(CYRF_RX_BUFFER, pkt, rlen);
+        spi_read_registers(CYRF_RX_BUFFER, (uint8_t *)&pkt, rlen);
     }
 
-    if (pkt[0] == 1 && pkt[1] == 2) {
-        //printf("%u %u\n", pkt[4], pkt[5]);
+    crc = crc_crc8((uint8_t*)&pkt.type, 15);
+    if (crc == pkt.crc) {
         dsm.telem_recv_count++;
+        process_telem_packet(&pkt);
     }
 }
 
@@ -1068,4 +1091,32 @@ static void cypress_transmit16(const uint8_t data[16])
     write_register(CYRF_TX_IRQ_STATUS, 0);
     write_register(CYRF_TX_CTRL, CYRF_TX_GO | CYRF_TXC_IRQEN);
     dsm.send_count++;
+}
+
+// get receiver packets per second
+uint8_t get_rx_pps(void)
+{
+    return t_status.pps;
+}
+
+// get receiver RSSI
+uint8_t get_rx_rssi(void)
+{
+    return t_status.rssi;
+}
+
+uint8_t get_telem_recv_count(void)
+{
+    static uint16_t last_tr;
+    uint8_t ret = dsm.telem_recv_count - last_tr;
+    last_tr = dsm.telem_recv_count;
+    return ret;
+}
+
+uint8_t get_pps(void)
+{
+    static uint16_t last_tx;
+    uint8_t ret = dsm.send_count - last_tx;
+    last_tx = dsm.send_count;
+    return ret;
 }

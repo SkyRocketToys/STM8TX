@@ -89,8 +89,18 @@ int main()
     next_ms = timer_get_ms() + 1000;
     
     while (true) {
-        printf("%u: ADC=[%u %u %u %u] ", counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3));
-        cypress_debug();
+        uint8_t trx_count = get_telem_recv_count();
+        printf("%u: ADC=[%u %u %u %u]",
+               counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3));
+        if (trx_count == 0) {
+            printf(" TX:%u NOSIGNAL\n", get_pps());
+        } else {
+            printf(" TX:%u TR:%u RRSSI:%u RPPS:%u\n",
+                   get_pps(),
+                   trx_count,
+                   get_rx_rssi(),
+                   get_rx_pps());
+        }
 
         while (timer_get_ms() < next_ms) {}
         next_ms += 1000;
