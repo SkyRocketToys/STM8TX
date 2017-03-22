@@ -681,14 +681,10 @@ void cypress_debug(void)
 static void start_telem_receive(void)
 {
     timer_call_after_ms(5, send_normal_packet);
-    led_yellow_toggle();
-    led_yellow_toggle();
     state = STATE_RECV_TELEM;
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
-    write_register(CYRF_RX_ABORT, 0);
-    write_register(CYRF_TX_IRQ_STATUS, 0);
     write_register(CYRF_RX_IRQ_STATUS, CYRF_RXOW_IRQ);
-    write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN | CYRF_RXE_IRQEN);
+    write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN);
 }
 
 /*
@@ -766,19 +762,7 @@ void cypress_irq(void)
  */
 static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint8_t data_col, uint16_t crc_seed)
 {
-    //printf("dsm_set_channel: %u\n", channel);
-    
-    uint8_t pn_row;
-
-#if 0
-    channel = 2;
-    is_dsm2 = false;
-    sop_col = 1;
-    data_col = 1;
-    crc_seed = 1;
-#endif
-    
-    pn_row = is_dsm2? channel % 5 : (channel-2) % 5;
+    uint8_t pn_row = is_dsm2? channel % 5 : (channel-2) % 5;
 
     // set CRC seed
     write_register(CYRF_CRC_SEED_LSB, crc_seed & 0xff);
