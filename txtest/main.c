@@ -46,7 +46,8 @@ static bool bind_stick_check_dsmx(void)
 
 int main()
 {
-    int i=0;
+    uint16_t counter=0;
+    uint32_t next_ms;
     
     chip_init();
     led_init();
@@ -84,13 +85,14 @@ int main()
 
     //buzzer_tune(TONE_STARTUP_TUNE);
     //buzzer_tune(TONE_STARWARS);
+
+    next_ms = timer_get_ms() + 1000;
     
-    do {
-        printf("test: '%d' ADC=[%u %u %u %u] t=%lu", i, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
-               timer_get_ms());
+    while (true) {
+        printf("%u: ADC=[%u %u %u %u] ", counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3));
         cypress_debug();
 
-        delay_ms(500);
-        i++;
-    } while(1);
+        while (timer_get_ms() < next_ms) {}
+        next_ms += 1000;
+    }
 }
