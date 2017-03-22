@@ -27,6 +27,7 @@ static enum {
     STATE_NONE,
     STATE_BIND_SEND,
     STATE_SEND,
+    STATE_RECV_WAIT,
     STATE_RECV_TELEM
 } state;
 
@@ -387,6 +388,7 @@ static struct {
     uint32_t send_count;
     uint16_t rssi_sum;
     uint16_t rssi_count;
+    uint32_t telem_listen_count;
 } dsm;
 
 static void radio_init(void);
@@ -693,11 +695,11 @@ void write_multiple(uint8_t reg, uint8_t n, const uint8_t *data)
  */
 static void start_telem_receive(void)
 {
-    timer_call_after_ms(5, send_normal_packet);
-    state = STATE_RECV_TELEM;
+    dsm.telem_listen_count++;
+    write_register(CYRF_RX_ABORT, 0);
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
     write_register(CYRF_RX_IRQ_STATUS, CYRF_RXOW_IRQ);
-    write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN);
+    write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN | CYRF_RXE_IRQEN);
 }
 
 static void process_telem_packet(const struct telem_packet *pkt)
@@ -746,11 +748,8 @@ static void irq_handler_recv(uint8_t rx_status)
 static void irq_handler_send(uint8_t tx_status)
 {
     if (tx_status & CYRF_TXC_IRQ) {
-        return;
-    }
-    if (state == STATE_SEND) {
-        if (dsm.receive_telem) {
-            // setup to receive telemetry
+        if (state == STATE_RECV_WAIT) {
+            state = STATE_RECV_TELEM;
             start_telem_receive();
         }
     }
@@ -771,6 +770,7 @@ void cypress_irq(void)
     switch (state) {
     case STATE_BIND_SEND:
     case STATE_SEND:
+    case STATE_RECV_WAIT:
         irq_handler_send(tx_status);
         break;
 
@@ -814,15 +814,6 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
 static const uint8_t chan_order[7] = { 1, 5, 2, 4, 6, 0, 3 };
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
 
-static void setup_for_transmit(void)
-{
-    dsm.receive_telem = false;
-    state = STATE_SEND;
-    timer_call_after_ms(4, send_normal_packet);
-    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
-    write_register(CYRF_RX_ABORT, 0);
-}
-
 /*
   send a normal packet
  */
@@ -834,7 +825,9 @@ static void send_normal_packet(void)
     uint16_t seed;
     bool send_zero = false;
 
-    state = STATE_SEND;
+    if (state != STATE_SEND) {
+        state = STATE_SEND;
+    }
     
     /*
       when sending 7 channels with the DSMX_2 protocol we need to
@@ -854,11 +847,11 @@ static void send_normal_packet(void)
     // case)
     if (dsm.invert_seed) {
         // odd channels are sent every 3ms, even channels every 7ms, total frame time 10ms
-        timer_call_after_ms(3, send_normal_packet);    
+        timer_call_after_ms(2, send_normal_packet);    
         dsm.receive_telem = false;
     } else {
-        timer_call_after_ms(2, start_telem_receive);
-        //timer_call_after_ms(7, send_normal_packet);
+        state = STATE_RECV_WAIT;
+        timer_call_after_ms(6, send_normal_packet);
         dsm.receive_telem = true;
     }
 
@@ -963,6 +956,9 @@ static void start_normal_send(void)
 {
     state = STATE_SEND;
     radio_set_config(cyrf_transfer_config, ARRAY_SIZE(cyrf_transfer_config));
+#if DISABLE_CRC
+    write_register(CYRF_RX_OVERRIDE, CYRF_DIS_RXCRC);
+#endif
     dsm_setup_transfer();
     timer_call_after_ms(10, send_normal_packet);
 }
