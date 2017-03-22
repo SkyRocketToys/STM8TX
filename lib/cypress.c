@@ -379,13 +379,14 @@ static struct {
     bool need_bind_save;
     enum dsm2_sync sync;
     uint32_t crc_errors;
-    uint32_t rssi_sum;
     uint32_t bind_send_end_ms;
     bool invert_seed;
     uint8_t zero_counter;
     bool receive_telem;
     uint32_t telem_recv_count;
     uint32_t send_count;
+    uint16_t rssi_sum;
+    uint16_t rssi_count;
 } dsm;
 
 static void radio_init(void);
@@ -732,6 +733,8 @@ static void irq_handler_recv(uint8_t rx_status)
 
     crc = crc_crc8((uint8_t*)&pkt.type, 15);
     if (crc == pkt.crc) {
+        dsm.rssi_sum += read_register(CYRF_RSSI) & 0x1F;
+        dsm.rssi_count++;
         dsm.telem_recv_count++;
         process_telem_packet(&pkt);
     }
@@ -1118,5 +1121,13 @@ uint8_t get_pps(void)
     static uint16_t last_tx;
     uint8_t ret = dsm.send_count - last_tx;
     last_tx = dsm.send_count;
+    return ret;
+}
+
+uint8_t get_rssi(void)
+{
+    uint8_t ret = dsm.rssi_sum / dsm.rssi_count;
+    dsm.rssi_sum = 0;
+    dsm.rssi_count = 0;
     return ret;
 }

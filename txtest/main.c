@@ -95,9 +95,10 @@ int main()
         if (trx_count == 0) {
             printf(" TX:%u NOSIGNAL\n", get_pps());
         } else {
-            printf(" TX:%u TR:%u RRSSI:%u RPPS:%u\n",
+            printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u\n",
                    get_pps(),
                    trx_count,
+                   get_rssi(),
                    get_rx_rssi(),
                    get_rx_pps());
         }
