@@ -29,7 +29,7 @@ void spi_init(void)
     
     // setup mode, clock, master
 #if CLOCK_DIV == CLOCK_DIV_16MHZ
-    SPI_CR1 = (0x2<<3) | SPI_CR1_MODE0; // mode0, 2MHz
+    SPI_CR1 = (0x1<<3) | SPI_CR1_MODE0; // mode0, 4MHz
 #else
     SPI_CR1 = (0x1<<3) | SPI_CR1_MODE0; // mode0, 1MHz
 #endif
