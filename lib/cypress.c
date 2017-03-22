@@ -17,7 +17,7 @@
 #include <timer.h>
 #include <adc.h>
 
-#define DISABLE_CRC 1
+#define DISABLE_CRC 0
 #define is_DSM2() is_dsm2
 
 static bool is_dsm2 = false;
@@ -331,7 +331,7 @@ static const struct reg_config cyrf_transfer_config[] = {
         {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | CYRF_PA_4},   // Enable 64 chip codes, 8DR mode and amplifier +4dBm
         {CYRF_FRAMING_CFG, CYRF_SOP_EN | CYRF_SOP_LEN | CYRF_LEN_EN | 0xE},      // Set SOP CODE enable, SOP CODE to 64 chips, Packet length enable, and SOP Correlator Threshold to 0xE
         {CYRF_TX_OVERRIDE, 0x00},                                                // Reset TX overrides
-        {CYRF_RX_OVERRIDE, CYRF_DIS_RXCRC},                                      // Reset RX overrides
+        {CYRF_RX_OVERRIDE, 0x00},                                      // Reset RX overrides
 };
 
 #define MAX_CHANNELS 16
@@ -363,6 +363,8 @@ static struct {
     bool invert_seed;
     uint8_t zero_counter;
     bool receive_telem;
+    uint32_t telem_recv_count;
+    uint32_t send_count;
 } dsm;
 
 static void radio_init(void);
@@ -664,11 +666,13 @@ void write_multiple(uint8_t reg, uint8_t n, const uint8_t *data)
     spi_force_chip_select(false);
 }
 
-static uint32_t telem_recv_count;
-
 void cypress_debug(void)
 {
-    printf(" TR:%lu\n", telem_recv_count);
+    static uint32_t last_tr, last_tx;
+    
+    printf(" TR:%lu TX:%lu\n", dsm.telem_recv_count - last_tr, dsm.send_count - last_tx);
+    last_tr = dsm.telem_recv_count;
+    last_tx = dsm.send_count;
 }
 
 /*
@@ -680,7 +684,6 @@ static void start_telem_receive(void)
     led_yellow_toggle();
     led_yellow_toggle();
     state = STATE_RECV_TELEM;
-    dsm_set_channel(1, false, 1, 1, 1);
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
     write_register(CYRF_TX_IRQ_STATUS, 0);
@@ -710,7 +713,8 @@ static void irq_handler_recv(uint8_t rx_status)
     }
 
     if (pkt[0] == 1 && pkt[1] == 2) {
-        telem_recv_count++;
+        //printf("%u %u\n", pkt[4], pkt[5]);
+        dsm.telem_recv_count++;
     }
 }
 
@@ -766,11 +770,13 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
     
     uint8_t pn_row;
 
+#if 0
     channel = 2;
     is_dsm2 = false;
     sop_col = 1;
     data_col = 1;
     crc_seed = 1;
+#endif
     
     pn_row = is_dsm2? channel % 5 : (channel-2) % 5;
 
@@ -1077,4 +1083,5 @@ static void cypress_transmit16(const uint8_t data[16])
     write_multiple(CYRF_TX_BUFFER, 16, data);
     write_register(CYRF_TX_IRQ_STATUS, 0);
     write_register(CYRF_TX_CTRL, CYRF_TX_GO | CYRF_TXC_IRQEN);
+    dsm.send_count++;
 }
