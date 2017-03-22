@@ -29,7 +29,7 @@
     
 // loop scaling for delay_ms()
 #if CLOCK_DIV == CLOCK_DIV_16MHZ
-# define DELAY_MS_LOOP_SCALE 727
+# define DELAY_MS_LOOP_SCALE 430
 #else
 # define DELAY_MS_LOOP_SCALE 70
 #endif
