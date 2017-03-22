@@ -24,10 +24,9 @@ static bool is_dsm2 = false;
 
 static enum {
     STATE_NONE,
-    STATE_RECV,
-    STATE_BIND_RECV,
     STATE_BIND_SEND,
-    STATE_SEND
+    STATE_SEND,
+    STATE_RECV_TELEM
 } state;
 
 enum dsm2_sync {
@@ -332,7 +331,7 @@ static const struct reg_config cyrf_transfer_config[] = {
         {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | CYRF_PA_4},   // Enable 64 chip codes, 8DR mode and amplifier +4dBm
         {CYRF_FRAMING_CFG, CYRF_SOP_EN | CYRF_SOP_LEN | CYRF_LEN_EN | 0xE},      // Set SOP CODE enable, SOP CODE to 64 chips, Packet length enable, and SOP Correlator Threshold to 0xE
         {CYRF_TX_OVERRIDE, 0x00},                                                // Reset TX overrides
-        {CYRF_RX_OVERRIDE, 0x00},                                                // Reset RX overrides
+        {CYRF_RX_OVERRIDE, CYRF_DIS_RXCRC},                                      // Reset RX overrides
 };
 
 #define MAX_CHANNELS 16
@@ -363,12 +362,13 @@ static struct {
     uint32_t bind_send_end_ms;
     bool invert_seed;
     uint8_t zero_counter;
+    bool receive_telem;
 } dsm;
 
-static void start_receive(void);
-static void dsm_choose_channel(void);
 static void radio_init(void);
 static void cypress_transmit16(const uint8_t data[16]);
+static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint8_t data_col, uint16_t crc_seed);
+static void send_normal_packet(void);
 
 
 static void cypress_reset(void)
@@ -396,7 +396,7 @@ void cypress_init(void)
     gpio_set(RADIO_CE);
 
     // setup interrupt
-    gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
+    gpio_config(RADIO_INT, GPIO_INPUT_FLOAT_IRQ);
     
     cypress_reset();
 
@@ -664,144 +664,34 @@ void write_multiple(uint8_t reg, uint8_t n, const uint8_t *data)
     spi_force_chip_select(false);
 }
 
-/*
-  process an incoming bind packet
- */
-static void process_bind(const uint8_t *pkt, uint8_t len)
+static uint32_t telem_recv_count;
+
+void cypress_debug(void)
 {
-    bool ok;
-    uint16_t bind_sum;
-    uint8_t i;
-    
-    if (len != 16) {
-        return;
-    }
-    ok = (len==16 && pkt[0] == pkt[4] && pkt[1] == pkt[5] && pkt[2] == pkt[6] && pkt[3] == pkt[7]);
-
-    // Calculate the first sum
-    bind_sum = 384 - 0x10;
-    for (i = 0; i < 8; i++) {
-        bind_sum += pkt[i];
-    }
-
-    // Check the first sum
-    if (pkt[8] != bind_sum >> 8 || pkt[9] != (bind_sum & 0xFF)) {
-        ok = false;
-    }
-
-    // Calculate second sum
-    for (i = 8; i < 14; i++) {
-        bind_sum += pkt[i];
-    }
-
-    // Check the second sum
-    if (pkt[14] != bind_sum >> 8 || pkt[15] != (bind_sum & 0xFF)) {
-        ok = false;
-    }
-
-    if (ok) {
-        uint8_t mfg_id[4] = {(uint8_t)(~pkt[0]), (uint8_t)(~pkt[1]), (uint8_t)(~pkt[2]), (uint8_t)(~pkt[3])};
-        uint8_t num_chan = pkt[11];
-        uint8_t protocol = pkt[12];
-        
-        // change to normal receive
-        memcpy(dsm.mfg_id, mfg_id, 4);
-        state = STATE_RECV;
-
-        radio_set_config(cyrf_transfer_config, ARRAY_SIZE(cyrf_transfer_config));
-
-#if DISABLE_CRC
-        write_register(CYRF_RX_OVERRIDE, CYRF_DIS_RXCRC);
-#endif
-
-        dsm_setup_transfer();
-
-        printf("BIND OK: mfg_id={0x%x, 0x%x, 0x%x, 0x%x} N=%u P=0x%x DSM2=%u\n",
-               mfg_id[0], mfg_id[1], mfg_id[2], mfg_id[3],
-               num_chan,
-               protocol,
-               is_DSM2());
-        
-        dsm.need_bind_save = true;
-    }
+    printf(" TR:%lu\n", telem_recv_count);
 }
 
 /*
-  process an incoming packet
+  start telemetry receive
  */
-static void process_packet(const uint8_t *pkt, uint8_t len)
+static void start_telem_receive(void)
 {
-    if (len == 16) {
-        bool ok;
-        const uint8_t *id = dsm.mfg_id;
-        if (is_DSM2()) {
-            ok = (pkt[0] == ((~id[2])&0xFF) && pkt[1] == (~id[3]&0xFF));
-        } else {
-            ok = (pkt[0] == id[2] && pkt[1] == id[3]);
-        }
-        if (ok && is_DSM2() && dsm.sync < DSM2_OK) {
-            if (dsm.sync == DSM2_SYNC_A) {
-                dsm.channels[0] = dsm.current_rf_channel;
-                dsm.sync = DSM2_SYNC_B;
-                printf("DSM2 SYNCA chan=%u\n", dsm.channels[0]);
-            } else {
-                if (dsm.current_rf_channel != dsm.channels[0]) {
-                    dsm.channels[1] = dsm.current_rf_channel;
-                    dsm.sync = DSM2_OK;                    
-                    printf("DSM2 SYNCB chan=%u\n", dsm.channels[1]);
-                }
-            }
-        }
-        if (ok) {
-            dsm.last_recv_chan = dsm.current_channel;
-            dsm.last_recv_ms = timer_get_ms();
-            if (dsm.crc_errors > 2) {
-                dsm.crc_errors -= 2;
-            }
-
-            //parse_dsm_channels(pkt);
-
-            stats.recv_packets++;
-
-            // sample the RSSI
-            dsm.rssi_sum += read_register(CYRF_RSSI);
-        } else {
-            stats.bad_packets++;
-        }
-    } else {
-            stats.bad_packets++;
-    }
-}
-
-
-static void irq_timeout(void);
-
-/*
-  start packet receive
- */
-static void start_receive(void)
-{
-    dsm_choose_channel();
-    
+    timer_call_after_ms(5, send_normal_packet);
+    led_yellow_toggle();
+    led_yellow_toggle();
+    state = STATE_RECV_TELEM;
+    dsm_set_channel(1, false, 1, 1, 1);
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
+    write_register(CYRF_RX_ABORT, 0);
+    write_register(CYRF_TX_IRQ_STATUS, 0);
     write_register(CYRF_RX_IRQ_STATUS, CYRF_RXOW_IRQ);
     write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN | CYRF_RXE_IRQEN);
-
-    dsm.receive_start_ms = timer_get_ms();
-    if (state == STATE_BIND_RECV) {
-        dsm.receive_timeout_ms = 15;
-    } else {
-        dsm.receive_timeout_ms = 23;
-    }
-
-    dsm.receive_timeout_ms = 45;
-    timer_call_after_ms(dsm.receive_timeout_ms, irq_timeout);
 }
-
 
 /*
   handle a receive IRQ
  */
-void irq_handler_recv(uint8_t rx_status)
+static void irq_handler_recv(uint8_t rx_status)
 {
     uint8_t pkt[16];
     uint8_t rlen;
@@ -819,39 +709,24 @@ void irq_handler_recv(uint8_t rx_status)
         spi_read_registers(CYRF_RX_BUFFER, pkt, rlen);
     }
 
-    if (rx_status & CYRF_RXE_IRQ) {
-        uint8_t reason = read_register(CYRF_RX_STATUS);
-        //hal.console->printf("reason=%u\n", reason);
-        if (reason & CYRF_BAD_CRC) {
-            dsm.crc_errors++;
-            if (dsm.crc_errors > 20) {
-                printf("Flip CRC\n");
-                // flip crc seed, this allows us to resync with transmitter
-                dsm.crc_seed = ~dsm.crc_seed;
-                dsm.crc_errors = 0;
-            }
-        }
-        write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
-        write_register(CYRF_RX_ABORT, 0);
-        stats.recv_errors++;
-    } else if (rx_status & CYRF_RXC_IRQ) {
-        if (state == STATE_RECV) {
-            process_packet(pkt, rlen);
-        } else {
-            process_bind(pkt, rlen);
-        }
+    if (pkt[0] == 1 && pkt[1] == 2) {
+        telem_recv_count++;
     }
-
-    start_receive();
 }
 
 /*
   handle a receive IRQ
  */
-void irq_handler_send(uint8_t rx_status)
+static void irq_handler_send(uint8_t tx_status)
 {
+    if (tx_status & CYRF_TXC_IRQ) {
+        return;
+    }
     if (state == STATE_SEND) {
-        printf("irq_send 0x%x\n", rx_status);
+        if (dsm.receive_telem) {
+            // setup to receive telemetry
+            start_telem_receive();
+        }
     }
 }
 
@@ -865,17 +740,16 @@ void cypress_irq(void)
     uint8_t rx_status = read_status_debounced(CYRF_RX_IRQ_STATUS);
     uint8_t tx_status = read_status_debounced(CYRF_TX_IRQ_STATUS);
 
-    //printf("rx_status=%u\n", rx_status);
+    //printf("rx_status=0x%x tx_status=0x%x\n", rx_status, tx_status);
     
     switch (state) {
-    case STATE_RECV:
-    case STATE_BIND_RECV:
-        irq_handler_recv(rx_status);
-        break;
-
     case STATE_BIND_SEND:
     case STATE_SEND:
         irq_handler_send(tx_status);
+        break;
+
+    case STATE_RECV_TELEM:
+        irq_handler_recv(rx_status);
         break;
         
     default:
@@ -884,29 +758,20 @@ void cypress_irq(void)
 }
 
 /*
-  called on radio timeout
- */
-static void irq_timeout(void)
-{
-    if (state == STATE_RECV || state == STATE_BIND_RECV) {
-        stats.timeouts++;
-
-        write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
-        write_register(CYRF_RX_ABORT, 0);
-        
-        start_receive();
-    }
-}
-
-
-/*
  Set the current DSM channel with SOP, CRC and data code
  */
 static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint8_t data_col, uint16_t crc_seed)
 {
     //printf("dsm_set_channel: %u\n", channel);
-
+    
     uint8_t pn_row;
+
+    channel = 2;
+    is_dsm2 = false;
+    sop_col = 1;
+    data_col = 1;
+    crc_seed = 1;
+    
     pn_row = is_dsm2? channel % 5 : (channel-2) % 5;
 
     // set CRC seed
@@ -929,115 +794,18 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
     set_channel(channel);
 }
 
-/*
-  choose channel to receive on
- */
-static void dsm_choose_channel(void)
-{
-    uint32_t now = timer_get_ms();
-    uint32_t dt = now - dsm.last_recv_ms;
-    
-    const uint32_t cycle_time = 11;
-    uint8_t next_channel;
-    uint8_t chan_count;
-    uint16_t seed;
-    
-    if (state == STATE_BIND_RECV) {
-        if (now - dsm.last_chan_change_ms > 15) {
-            // always use odd channel numbers for bind
-            dsm.current_rf_channel |= 1;
-            dsm.current_rf_channel = (dsm.current_rf_channel+2) % DSM_MAX_CHANNEL;
-            dsm.last_chan_change_ms = now;
-        }
-        set_channel(dsm.current_rf_channel);
-        return;
-    }
-
-    if (state == STATE_RECV && is_DSM2() && dsm.sync < DSM2_OK) {
-        if (now - dsm.last_chan_change_ms > 15) {
-            dsm.current_rf_channel = (dsm.current_rf_channel+1) % DSM_MAX_CHANNEL;
-            dsm.last_chan_change_ms = now;
-        }
-        dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
-                        dsm.sop_col, dsm.data_col,
-                        dsm.sync==DSM2_SYNC_B?~dsm.crc_seed:dsm.crc_seed);
-        return;
-    }
-    
-    if (dt <= 1) {
-        // normal channel advance
-        next_channel = dsm.last_recv_chan + 1;
-    } else if (dt > 10*cycle_time) {
-        // stay with this channel till transmitter finds us
-        next_channel = dsm.last_recv_chan + (dt % 15);
-    } else {
-        // predict next channel
-        next_channel = dsm.last_recv_chan + 1;
-        next_channel += (dt / cycle_time) * 2;
-        if (dt % cycle_time > 5) {
-            next_channel++;
-        }
-    }
-
-    chan_count = is_DSM2()?2:23;
-    dsm.current_channel = next_channel;
-    if (dsm.current_channel >= chan_count) {
-        dsm.current_channel %= chan_count;
-        if (!is_DSM2()) {
-            dsm.crc_seed = ~dsm.crc_seed;
-        }
-    }
-    
-    dsm.current_rf_channel = dsm.channels[dsm.current_channel];
-
-    seed = dsm.crc_seed;
-    if (dsm.current_channel & 1) {
-        seed = ~seed;
-    }
-
-    if (is_DSM2()) {
-        if (now - dsm.last_recv_ms > 5000) {
-            printf("DSM2 resync\n");
-            dsm.sync = DSM2_SYNC_A;
-        }
-    }
-    
-    dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
-                    dsm.sop_col, dsm.data_col, seed);
-}
-
-/*
-  setup radio for bind on receive side
- */
-void cypress_start_bind_recv(void)
-{
-    uint8_t data_code[16];
-    printf("Cypress: start_bind_recv\n");
-
-    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
-    write_register(CYRF_RX_ABORT, 0);
-    
-    state = STATE_BIND_RECV;
-
-    radio_set_config(cyrf_bind_config, ARRAY_SIZE(cyrf_bind_config));
-
-    write_register(CYRF_CRC_SEED_LSB, 0);
-    write_register(CYRF_CRC_SEED_MSB, 0);
-
-    write_multiple(CYRF_SOP_CODE, 8, pn_codes[0][0]);
-
-    memcpy(data_code, pn_codes[0][8], 8);
-    memcpy(&data_code[8], pn_bind, 8);
-    write_multiple(CYRF_DATA_CODE, 16, data_code);
-
-    dsm.current_rf_channel = 1;
-
-    start_receive();
-}
-
 // order of channels in DSMX packet
 static const uint8_t chan_order[7] = { 1, 5, 2, 4, 6, 0, 3 };
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
+
+static void setup_for_transmit(void)
+{
+    dsm.receive_telem = false;
+    state = STATE_SEND;
+    timer_call_after_ms(4, send_normal_packet);
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
+    write_register(CYRF_RX_ABORT, 0);
+}
 
 /*
   send a normal packet
@@ -1050,6 +818,8 @@ static void send_normal_packet(void)
     uint16_t seed;
     bool send_zero = false;
 
+    state = STATE_SEND;
+    
     /*
       when sending 7 channels with the DSMX_2 protocol we need to
       occasionally send a zero bit in the leading channel high bit in
@@ -1069,9 +839,15 @@ static void send_normal_packet(void)
     if (dsm.invert_seed) {
         // odd channels are sent every 3ms, even channels every 7ms, total frame time 10ms
         timer_call_after_ms(3, send_normal_packet);    
+        dsm.receive_telem = false;
     } else {
-        timer_call_after_ms(7, send_normal_packet);
+        timer_call_after_ms(2, start_telem_receive);
+        //timer_call_after_ms(7, send_normal_packet);
+        dsm.receive_telem = true;
     }
+
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
+    write_register(CYRF_RX_ABORT, 0);
     
     memset(pkt, 0, 16);
     
@@ -1238,7 +1014,7 @@ void cypress_start_bind_send(bool use_dsm2)
 
     get_mfg_id(dsm.mfg_id);
     
-    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
     
     state = STATE_BIND_SEND;
@@ -1280,30 +1056,13 @@ void cypress_start_send(bool use_dsm2)
 
     get_mfg_id(dsm.mfg_id);
     
-    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
     
     printf("send start: mfg_id={0x%x, 0x%x, 0x%x, 0x%x}\n",
            dsm.mfg_id[0], dsm.mfg_id[1], dsm.mfg_id[2], dsm.mfg_id[3]);
 
     start_normal_send();
-}
-
-/*
-  save bind info
- */
-static void save_bind_info(void)
-{
-    printf("NI: save_bind_info\n");
-    dsm.need_bind_save = false;
-}
-
-/*
-  load bind info
- */
-static void load_bind_info(void)
-{
-    printf("NI: load_bind_info\n");
 }
 
 /*
@@ -1316,7 +1075,6 @@ static void cypress_transmit16(const uint8_t data[16])
     write_register(CYRF_TX_CTRL, CYRF_TX_CLR);
 
     write_multiple(CYRF_TX_BUFFER, 16, data);
-    write_register(CYRF_TX_CTRL, CYRF_TX_GO);
-    led_yellow_toggle();
-    led_yellow_toggle();
+    write_register(CYRF_TX_IRQ_STATUS, 0);
+    write_register(CYRF_TX_CTRL, CYRF_TX_GO | CYRF_TXC_IRQEN);
 }

@@ -83,11 +83,12 @@ int main()
     }
 
     //buzzer_tune(TONE_STARTUP_TUNE);
-    buzzer_tune(TONE_STARWARS);
+    //buzzer_tune(TONE_STARWARS);
     
     do {
-        printf("test: '%d' ADC=[%u %u %u %u] t=%lu\n", i, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
+        printf("test: '%d' ADC=[%u %u %u %u] t=%lu", i, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
                timer_get_ms());
+        cypress_debug();
 
         delay_ms(500);
         i++;

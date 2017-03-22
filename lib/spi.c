@@ -25,7 +25,7 @@ void spi_init(void)
     gpio_config(SPI_NSS_HW, GPIO_INPUT_PULLUP);
 
     gpio_config(RADIO_NCS, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
-    gpio_config(RADIO_INT, GPIO_INPUT_PULLUP);
+    gpio_config(RADIO_INT, GPIO_INPUT_FLOAT_IRQ);
     
     // setup mode, clock, master
 #if CLOCK_DIV == CLOCK_DIV_16MHZ
