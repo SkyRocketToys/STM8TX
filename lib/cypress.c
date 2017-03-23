@@ -498,7 +498,7 @@ static void set_channel(uint8_t channel)
     write_register(CYRF_CHANNEL, channel);
 
     // wait worst case time for synthesiser to settle (listed as 270us in datasheet)
-    delay_us(280);
+    delay_us(300);
 }
 
 static void radio_set_config(const struct reg_config *conf, uint8_t size)
@@ -790,6 +790,11 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
 {
     uint8_t pn_row = is_dsm2? channel % 5 : (channel-2) % 5;
 
+    //printf("c=%u s=0x%x\n", channel, crc_seed);
+    
+    // Change channel
+    set_channel(channel);
+
     // set CRC seed
     write_register(CYRF_CRC_SEED_LSB, crc_seed & 0xff);
     write_register(CYRF_CRC_SEED_MSB, crc_seed >> 8);
@@ -805,9 +810,6 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
         write_multiple(CYRF_DATA_CODE, 16, pn_codes[pn_row][data_col]);
         memcpy(dsm.last_data_code, pn_codes[pn_row][data_col], 16);
     }
-
-    // Change channel
-    set_channel(channel);
 }
 
 // order of channels in DSMX packet
