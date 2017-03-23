@@ -586,13 +586,18 @@ static void dsm_setup_transfer_dsmx(void)
 static void scan_channels(void)
 {
     uint8_t i;
+    uint8_t best = 0;
+    uint8_t best_rssi = 32;
+    static uint8_t rssi[DSM_MAX_CHANNEL/2];
     
     write_register(CYRF_XACT_CFG, CYRF_MODE_RX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
     delay_ms(1);
 
-    for (i=0; i<DSM_MAX_CHANNEL; i+=2) {
-        uint16_t samples = 2000;
+    // find the first channel
+    i = 0;
+    while (true) {
+        uint16_t samples = 1500;
         uint8_t highest = 0;
         
         set_channel(i);
@@ -604,8 +609,37 @@ static void scan_channels(void)
         }
         
         printf("%u:%u ", i, highest);
+        rssi[i/2] = highest;
+        if (highest < best_rssi) {
+            best = i;
+            best_rssi = highest;
+        }
+
+        i += 2;
+        if (i >= DSM_MAX_CHANNEL) {
+            break;
+        }
     }
+    
     printf("\n");
+
+    dsm.channels[0] = best;
+
+    best = 0;
+    best_rssi = 32;
+    
+    // find the second channel
+    for (i=0; i<DSM_MAX_CHANNEL; i+=2) {
+        if (i != dsm.channels[0] && (i>dsm.channels[0]+10 || i<dsm.channels[0]-10)) {
+            if (rssi[i/2] < best_rssi) {
+                best_rssi = rssi[i/2];
+                best = i;
+            }
+        }
+    }
+    dsm.channels[1] = best;
+
+    printf("Chose channels %u and %u\n", dsm.channels[0], dsm.channels[1]);
 }
 
 /*
@@ -619,11 +653,8 @@ static void dsm_setup_transfer_dsm2(void)
     dsm.sop_col = (dsm.mfg_id[0] + dsm.mfg_id[1] + dsm.mfg_id[2] + 2) & 0x07;
     dsm.data_col = 7 - dsm.sop_col;
 
+    // scan for best channels
     scan_channels();
-    
-    // needs listening on channels for noise
-    dsm.channels[0] = 26;
-    dsm.channels[1] = 76;
 
     printf("Setup for DSM2 send\n");
 }
