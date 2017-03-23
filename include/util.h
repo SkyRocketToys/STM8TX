@@ -20,7 +20,9 @@ uint32_t micros(void);
 
 // time since boot in milliseconds
 uint32_t millis(void);
-    
+
+uint16_t get_random16(void);
+
 void printf(const char *fmt, ...);
 
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
