@@ -48,3 +48,6 @@
 #define PIN_SW3  (GPIO_PORTA|GPIO_PIN2)
 #define PIN_SW4  (GPIO_PORTA|GPIO_PIN1)
 #define PIN_USER (GPIO_PORTB|GPIO_PIN5)
+
+// time to power off, ms
+#define POWER_OFF_MS 2000

@@ -1,6 +1,9 @@
 #include <timer.h>
 #include <stm8l.h>
 #include <util.h>
+#include <gpio.h>
+#include <config.h>
+#include <buzzer.h>
 
 static volatile uint32_t g_time_ms;
 static volatile uint32_t g_callback_t_ms;
@@ -17,6 +20,7 @@ void timer_init(void)
 }
 
 static uint8_t tick_count;
+static uint16_t power_pin_count;
 
 void timer_irq(void)
 {
@@ -30,6 +34,18 @@ void timer_irq(void)
         if (g_callback_t_ms != 0 && g_time_ms >= g_callback_t_ms && g_callback != NULL) {
             g_callback_t_ms = 0;
             g_callback();
+        }
+        if (gpio_get(PIN_USER)) {
+            power_pin_count++;
+            if (power_pin_count > POWER_OFF_MS) {
+                // clear power control
+                gpio_clear(PIN_POWER);
+                buzzer_tune(TONE_ERROR_TUNE);
+                // loop forever
+                while (true) ;
+            }
+        } else {
+            power_pin_count = 0;
         }
     }
     // clear interrupt
