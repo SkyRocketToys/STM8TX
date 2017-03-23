@@ -947,6 +947,13 @@ static void get_mfg_id(uint8_t mfg_id[6])
     write_register(CYRF_MFG_ID, 0xFF);
     spi_read_registers(CYRF_MFG_ID, mfg_id, 6);
     write_register(CYRF_MFG_ID, 0x00);
+#if 0
+    // this is used to match my OrangeRX TX for testing
+    mfg_id[0] = 0xa5;
+    mfg_id[1] = 0xa7;
+    mfg_id[2] = 0x55;
+    mfg_id[3] = 0x0c;
+#endif
 }
 
 /*
