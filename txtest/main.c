@@ -83,7 +83,7 @@ int main()
         cypress_start_send(use_dsm2);
     }
 
-    //buzzer_tune(TONE_STARTUP_TUNE);
+    buzzer_tune(TONE_STARTUP_TUNE);
     //buzzer_tune(TONE_STARWARS);
 
     next_ms = timer_get_ms() + 1000;
