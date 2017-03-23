@@ -1,5 +1,6 @@
 #include "stm8l.h"
 #include <stdint.h>
+#include <util.h>
 
 #define NUM_CHANS 4
 static uint8_t chan=0;

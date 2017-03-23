@@ -1,5 +1,7 @@
 CC=sdcc
-CFLAGS=-mstm8 -Iinclude -DSTM8S105=1 --opt-code-size
+CODELOC=0x8700
+CFLAGS=-mstm8 -Iinclude -DSTM8S105=1 --opt-code-size -DCODELOC=$(CODELOC) -DBLBASE=$(BLBASE)
+BLBASE=0x8100
 LD=sdld
 CHIP=stm8s105c6
 #STLINK=stlink
@@ -26,10 +28,14 @@ lib/%.rel: lib/%.c
 	@$(CC) -c $(CFLAGS) $^ -o lib/$*.rel
 
 %.ihx: %/main.c $(RELOBJ)
-	@echo Building binary $*
-	@$(CC) $(CFLAGS) -o $*.ihx --out-fmt-ihx $^
+	@echo Building binary $* at $(CODELOC)
+	@$(CC) $(CFLAGS) --code-loc $(CODELOC) -o $*.ihx --out-fmt-ihx $^
 
-all: txtest pintest
+bootloader.ihx: bootloader/main.c lib/util.rel lib/gpio.rel
+	@echo Building bootloader binary $* at $(BLBASE)
+	@$(CC) $(CFLAGS) -o bootloader.ihx --code-loc $(BLBASE) --out-fmt-ihx $^
+
+all: txtest bootloader pintest
 
 clean:
 	@echo Cleaning
@@ -37,8 +43,13 @@ clean:
 
 txtest.flash: txtest.ihx
 	@echo Flashing $^ to $(STLINK)
-	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
+	@stm8flash -c$(STLINK) -p$(CHIP) -s $(CODELOC) -w $^
 
 pintest.flash: pintest.ihx
 	@echo Flashing $^ to $(STLINK)
+	@stm8flash -c$(STLINK) -p$(CHIP) -s $(CODELOC) -w $^
+
+bootloader.flash: bootloader.ihx
+	@echo Flashing bootloader to $(STLINK)
 	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
+

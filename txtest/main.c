@@ -10,21 +10,17 @@
 
 #define EEPROM_DSMPROT_OFFSET 0
 
-// ADC1 interrupt
-INTERRUPT_HANDLER(ADC1_IRQHandler, 22)
-{
+/*
+  note that the interrupt vector table is at 0x8700, not 0x8000
+ */
+
+INTERRUPT_HANDLER(ADC1_IRQHandler, 22) {
     adc_irq();
 }
-
-// External Interrupt PORTC
-INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5)
-{
+INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5) {
     cypress_irq();
 }
-
-// Timer4 Update/Overflow Interrupt
-INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
-{
+INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
     timer_irq();
 }
 
@@ -44,7 +40,7 @@ static bool bind_stick_check_dsmx(void)
     return adc_value(STICK_THROTTLE) < 100 && adc_value(STICK_YAW) < 100;
 }
 
-int main()
+void main(void)
 {
     uint16_t counter=0;
     uint32_t next_ms;
@@ -56,9 +52,7 @@ int main()
     timer_init();
 
     delay_ms(1);
-    
     uart2_init();
-
     cypress_init();
 
     buzzer_init();
@@ -87,7 +81,7 @@ int main()
     //buzzer_tune(TONE_STARWARS);
 
     next_ms = timer_get_ms() + 1000;
-    
+
     while (true) {
         uint8_t trx_count = get_telem_recv_count();
         printf("%u: ADC=[%u %u %u %u]",
