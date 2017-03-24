@@ -31,7 +31,7 @@ lib/%.rel: lib/%.c
 	@echo Building binary $* at $(CODELOC)
 	@$(CC) $(CFLAGS) --code-loc $(CODELOC) -o $*.ihx --out-fmt-ihx $^
 
-bootloader.ihx: bootloader/main.c lib/util.rel lib/gpio.rel
+bootloader.ihx: bootloader/main.c lib/gpio.rel
 	@echo Building bootloader binary $* at $(BLBASE)
 	@$(CC) $(CFLAGS) -o bootloader.ihx --code-loc $(BLBASE) --out-fmt-ihx $^
 

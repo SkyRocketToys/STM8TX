@@ -3,8 +3,10 @@
  */
 
 #include "stm8l.h"
-#include "util.h"
+#include "config.h"
 #include "gpio.h"
+
+#pragma noiv
 
 // location of interrupt vector table in main app
 static const void (*main_app)(void) = CODELOC;
@@ -60,14 +62,15 @@ static const __at(0x8000) struct ivector vectors[32] = {
 int main()
 {
     uint8_t c=5;
-    
-    chip_init();
-    led_init();
+
+    // setup yellow led for bootloader indication
+    gpio_config(LED_YELLOW, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
 
     // flash LED a few times to indicate bootloader operation
     while (true) {
-        led_yellow_toggle();
-        delay_ms(250);
+        uint16_t counter=250*70;
+        gpio_toggle(LED_YELLOW);
+        while (counter--) {}
         c--;
         if (c == 0) {
             // jump to app
