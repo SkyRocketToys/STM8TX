@@ -1,5 +1,9 @@
 #include "crc.h"
 
+/*
+  based on trone crc from ArduPilot
+ */
+
 static const uint8_t crc8_table[] = {
     0x00, 0x07, 0x0e, 0x09, 0x1c, 0x1b, 0x12, 0x15, 0x38, 0x3f, 0x36, 0x31,
     0x24, 0x23, 0x2a, 0x2d, 0x70, 0x77, 0x7e, 0x79, 0x6c, 0x6b, 0x62, 0x65,
@@ -26,17 +30,36 @@ static const uint8_t crc8_table[] = {
 };
 
 /*
-  crc8 from trone driver by Luis Rodrigues
+  16 bit crc
+ */
+static uint16_t crc_crc16(const uint8_t *p, uint8_t len)
+{
+    uint16_t i;
+    uint16_t crc = 0x0;
+
+    while (len--) {
+        i = (crc ^ *p++) & 0xFF;
+        crc = (crc8_table[i] ^ (crc << 8));
+    }
+    
+    return crc;
+}
+
+/*
+  8-bit crc
  */
 uint8_t crc_crc8(const uint8_t *p, uint8_t len)
 {
-	uint16_t i;
-	uint16_t crc = 0x0;
+    return crc_crc16(p, len) & 0xFF;
+}
 
-	while (len--) {
-		i = (crc ^ *p++) & 0xFF;
-		crc = (crc8_table[i] ^ (crc << 8)) & 0xFF;
-	}
-
-	return crc & 0xFF;
+/*
+  a poor-mans crc32, re-using the crc16 table
+ */
+uint32_t crc_crc32(const uint8_t *p, uint8_t len)
+{
+    uint32_t crc;
+    crc = crc_crc16(p, len/2);
+    crc |= ((uint32_t)crc_crc16(p+(len/2), len-(len/2))) << 16;
+    return crc;
 }
