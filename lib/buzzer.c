@@ -21,8 +21,8 @@ static uint8_t tune_pos;
 static int8_t prev_tune_num;
 static bool tune_changed;
 static uint16_t cur_note;
-static uint32_t prev_time;
-static uint32_t duration;
+static uint16_t prev_time;
+static uint16_t duration;
 static bool tune_comp;
 static uint16_t wholenote;
 static uint8_t default_oct;
@@ -44,9 +44,6 @@ static const char *tune[TONE_NUMBER_OF_TUNES] = {
     "para_rel:d=16,o=6,b=512:a,g,a,g,a,g,a,g",
     "starwars:d=4,o=5,b=45:32p,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#.6,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#6"
 };
-
-//Tune Repeat true: play rtttl tune in loop, false: play only once
-static bool tune_repeat[TONE_NUMBER_OF_TUNES] = {false,true,false,false,false,false,true,true,false,false,false};
 
 // map 49 tones onto 30 available frequencies.
 static const uint8_t note_map[49] = { 30, 30, 29, 29, 28, 28, 27, 27, 26, 26, 25, 25, 24, 24,
@@ -83,7 +80,7 @@ static void stop_note(void)
  */
 static bool play()
 {
-    uint32_t cur_time = timer_get_ms();
+    uint16_t cur_time = timer_get_ms();
     if (tune_num != prev_tune_num){
         tune_changed = true;
         return true;
@@ -96,10 +93,7 @@ static bool play()
     if ((cur_time - prev_time) > duration){
         stop_note();
         if(tune[tune_num][tune_pos] == '\0'){
-            if(!tune_repeat[tune_num]){
-                tune_num = -1;
-            }
-
+            tune_num = -1;
             tune_pos = 0;
             tune_comp = true;
             return false;
@@ -115,7 +109,7 @@ static bool play()
 static bool set_note()
 {
     // first, get note duration, if available
-    uint32_t scale,note,num =0;
+    uint16_t scale,note,num =0;
     char c;
 
     if (tune_num < 0) {
