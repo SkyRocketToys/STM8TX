@@ -35,15 +35,29 @@ bootloader.ihx: bootloader/main.c lib/gpio.rel
 	@echo Building bootloader binary $* at $(BLBASE)
 	@$(CC) $(CFLAGS) -o bootloader.ihx --code-loc $(BLBASE) --out-fmt-ihx $^
 
-all: txtest bootloader pintest
+blimage: bootloader/blimage.c lib/crc.c
+	@echo Building blimage
+	gcc -Wall -o blimage -Iinclude bootloader/blimage.c lib/crc.c
+
+all: txtest bootloader pintest txtest.img
 
 clean:
 	@echo Cleaning
-	@rm -f $(OBJ) $(HEX) *.map *.asm *.lst *.rst *.sym *.lk *.cdb *.ihx *.rel */*.rel
+	@rm -f $(OBJ) $(HEX) *.map *.asm *.lst *.rst *.sym *.lk *.cdb *.ihx *.rel */*.rel *.img *.bin
 
 txtest.flash: txtest.ihx
 	@echo Flashing $^ to $(STLINK)
 	@stm8flash -c$(STLINK) -p$(CHIP) -s $(CODELOC) -w $^
+
+txtest.img: txtest.ihx blimage
+	@echo Creating txtest.bin
+	@hex2bin.py txtest.ihx txtest.bin
+	@echo Creating txtest.img
+	@./blimage
+
+txtest.flash2: txtest.img
+	@echo Flashing copy of $^ to $(STLINK) at 0x10000
+	@stm8flash -c$(STLINK) -p$(CHIP) -s 0x10000 -w txtest.img -b 16384
 
 pintest.flash: pintest.ihx
 	@echo Flashing $^ to $(STLINK)
