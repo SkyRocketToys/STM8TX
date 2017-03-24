@@ -8,8 +8,10 @@ CHIP=stm8s105c6
 STLINK=stlinkv2
 
 LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c
+BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom.c
 
 RELOBJ = $(LIBSRC:%.c=%.rel)
+BL_RELOBJ = $(BL_LIBSRC:%.c=%.rel)
 
 txtest: txtest.ihx
 
@@ -31,7 +33,7 @@ lib/%.rel: lib/%.c
 	@echo Building binary $* at $(CODELOC)
 	@$(CC) $(CFLAGS) --code-loc $(CODELOC) -o $*.ihx --out-fmt-ihx $^
 
-bootloader.ihx: bootloader/main.c lib/gpio.rel
+bootloader.ihx: bootloader/main.c $(BL_RELOBJ)
 	@echo Building bootloader binary $* at $(BLBASE)
 	@$(CC) $(CFLAGS) -o bootloader.ihx --code-loc $(BLBASE) --out-fmt-ihx $^
 
@@ -56,8 +58,8 @@ txtest.img: txtest.ihx blimage
 	@./blimage
 
 txtest.flash2: txtest.img
-	@echo Flashing copy of $^ to $(STLINK) at 0x10000
-	@stm8flash -c$(STLINK) -p$(CHIP) -s 0x10000 -w txtest.img -b 16384
+	@echo Flashing copy of $^ to $(STLINK) at 0xC000
+	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC000 -w txtest.img -b 16384
 
 pintest.flash: pintest.ihx
 	@echo Flashing $^ to $(STLINK)

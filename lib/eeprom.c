@@ -15,6 +15,12 @@ void eeprom_lock(void)
     FLASH_IAPSR &= ~0x08;
 }
 
+void progmem_unlock(void)
+{
+    FLASH_PUKR = EEPROM_KEY2;
+    FLASH_PUKR = EEPROM_KEY1;
+}
+
 void eeprom_write(uint16_t offset, uint8_t value)
 {
     eeprom_unlock();

@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <crc.h>
+#include <arpa/inet.h>
 
 int main(void)
 {
@@ -35,8 +36,11 @@ int main(void)
     uint32_t crc = crc_crc32(b, size);
     printf("size: %u crc:0x%08x\n", size, crc);
 
-    if (write(fd_out, &size, sizeof(size)) != sizeof(size) ||
-        write(fd_out, &crc, sizeof(crc)) != sizeof(crc) ||
+    uint32_t crc_swapped = htonl(crc);
+    uint16_t size_swapped = htons(size);
+
+    if (write(fd_out, &size_swapped, sizeof(size_swapped)) != sizeof(size_swapped) ||
+        write(fd_out, &crc_swapped, sizeof(crc_swapped)) != sizeof(crc_swapped) ||
         write(fd_out, b, size) != size) {
         printf("write failed\n");
         exit(1);
