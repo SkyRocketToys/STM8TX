@@ -17,6 +17,7 @@
 #include <timer.h>
 #include <adc.h>
 #include <crc.h>
+#include <telemetry.h>
 
 #define DISABLE_CRC 0
 #define is_DSM2() is_dsm2
@@ -52,24 +53,6 @@ static struct stats {
     uint32_t lost_packets;
     uint32_t timeouts;
 } stats;
-
-enum telem_type {
-    TELEM_STATUS=0, // a telem_status packet
-};
-
-struct telem_status {
-    uint8_t pps; // packets per second received
-    uint8_t rssi; // lowpass rssi
-};
-    
-struct telem_packet {
-    uint8_t crc; // simple CRC
-    enum telem_type type;
-    union {
-        uint8_t pkt[14];
-        struct telem_status status;
-    } payload;
-};
 
 static struct telem_status t_status;
 
@@ -369,17 +352,8 @@ static struct {
     uint8_t last_sop_code[8];
     uint8_t last_data_code[16];
     
-    uint32_t receive_start_ms;
-    uint32_t receive_timeout_ms;
-    
-    uint32_t last_recv_ms;
-    uint32_t last_recv_chan;
-    uint32_t last_chan_change_ms;
     uint16_t num_channels;
     uint16_t pwm_channels[MAX_CHANNELS];
-    bool need_bind_save;
-    enum dsm2_sync sync;
-    uint32_t crc_errors;
     uint32_t bind_send_end_ms;
     bool invert_seed;
     uint8_t zero_counter;
@@ -388,7 +362,6 @@ static struct {
     uint32_t send_count;
     uint16_t rssi_sum;
     uint16_t rssi_count;
-    uint32_t telem_listen_count;
 } dsm;
 
 static void radio_init(void);
@@ -726,7 +699,6 @@ void write_multiple(uint8_t reg, uint8_t n, const uint8_t *data)
  */
 static void start_telem_receive(void)
 {
-    dsm.telem_listen_count++;
     write_register(CYRF_RX_ABORT, 0);
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END);
     write_register(CYRF_RX_IRQ_STATUS, CYRF_RXOW_IRQ);
