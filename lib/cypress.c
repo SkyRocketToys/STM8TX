@@ -15,8 +15,9 @@
 #include <spi.h>
 #include <gpio.h>
 #include <timer.h>
-#include <adc.h>
+#include <channels.h>
 #include <crc.h>
+#include <adc.h>
 #include <telemetry.h>
 
 #define DISABLE_CRC 0
@@ -817,7 +818,6 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
 
 // order of channels in DSMX packet
 static const uint8_t chan_order[7] = { 1, 5, 2, 4, 6, 0, 3 };
-static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
 
 /*
   send a normal packet
@@ -879,45 +879,7 @@ static void send_normal_packet(void)
         if (!is_DSM2()) {
             chan = chan_order[i];
         }
-        switch (chan) {
-        case 0:
-        case 1:
-        case 2:
-        case 3: {
-            uint8_t stick = stick_map[chan];
-            v = adc_value(stick);
-            if (v > 1000) {
-                v = 1000;
-            }
-            if (stick != STICK_THROTTLE) {
-                // fix reversals
-                v = 1000 - v;
-            }
-            break;
-        }
-        case 4:
-            v = gpio_get(PIN_SW3)?1000:0;
-            break;
-        case 5:
-            v = gpio_get(PIN_SW4)?1000:0;
-            break;
-        case 6:
-            // encode 3 switches onto final channel
-            v = 0;
-            if (gpio_get(PIN_SW1)) {
-                v |= 1;
-            }
-            if (gpio_get(PIN_SW2)) {
-                v |= 2;
-            }
-            if (gpio_get(PIN_USER)) {
-                v |= 4;
-            }
-            v *= 100;
-            break;
-        }
-        v = (((v - 500) * 27 / 32) + 512) * 2;
-        v |= (((uint16_t)chan)<<11);
+        v = (((uint16_t)chan)<<11) | channel_value(chan);
         if (i == 0 && !send_zero) {
             v |= 0x8000;
         }

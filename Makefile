@@ -8,7 +8,7 @@ CHIP=stm8s105c6
 STLINK=stlinkv2
 
 LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c
-LIBSRC += lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c lib/telemetry.c
+LIBSRC += lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c lib/telemetry.c lib/channels.c
 BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom.c
 
 RELOBJ = $(LIBSRC:%.c=%.rel)
@@ -61,6 +61,10 @@ txtest.img: txtest.ihx blimage
 txtest.flash2: txtest.img
 	@echo Flashing copy of $^ to $(STLINK) at 0xC000
 	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC000 -w txtest.img -b 16384
+
+zero.flash2: txtest.img
+	@echo Flashing zeros to $(STLINK) at 0xC000
+	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC000 -w /dev/zero -b 16384
 
 pintest.flash: pintest.ihx
 	@echo Flashing $^ to $(STLINK)
