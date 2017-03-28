@@ -40,12 +40,32 @@ static bool bind_stick_check_dsmx(void)
     return adc_value(STICK_THROTTLE) < 100 && adc_value(STICK_YAW) < 100;
 }
 
+
 /*
   check for actions on telemetry packets
  */
 static void check_telemetry(void)
 {
     
+}
+
+/*
+   notify user when we have link
+ */
+static void notify_link(bool have_link)
+{
+    static bool last_have_link;
+    if (have_link) {
+        if (!last_have_link) {
+            last_have_link = true;
+            buzzer_tune(TONE_NOTIFY_POSITIVE_TUNE);            
+        }
+    } else {
+        last_have_link = false;
+    }
+    if (!last_have_link) {
+        buzzer_tune(TONE_RX_SEARCH);
+    }
 }
 
 void main(void)
@@ -92,10 +112,13 @@ void main(void)
 
     while (true) {
         uint8_t trx_count = get_telem_recv_count();
+        bool link_ok;
+
         printf("%u: ADC=[%u %u %u %u]",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3));
         if (trx_count == 0) {
             printf(" TX:%u NOSIGNAL\n", get_pps());
+            link_ok = false;
         } else {
             printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u\n",
                    get_pps(),
@@ -103,8 +126,11 @@ void main(void)
                    get_rssi(),
                    get_rx_rssi(),
                    get_rx_pps());
+            link_ok = true;
         }
 
+        notify_link(link_ok);
+        
         while (timer_get_ms() < next_ms) {
             check_telemetry();
         }

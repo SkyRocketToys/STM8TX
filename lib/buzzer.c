@@ -42,8 +42,10 @@ static const char *tune[TONE_NUMBER_OF_TUNES] = {
     "GPS_war:d=4,o=6,b=512:a,a,a,1f#",
     "Arm_fail:d=4,o=4,b=512:b,a,p",
     "para_rel:d=16,o=6,b=512:a,g,a,g,a,g,a,g",
-    "starwars:d=4,o=5,b=45:32p,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#.6,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#6"
+    "starwars:d=4,o=5,b=45:32p,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#.6,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#6",
+    ":d=1,o=4,b=2048:b",
 };
+
 
 // map 49 tones onto 30 available frequencies.
 static const uint8_t note_map[49] = { 30, 30, 29, 29, 28, 28, 27, 27, 26, 26, 25, 25, 24, 24,
@@ -207,6 +209,7 @@ static bool set_note()
 static bool init_tune()
 {
     uint16_t num;
+    bool have_name;
     
     default_dur = 4;
     default_oct = 6;
@@ -216,7 +219,10 @@ static bool init_tune()
         return false;
     }
 
-    printf("Playing tune '");
+    have_name = (tune[tune_num][tune_pos] != ':');
+    if (have_name) {
+        printf("Playing tune '");
+    }
     
     tune_comp = false;
     while (tune[tune_num][tune_pos] != ':') {
@@ -226,7 +232,9 @@ static bool init_tune()
         uart2_putchar(tune[tune_num][tune_pos]);
         tune_pos++;
     }
-    printf("'\n");
+    if (have_name) {
+        printf("'\n");
+    }
     tune_pos++;
 
     if (tune[tune_num][tune_pos] == 'd'){
