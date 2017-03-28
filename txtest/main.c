@@ -40,6 +40,14 @@ static bool bind_stick_check_dsmx(void)
     return adc_value(STICK_THROTTLE) < 100 && adc_value(STICK_YAW) < 100;
 }
 
+/*
+  check for actions on telemetry packets
+ */
+static void check_telemetry(void)
+{
+    
+}
+
 void main(void)
 {
     uint16_t counter=0;
@@ -97,7 +105,9 @@ void main(void)
                    get_rx_pps());
         }
 
-        while (timer_get_ms() < next_ms) {}
+        while (timer_get_ms() < next_ms) {
+            check_telemetry();
+        }
         next_ms += 1000;
     }
 }

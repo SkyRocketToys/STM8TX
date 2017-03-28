@@ -7,7 +7,8 @@ CHIP=stm8s105c6
 #STLINK=stlink
 STLINK=stlinkv2
 
-LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c
+LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c
+LIBSRC += lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c lib/telemetry.c
 BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom.c
 
 RELOBJ = $(LIBSRC:%.c=%.rel)
