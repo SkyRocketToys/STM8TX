@@ -47,11 +47,68 @@ static const char *tune[TONE_NUMBER_OF_TUNES] = {
 };
 
 
-// map 49 tones onto 30 available frequencies.
-static const uint8_t note_map[49] = { 30, 30, 29, 29, 28, 28, 27, 27, 26, 26, 25, 25, 24, 24,
-                                      23, 23, 22, 22, 21, 21, 20, 20, 19, 19, 18, 18, 17, 17,
-                                      16, 16, 15, 15, 14, 14, 13, 13, 12, 11, 10, 9,   8,  7,
-                                       6,  5,  4,  3,  2,  1,  0 };
+// map 49 tones onto 30 available frequencies. Thanks to Carl for the
+// mapping spreadsheet behind this
+
+#define NOTEBITS(range, divider) (((range)<<6) | divider)
+
+
+#define NOTE_C4  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_CS4 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_D4  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_DS4 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_E4  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_F4  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_FS4 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_G4  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_GS4 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_A4  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_AS4 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_B4  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_C5  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_CS5 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_D5  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_DS5 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_E5  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_F5  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_FS5 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_G5  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_GS5 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_A5  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_AS5 NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_B5  NOTEBITS(BEEP_1KHZ, 30)
+#define NOTE_C6  NOTEBITS(BEEP_1KHZ, 29)
+#define NOTE_CS6 NOTEBITS(BEEP_1KHZ, 27)
+#define NOTE_D6  NOTEBITS(BEEP_1KHZ, 25)
+#define NOTE_DS6 NOTEBITS(BEEP_1KHZ, 24)
+#define NOTE_E6  NOTEBITS(BEEP_1KHZ, 22)
+#define NOTE_F6  NOTEBITS(BEEP_1KHZ, 21)
+#define NOTE_FS6 NOTEBITS(BEEP_1KHZ, 20)
+#define NOTE_G6  NOTEBITS(BEEP_1KHZ, 18)
+#define NOTE_GS6 NOTEBITS(BEEP_1KHZ, 17)
+#define NOTE_A6  NOTEBITS(BEEP_1KHZ, 16)
+#define NOTE_AS6 NOTEBITS(BEEP_1KHZ, 15)
+#define NOTE_B6  NOTEBITS(BEEP_2KHZ, 30)
+#define NOTE_C7  NOTEBITS(BEEP_2KHZ, 29)
+#define NOTE_CS7 NOTEBITS(BEEP_2KHZ, 27)
+#define NOTE_D7  NOTEBITS(BEEP_2KHZ, 25)
+#define NOTE_DS7 NOTEBITS(BEEP_2KHZ, 24)
+#define NOTE_E7  NOTEBITS(BEEP_2KHZ, 22)
+#define NOTE_F7  NOTEBITS(BEEP_2KHZ, 21)
+#define NOTE_FS7 NOTEBITS(BEEP_2KHZ, 20)
+#define NOTE_G7  NOTEBITS(BEEP_2KHZ, 18)
+#define NOTE_GS7 NOTEBITS(BEEP_2KHZ, 17)
+#define NOTE_A7  NOTEBITS(BEEP_2KHZ, 16)
+#define NOTE_AS7 NOTEBITS(BEEP_2KHZ, 15)
+#define NOTE_B7  NOTEBITS(BEEP_4KHZ, 30)
+
+static const uint8_t note_map[49] = { NOTEBITS(0,0), 
+    NOTE_C4, NOTE_CS4, NOTE_D4, NOTE_DS4, NOTE_E4, NOTE_F4, NOTE_FS4, NOTE_G4, NOTE_GS4, NOTE_A4, NOTE_AS4, NOTE_B4,
+    NOTE_C5, NOTE_CS5, NOTE_D5, NOTE_DS5, NOTE_E5, NOTE_F5, NOTE_FS5, NOTE_G5, NOTE_GS5, NOTE_A5, NOTE_AS5, NOTE_B5,
+    NOTE_C6, NOTE_CS6, NOTE_D6, NOTE_DS6, NOTE_E6, NOTE_F6, NOTE_FS6, NOTE_G6, NOTE_GS6, NOTE_A6, NOTE_AS6, NOTE_B6,
+    NOTE_C7, NOTE_CS7, NOTE_D7, NOTE_DS7, NOTE_E7, NOTE_F7, NOTE_FS7, NOTE_G7, NOTE_GS7, NOTE_A7, NOTE_AS7, NOTE_B7
+};
+
 
 /*
   playe a note. The note number is from 0 to 48. We map this to a
@@ -60,12 +117,10 @@ static const uint8_t note_map[49] = { 30, 30, 29, 29, 28, 28, 27, 27, 26, 26, 25
  */
 static void play_note(uint8_t note)
 {
-    uint8_t prescale;
     if (note >= sizeof(note_map)) {
         note = sizeof(note_map)-1;
     }
-    prescale = note_map[note];
-    BEEP_CSR = (((uint8_t)BEEP_2KHZ)<<6) | prescale;
+    BEEP_CSR = note_map[note];
     BEEP_CSR |= 0x20;
 }
 
