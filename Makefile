@@ -14,6 +14,8 @@ BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom.c
 RELOBJ = $(LIBSRC:%.c=%.rel)
 BL_RELOBJ = $(BL_LIBSRC:%.c=%.rel)
 
+all: combined.ihx
+
 txtest: txtest.ihx
 
 pintest: pintest.ihx
@@ -41,8 +43,6 @@ bootloader.ihx: bootloader/main.c $(BL_RELOBJ)
 blimage: bootloader/blimage.c lib/crc.c
 	@echo Building blimage
 	gcc -Wall -o blimage -Iinclude bootloader/blimage.c lib/crc.c
-
-all: txtest bootloader pintest txtest.img combined.ihx
 
 clean:
 	@echo Cleaning
@@ -75,10 +75,11 @@ bootloader.flash: bootloader.ihx
 	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
 
 combined.ihx: txtest.ihx bootloader.ihx
-	hex2bin.py --size=1792 bootloader.ihx bootloader.bin
-	hex2bin.py --size=14592 txtest.ihx txtest.bin
-	cat bootloader.bin txtest.bin txtest.bin > combined.bin
-	bin2hex.py --offset 0x8000 combined.bin combined.ihx
+	@echo Building combined.ihx
+	@hex2bin.py --size=1792 bootloader.ihx bootloader.bin
+	@hex2bin.py --size=14592 txtest.ihx txtest.bin
+	@cat bootloader.bin txtest.bin txtest.bin > combined.bin
+	@bin2hex.py --offset 0x8000 combined.bin combined.ihx
 
 combined.flash: combined.ihx
 	@echo Flashing combined to $(STLINK)
