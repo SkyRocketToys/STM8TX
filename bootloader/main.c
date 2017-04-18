@@ -169,4 +169,6 @@ int main()
 
     // jump to app
     main_app();
+
+    return 0;
 }
