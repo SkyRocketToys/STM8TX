@@ -19,7 +19,6 @@ void timer_init(void)
     TIM4_CR1 = TIM_CR1_URS | TIM_CR1_CEN;
 }
 
-static uint8_t tick_count;
 static uint16_t power_pin_count;
 
 void timer_irq(void)
@@ -27,10 +26,6 @@ void timer_irq(void)
     if (TIM4_SR & TIM_SR1_UIF) {
         // we have overflowed, increment ms counter
         g_time_ms++;
-        tick_count++;
-        if (tick_count == 0) {
-            led_green_toggle();
-        }
         if (g_callback_t_ms != 0 && g_time_ms >= g_callback_t_ms && g_callback != NULL) {
             g_callback_t_ms = 0;
             g_callback();

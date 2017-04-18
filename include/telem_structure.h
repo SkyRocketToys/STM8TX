@@ -3,19 +3,23 @@
   This header is common to ArduPilot AP_Radio and STM8 TX code
  */
 
+#pragma once
+
 enum telem_type {
     TELEM_STATUS= 0, // a telem_status packet
     TELEM_PLAY  = 1, // play a tune
     TELEM_FW    = 2, // update new firmware
 };
 
+#define TELEM_FLAG_GPS_OK  (1U<<0)
+#define TELEM_FLAG_ARM_OK  (1U<<1)
+#define TELEM_FLAG_BATT_OK (1U<<2)
+
 struct telem_status {
     uint8_t pps; // packets per second received
     uint8_t rssi; // lowpass rssi
-    uint8_t gps_ok:1; // GPS is good
-    uint8_t arm_ok:1; // ok to arm
-    uint8_t gps_mode:1; // in GPS flight mode
-    uint8_t low_battery:1; // low battery condition
+    uint8_t flags; // TELEM_FLAG_*
+    uint8_t flight_mode; // flight mode
 };
 
 // play a tune

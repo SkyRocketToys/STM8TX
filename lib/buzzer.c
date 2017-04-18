@@ -44,6 +44,8 @@ static const char *tune[TONE_NUMBER_OF_TUNES] = {
     "para_rel:d=16,o=6,b=512:a,g,a,g,a,g,a,g",
     "starwars:d=4,o=5,b=45:32p,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#.6,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#6",
     ":d=1,o=4,b=2048:b",
+    "loiter:d=4,o=6,b=400:8d,8d,a",
+    "althold:d=4,o=6,b=400:8e,8e,8e,c",
 };
 
 

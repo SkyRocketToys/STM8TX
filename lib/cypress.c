@@ -55,7 +55,7 @@ static struct stats {
     uint32_t timeouts;
 } stats;
 
-static struct telem_status t_status;
+struct telem_status t_status;
 
 /* The SPI interface defines */
 enum {

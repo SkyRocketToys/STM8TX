@@ -24,6 +24,8 @@ void buzzer_tune(uint8_t t);
 #define TONE_PARACHUTE_RELEASE_TUNE         10
 #define TONE_STARWARS                       11
 #define TONE_RX_SEARCH                      12
+#define TONE_LOITER                         13
+#define TONE_ALT_HOLD                       14
 
-#define TONE_NUMBER_OF_TUNES 13
+#define TONE_NUMBER_OF_TUNES 15
 
