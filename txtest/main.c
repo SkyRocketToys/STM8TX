@@ -7,6 +7,8 @@
 #include "timer.h"
 #include "eeprom.h"
 #include "buzzer.h"
+#include "gpio.h"
+#include "config.h"
 #include "telem_structure.h"
 #include <string.h>
 
@@ -31,7 +33,7 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
  */
 static bool bind_stick_check_dsm2(void)
 {
-    return adc_value(STICK_THROTTLE) < 100 && adc_value(STICK_YAW) > 900;
+    return (gpio_get(PIN_LEFT_BUTTON) == 0);
 }
 
 /*
@@ -39,7 +41,7 @@ static bool bind_stick_check_dsm2(void)
  */
 static bool bind_stick_check_dsmx(void)
 {
-    return adc_value(STICK_THROTTLE) < 100 && adc_value(STICK_YAW) < 100;
+    return (gpio_get(PIN_RIGHT_BUTTON) == 0);
 }
 
 
