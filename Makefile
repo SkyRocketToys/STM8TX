@@ -42,7 +42,7 @@ blimage: bootloader/blimage.c lib/crc.c
 	@echo Building blimage
 	gcc -Wall -o blimage -Iinclude bootloader/blimage.c lib/crc.c
 
-all: txtest bootloader pintest txtest.img
+all: txtest bootloader pintest txtest.img combined.ihx
 
 clean:
 	@echo Cleaning
@@ -74,3 +74,12 @@ bootloader.flash: bootloader.ihx
 	@echo Flashing bootloader to $(STLINK)
 	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
 
+combined.ihx: txtest.ihx bootloader.ihx
+	hex2bin.py --size=1792 bootloader.ihx bootloader.bin
+	hex2bin.py --size=14592 txtest.ihx txtest.bin
+	cat bootloader.bin txtest.bin txtest.bin > combined.bin
+	bin2hex.py --offset 0x8000 combined.bin combined.ihx
+
+combined.flash: combined.ihx
+	@echo Flashing combined to $(STLINK)
+	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
