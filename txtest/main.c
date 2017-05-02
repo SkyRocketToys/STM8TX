@@ -61,11 +61,13 @@ static void update_leds(void)
 extern struct telem_status t_status;
 static struct telem_status last_status;
 
-#define LED_PATTERN_OFF    0x0000
+#define LED_PATTERN_LOW    0x0003
+#define LED_PATTERN_HIGH   0xFFFC
 #define LED_PATTERN_SOLID  0xFFFF
 #define LED_PATTERN_BLINK1 0xFF00
 #define LED_PATTERN_BLINK2 0xFFF0
 #define LED_PATTERN_BLINK3 0xF0F0
+#define LED_PATTERN_RAPID  0xAAAA
 
 enum control_mode_t {
     STABILIZE =     0,  // manual airframe angle with manual throttle
@@ -104,8 +106,8 @@ static void status_update(bool have_link)
     }
     if (!last_have_link) {
         buzzer_tune(TONE_RX_SEARCH);
-        led_green_toggle();
-        led_yellow_set(false);
+        yellow_led_pattern = LED_PATTERN_LOW;
+        green_led_pattern = LED_PATTERN_HIGH;
         return;
     }
 
