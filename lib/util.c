@@ -37,7 +37,7 @@ void led_green_set(bool set)
 
 void led_yellow_set(bool set)
 {
-    if (!set) {
+    if (set) {
         gpio_clear(LED_YELLOW);
     } else {
         gpio_set(LED_YELLOW);
