@@ -187,17 +187,18 @@ void main(void)
         printf("%u: ADC=[%u %u %u %u]",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3));
         if (trx_count == 0) {
-            printf(" TX:%u NOSIGNAL\n", get_pps());
+            printf(" TX:%u NOSIGNAL PWR:%u\n", get_pps(), get_tx_power());
             link_ok = false;
         } else {
-            printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u F:0x%x M:%u\n",
+            printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u F:0x%x M:%u PWR:%u\n",
                    get_pps(),
                    trx_count,
                    get_rssi(),
                    get_rx_rssi(),
                    get_rx_pps(),
                    t_status.flags,
-                   t_status.flight_mode);
+                   t_status.flight_mode,
+                   get_tx_power());
             link_ok = true;
         }
 

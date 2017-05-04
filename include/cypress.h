@@ -7,3 +7,5 @@ uint8_t get_rx_rssi(void);
 uint8_t get_pps(void);
 uint8_t get_telem_recv_count(void);
 uint8_t get_rssi(void);
+uint8_t get_tx_power(void);
+

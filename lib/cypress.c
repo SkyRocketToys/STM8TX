@@ -319,14 +319,14 @@ static const struct reg_config cyrf_config[] = {
         {CYRF_TX_OFFSET_LSB, 0x55},                                             // From manual, typical configuration
         {CYRF_TX_OFFSET_MSB, 0x05},                                             // From manual, typical configuration
         {CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END},                     // Force in Synth RX mode
-        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_SDR | CYRF_PA_4},  // Enable 64 chip codes, SDR mode and amplifier +4dBm
+        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_SDR | CYRF_PA_0},  // Enable 64 chip codes, SDR mode and amplifier +0dBm
         {CYRF_DATA64_THOLD, 0x0E},                                              // From manual, typical configuration
         {CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX},                                    // Set in Synth RX mode (again, really needed?)
         {CYRF_IO_CFG, CYRF_IRQ_POL},                                            // IRQ active high
 };
 
 static const struct reg_config cyrf_bind_config[] = {
-        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_SDR | CYRF_PA_4},   // Enable 64 chip codes, SDR mode and amplifier +4dBm
+        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_SDR | CYRF_PA_0},   // Enable 64 chip codes, SDR mode and amplifier +0dBm
         {CYRF_FRAMING_CFG, CYRF_SOP_LEN | 0xE},                                  // Set SOP CODE to 64 chips and SOP Correlator Threshold to 0xE
         {CYRF_RX_OVERRIDE, CYRF_FRC_RXDR | CYRF_DIS_RXCRC},                      // Force receive data rate and disable receive CRC checker
         {CYRF_EOP_CTRL, 0x02},                                                   // Only enable EOP symbol count of 2
@@ -334,7 +334,7 @@ static const struct reg_config cyrf_bind_config[] = {
 };
 
 static const struct reg_config cyrf_transfer_config[] = {
-        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | CYRF_PA_4},   // Enable 64 chip codes, 8DR mode and amplifier +4dBm
+        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | CYRF_PA_M35},   // Enable 64 chip codes, 8DR mode and amplifier, min power
         {CYRF_FRAMING_CFG, CYRF_SOP_EN | CYRF_SOP_LEN | CYRF_LEN_EN | 0xE},      // Set SOP CODE enable, SOP CODE to 64 chips, Packet length enable, and SOP Correlator Threshold to 0xE
         {CYRF_TX_OVERRIDE, 0x00},                                                // Reset TX overrides
         {CYRF_RX_OVERRIDE, 0x00},                                      // Reset RX overrides
@@ -360,9 +360,12 @@ static struct {
     uint8_t zero_counter;
     bool receive_telem;
     uint32_t telem_recv_count;
+    uint16_t sends_since_recv;
+    uint16_t sends_since_power_change;
     uint32_t send_count;
     uint16_t rssi_sum;
     uint16_t rssi_count;
+    uint8_t power_level;
 } dsm;
 
 static void radio_init(void);
@@ -711,6 +714,7 @@ static void process_telem_packet(const struct telem_packet *pkt)
     switch (pkt->type) {
     case TELEM_STATUS:
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
+        dsm.sends_since_recv = 0;
         break;
     }
 }
@@ -1052,11 +1056,42 @@ void cypress_start_send(bool use_dsm2)
 }
 
 /*
+  auto-adjust transmit power to minimise battery usage and increase
+  likelyhook of connection on low battery
+ */
+static void check_power_level(void)
+{
+    uint8_t current_power_level = dsm.power_level;
+    if (dsm.sends_since_recv > 512 && dsm.power_level < CYRF_PA_4) {
+        dsm.power_level++;
+        dsm.sends_since_recv = 0;        
+    }
+    if (dsm.sends_since_recv > 512 && dsm.power_level == CYRF_PA_4) {
+        dsm.power_level -= 3;
+        dsm.sends_since_recv = 0;        
+    }
+    if (dsm.sends_since_recv < 2 && dsm.sends_since_power_change > 256) {
+        if (dsm.power_level > 0 && t_status.rssi > 26) {
+            dsm.power_level--;
+        }
+        if (dsm.power_level < CYRF_PA_4 && t_status.rssi < 20) {
+            dsm.power_level++;
+        }
+    }
+    if (dsm.power_level != current_power_level) {
+        dsm.sends_since_power_change = 0;
+        write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.power_level);
+    }
+}
+
+/*
   transmit a 16 byte packet
   this is a blind send, not waiting for ack or completion
 */
 static void cypress_transmit16(const uint8_t data[16])
 {
+    check_power_level();
+    
     write_register(CYRF_TX_LENGTH, 16);
     write_register(CYRF_TX_CTRL, CYRF_TX_CLR);
 
@@ -1064,6 +1099,8 @@ static void cypress_transmit16(const uint8_t data[16])
     write_register(CYRF_TX_IRQ_STATUS, 0);
     write_register(CYRF_TX_CTRL, CYRF_TX_GO | CYRF_TXC_IRQEN);
     dsm.send_count++;
+    dsm.sends_since_recv++;
+    dsm.sends_since_power_change++;
 }
 
 // get receiver packets per second
@@ -1076,6 +1113,11 @@ uint8_t get_rx_pps(void)
 uint8_t get_rx_rssi(void)
 {
     return t_status.rssi;
+}
+
+uint8_t get_tx_power(void)
+{
+    return dsm.power_level;
 }
 
 uint8_t get_telem_recv_count(void)
