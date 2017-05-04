@@ -20,17 +20,24 @@ void timer_init(void)
 }
 
 static uint16_t power_pin_count;
+static bool activate_power_pin;
 
 void timer_irq(void)
 {
     if (TIM4_SR & TIM_SR1_UIF) {
+        bool pin_user;
         // we have overflowed, increment ms counter
         g_time_ms++;
         if (g_callback_t_ms != 0 && g_time_ms >= g_callback_t_ms && g_callback != NULL) {
             g_callback_t_ms = 0;
             g_callback();
         }
-        if (gpio_get(PIN_USER)) {
+        pin_user = gpio_get(PIN_USER);
+        if (!pin_user) {
+            // only activate if its been off at least once since boot
+            activate_power_pin = true;
+        }
+        if (pin_user && activate_power_pin) {
             power_pin_count++;
             if (power_pin_count > POWER_OFF_MS) {
                 // clear power control
