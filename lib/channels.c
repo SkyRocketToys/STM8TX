@@ -50,6 +50,10 @@ uint16_t channel_value(uint8_t chan)
     }
     case 4:
         v = latched_left_button()?1000:0;
+        if (!gpio_get(PIN_LEFT_BUTTON)) {
+            // this allows for long-press vs short-press actions
+            v += 100;
+        }
         break;
     case 5:
         v = gpio_get(PIN_RIGHT_BUTTON)==0?1000:0;
