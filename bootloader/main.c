@@ -65,8 +65,8 @@ static const __at(0x8000) struct ivector vectors[32] = {
 static void delay_ms(uint16_t d)
 {
     // empirically tuned
-    uint32_t counter=((uint32_t)d)*DELAY_MS_LOOP_SCALE;
-    while (counter--) {}
+    d = d << 7;
+    while (d--) {}
 }
 
 static void toggle_code(uint8_t n)
@@ -85,23 +85,22 @@ static void toggle_code(uint8_t n)
  */
 static void flash_copy(uint16_t to, uint16_t from, uint16_t size)
 {
-    uint8_t *ptr1 = (uint8_t *)to;
-    const uint8_t *ptr2 = (const uint8_t *)from;
-    uint16_t round_size = (size+3) & 0xFFFC;
-    uint16_t i;
+    uint32_t *ptr1 = (uint32_t *)to;
+    const uint32_t *ptr2 = (const uint32_t *)from;
+    uint16_t nwords = (size+3) >> 2;
 
     progmem_unlock();
     // copy using word mode, takes 14 seconds for 11k
     gpio_clear(LED_YELLOW);
     gpio_set(LED_GREEN);
 
-    for (i=0; i<round_size; i += 4) {
+    while (nwords--) {
         FLASH_CR2 |= 0x40;
         FLASH_NCR2 &= ~0x40;
 
-        memcpy(&ptr1[i], &ptr2[i], 4);
+        *ptr1++ = *ptr2++;
 
-        if (i % 256 == 0) {
+        if (nwords % 64 == 0) {
             gpio_toggle(LED_YELLOW);
             gpio_toggle(LED_GREEN);
         }
