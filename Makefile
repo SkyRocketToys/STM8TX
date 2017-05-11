@@ -16,7 +16,7 @@ BL_RELOBJ = $(BL_LIBSRC:%.c=%.rel)
 
 all: combined.ihx
 
-txtest: txtest.ihx
+txmain: txmain.ihx
 
 pintest: pintest.ihx
 
@@ -48,21 +48,21 @@ clean:
 	@echo Cleaning
 	@rm -f $(OBJ) $(HEX) *.map *.asm *.lst *.rst *.sym *.lk *.cdb *.ihx *.rel */*.rel *.img *.bin
 
-txtest.flash: txtest.ihx
+txmain.flash: txmain.ihx
 	@echo Flashing $^ to $(STLINK)
 	@stm8flash -c$(STLINK) -p$(CHIP) -s $(CODELOC) -w $^
 
-txtest.img: txtest.ihx blimage
-	@echo Creating txtest.bin
-	@hex2bin.py txtest.ihx txtest.bin
-	@echo Creating txtest.img
+txmain.img: txmain.ihx blimage
+	@echo Creating txmain.bin
+	@hex2bin.py txmain.ihx txmain.bin
+	@echo Creating txmain.img
 	@./blimage
 
-txtest.flash2: txtest.img
+txmain.flash2: txmain.img
 	@echo Flashing copy of $^ to $(STLINK) at 0xC000
-	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC000 -w txtest.img -b 16384
+	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC000 -w txmain.img -b 16384
 
-zero.flash2: txtest.img
+zero.flash2: txmain.img
 	@echo Flashing zeros to $(STLINK) at 0xC000
 	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC000 -w /dev/zero -b 16384
 
@@ -74,11 +74,11 @@ bootloader.flash: bootloader.ihx
 	@echo Flashing bootloader to $(STLINK)
 	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
 
-combined.ihx: txtest.ihx bootloader.ihx
+combined.ihx: txmain.ihx bootloader.ihx
 	@echo Building combined.ihx
 	@hex2bin.py --size=1792 bootloader.ihx bootloader.bin
-	@hex2bin.py --size=14592 txtest.ihx txtest.bin
-	@cat bootloader.bin txtest.bin txtest.bin > combined.bin
+	@hex2bin.py --size=14592 txmain.ihx txmain.bin
+	@cat bootloader.bin txmain.bin txmain.bin > combined.bin
 	@bin2hex.py --offset 0x8000 combined.bin combined.ihx
 
 combined.flash: combined.ihx

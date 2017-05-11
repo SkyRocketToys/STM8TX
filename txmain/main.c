@@ -1,3 +1,6 @@
+/*
+  main entry point for transmitter firmware
+ */
 #include "stm8l.h"
 #include "util.h"
 #include "uart.h"

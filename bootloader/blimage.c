@@ -1,5 +1,5 @@
 /*
-  create a image file for OTA update from txtest.bin
+  create a image file for OTA update from txmain.bin
  */
 
 #include <stdio.h>
@@ -13,14 +13,14 @@
 
 int main(void)
 {
-    int fd_in = open("txtest.bin", O_RDONLY);
-    int fd_out = open("txtest.img", O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    int fd_in = open("txmain.bin", O_RDONLY);
+    int fd_out = open("txmain.img", O_WRONLY|O_CREAT|O_TRUNC, 0644);
     if (fd_in == -1) {
-        printf("failed to open txtest.bin\n");
+        printf("failed to open txmain.bin\n");
         exit(1);
     }
     if (fd_out == -1) {
-        printf("failed to open txtest.img\n");
+        printf("failed to open txmain.img\n");
         exit(1);
     }
 
