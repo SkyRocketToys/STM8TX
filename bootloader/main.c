@@ -158,6 +158,9 @@ int main()
     // 16MHz clock
     CLK_CKDIVR = CLOCK_DIV;
 
+    // power button
+    gpio_config(PIN_POWER, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
+    
     // setup yellow led for bootloader indication
     gpio_config(LED_YELLOW, GPIO_OUTPUT_PUSHPULL|GPIO_CLEAR);
     gpio_config(LED_GREEN, GPIO_OUTPUT_PUSHPULL|GPIO_CLEAR);
