@@ -19,6 +19,7 @@
 #include <crc.h>
 #include <adc.h>
 #include <telemetry.h>
+#include "eeprom.h"
 
 #define DISABLE_CRC 0
 #define is_DSM2() is_dsm2
@@ -56,6 +57,7 @@ static struct stats {
 } stats;
 
 struct telem_status t_status;
+uint8_t telem_ack_value;
 
 /* The SPI interface defines */
 enum {
@@ -709,6 +711,31 @@ static void start_telem_receive(void)
     write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN | CYRF_RXE_IRQEN);
 }
 
+/*
+  write to new firmware location
+ */
+static void write_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len)
+{
+    uint16_t dest = NEW_FIRMWARE_BASE + offset;
+    uint8_t *ptr1;
+    ptr1 = (uint8_t *)dest;
+
+    progmem_unlock();
+
+    FLASH_CR1 = 0;
+    FLASH_CR2 = 0x40;
+    FLASH_NCR2 = ~0x40;
+    memcpy(&ptr1[0], &data[0], 4);
+
+    if (len > 4) {
+        FLASH_CR2 = 0x40;
+        FLASH_NCR2 = ~0x40;
+        memcpy(&ptr1[4], &data[4], 4);
+    }
+    
+    progmem_lock();
+}
+
 static void process_telem_packet(const struct telem_packet *pkt)
 {
     switch (pkt->type) {
@@ -716,6 +743,15 @@ static void process_telem_packet(const struct telem_packet *pkt)
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
         dsm.sends_since_recv = 0;
         break;
+    case TELEM_FW: {
+        struct telem_firmware fw;
+        memcpy(&fw, &pkt->payload.fw, sizeof(fw));
+        fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
+        //printf("got fw seq=%u offset=%u len=%u\n", fw.seq, fw.offset, fw.len);
+        write_flash_copy(fw.offset, &fw.data[0], fw.len);
+        telem_ack_value = fw.seq;
+        break;
+    }
     }
 }
 
@@ -882,6 +918,10 @@ static void send_normal_packet(void)
         uint8_t chan = i;
         if (!is_DSM2()) {
             chan = chan_order[i];
+        }
+        if (chan == 6 && dsm.invert_seed) {
+            // send telem acks as extra channel on every 2nd packet
+            chan = 7;
         }
         v = (((uint16_t)chan)<<11) | channel_value(chan);
         if (i == 0 && !send_zero) {

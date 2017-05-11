@@ -15,8 +15,6 @@
 // location of interrupt vector table in main app
 static const void (*main_app)(void) = CODELOC;
 
-#define NEW_FIRMWARE_BASE 0xC000
-
 /*
   create an interrupt vector table pointing at the applications vector table
  */

@@ -32,7 +32,7 @@ static const uint8_t crc8_table[] = {
 /*
   16 bit crc
  */
-static uint16_t crc_crc16(const uint8_t *p, uint8_t len)
+static uint16_t crc_crc16(const uint8_t *p, uint16_t len)
 {
     uint16_t i;
     uint16_t crc = 0x0;
@@ -48,7 +48,7 @@ static uint16_t crc_crc16(const uint8_t *p, uint8_t len)
 /*
   8-bit crc
  */
-uint8_t crc_crc8(const uint8_t *p, uint8_t len)
+uint8_t crc_crc8(const uint8_t *p, uint16_t len)
 {
     return crc_crc16(p, len) & 0xFF;
 }
@@ -56,7 +56,7 @@ uint8_t crc_crc8(const uint8_t *p, uint8_t len)
 /*
   a poor-mans crc32, re-using the crc16 table
  */
-uint32_t crc_crc32(const uint8_t *p, uint8_t len)
+uint32_t crc_crc32(const uint8_t *p, uint16_t len)
 {
     uint32_t crc;
     crc = crc_crc16(p, len/2);

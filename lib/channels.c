@@ -4,6 +4,7 @@
 #include "config.h"
 
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
+extern uint8_t telem_ack_value;
 
 /*
   latch left button with debouncing
@@ -72,6 +73,8 @@ uint16_t channel_value(uint8_t chan)
         }
         v *= 100;
         break;
+    case 7:
+        return telem_ack_value;
     }
 
     // map into 11 bit range

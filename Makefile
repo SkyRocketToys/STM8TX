@@ -84,3 +84,15 @@ combined.ihx: txtest.ihx bootloader.ihx
 combined.flash: combined.ihx
 	@echo Flashing combined to $(STLINK)
 	@stm8flash -c$(STLINK) -p$(CHIP) -w $^
+
+get.flash:
+	@echo Reading flash from $(STLINK) at $(CODELOC)
+	@stm8flash -c$(STLINK) -p$(CHIP) -s $(CODELOC) -r flash.img -b 16384
+
+get.flash2:
+	@echo Reading flash from $(STLINK) at 0xC000
+	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC000 -r flash2hdr.img -b 6
+	@echo Reading flash from $(STLINK) at 0xC006
+	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC006 -r flash2.bin -b 16384
+	@echo Reading flash from $(STLINK) at 0xC000
+	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC000 -r flash2.img -b 16384
