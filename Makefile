@@ -54,7 +54,7 @@ txmain.flash: txmain.ihx
 
 txmain.img: txmain.ihx blimage
 	@echo Creating txmain.bin
-	@hex2bin.py txmain.ihx txmain.bin
+	@hex2bin.py txmain.ihx txmain.bin1
 	@echo Creating txmain.img
 	@./blimage
 
@@ -76,6 +76,7 @@ bootloader.flash: bootloader.ihx
 
 combined.ihx: txmain.ihx bootloader.ihx
 	@echo Building combined.ihx
+	@hex2bin.py bootloader.ihx bootloader.bin1
 	@hex2bin.py --size=1792 bootloader.ihx bootloader.bin
 	@hex2bin.py --size=14592 txmain.ihx txmain.bin
 	@cat bootloader.bin txmain.bin txmain.bin > combined.bin
@@ -96,3 +97,8 @@ get.flash2:
 	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC006 -r flash2.bin -b 16384
 	@echo Reading flash from $(STLINK) at 0xC000
 	@stm8flash -c$(STLINK) -p$(CHIP) -s 0xC000 -r flash2.img -b 16384
+
+get.eeprom:
+	@echo Reading eeprom from $(STLINK) at 0x4000
+	@stm8flash -c$(STLINK) -p$(CHIP) -s 0x4000 -r eeprom.img -b 1024
+
