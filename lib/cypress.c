@@ -24,6 +24,8 @@
 #define DISABLE_CRC 0
 #define is_DSM2() is_dsm2
 
+#define DYNAMIC_POWER_ADJUSTMENT 1
+
 static bool is_dsm2 = false;
 
 static enum {
@@ -1102,6 +1104,7 @@ void cypress_start_send(bool use_dsm2)
 static void check_power_level(void)
 {
     uint8_t current_power_level = dsm.power_level;
+#if DYNAMIC_POWER_ADJUSTMENT
     if (dsm.sends_since_recv > 512 && dsm.power_level < CYRF_PA_4) {
         dsm.power_level++;
         dsm.sends_since_recv = 0;        
@@ -1118,6 +1121,10 @@ static void check_power_level(void)
             dsm.power_level++;
         }
     }
+#else
+    // always full power
+    dsm.power_level = CYRF_PA_4;
+#endif
     if (dsm.power_level != current_power_level) {
         dsm.sends_since_power_change = 0;
         write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.power_level);
