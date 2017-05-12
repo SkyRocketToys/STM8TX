@@ -14,7 +14,7 @@ BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom.c
 RELOBJ = $(LIBSRC:%.c=%.rel)
 BL_RELOBJ = $(BL_LIBSRC:%.c=%.rel)
 
-all: combined.ihx
+all: combined.ihx txmain.img
 
 txmain: txmain.ihx
 
@@ -54,7 +54,7 @@ txmain.flash: txmain.ihx
 
 txmain.img: txmain.ihx blimage
 	@echo Creating txmain.bin
-	@hex2bin.py txmain.ihx txmain.bin1
+	@hex2bin.py txmain.ihx txmain.bin
 	@echo Creating txmain.img
 	@./blimage
 
