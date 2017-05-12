@@ -30,19 +30,10 @@ static uint8_t default_dur;
 static uint16_t bpm;
 
 // List of RTTTL tones
-static const char *tune[TONE_NUMBER_OF_TUNES] = {
+static const char * const tune[TONE_NUMBER_OF_TUNES] = {
     "Startup:d=8,o=6,b=480:a,d7,c7,a,d7,c7,a,d7,16d7,16c7,16d7,16c7,16d7,16c7,16d7,16c7",
     "Error:d=4,o=6,b=400:8a,8a,8a,p,a,a,a,p",
     "notify_pos:d=4,o=6,b=400:8e,8e,a",
-    "notify_neut:d=4,o=6,b=400:8e,e",
-    "notify_neg:d=4,o=6,b=400:8e,8c,8e,8c,8e,8c",
-    "arming_warn:d=1,o=4,b=75:g",
-    "batt_war_slow:d=4,o=6,b=200:8a",
-    "batt_war_fast:d=4,o=6,b=512:8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a,8a",
-    "GPS_war:d=4,o=6,b=512:a,a,a,1f#",
-    "Arm_fail:d=4,o=4,b=512:b,a,p",
-    "para_rel:d=16,o=6,b=512:a,g,a,g,a,g,a,g",
-    "starwars:d=4,o=5,b=45:32p,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#.6,32f#,32f#,32f#,8b.,8f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32c#6,8b.6,16f#.6,32e6,32d#6,32e6,8c#6",
     ":d=1,o=4,b=2048:b",
     "loiter:d=4,o=6,b=400:8d,8d,a",
     "althold:d=4,o=6,b=400:8e,8e,8e,c",
