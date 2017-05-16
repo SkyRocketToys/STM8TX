@@ -4,17 +4,27 @@
 
 #define NUM_CHANS 4
 static uint8_t chan=0;
+static bool take_next;
 static uint16_t values[NUM_CHANS];
 
 void adc_irq(void)
 {
-    uint16_t v;
-    v = ADC_DRL;
-    v |= ADC_DRH << 8;
-    values[chan] = v;
+    if (take_next) {
+        /*
+          wait a full ADC cycle before grabbing the next value, or
+          sometimes we get a stale value. Thanks to Bill for noticing
+          this in testing.
+         */
+        uint16_t v;
+        v = ADC_DRL;
+        v |= ADC_DRH << 8;
+        values[chan] = v;
+        chan = (chan + 1) & (NUM_CHANS-1);
+    }
     ADC_CSR &= 0x3f; // clear EOC & AWD flags
-    chan = (chan + 1) & (NUM_CHANS-1);
     ADC_CSR = 0x20 | chan;
+
+    take_next = !take_next;
 }
 
 void adc_init(void)
