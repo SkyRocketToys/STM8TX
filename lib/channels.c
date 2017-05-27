@@ -5,6 +5,8 @@
 
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
 extern uint8_t telem_ack_value;
+static uint8_t last_telem_ack_value;
+static uint8_t telem_extra_type;
 
 /*
   latch left button with debouncing
@@ -73,8 +75,17 @@ uint16_t channel_value(uint8_t chan)
         }
         v *= 100;
         break;
-    case 7:
-        return telem_ack_value;
+    case 7: {
+        /* return extra data in channel 8. Use top 3 bits for data type */
+        telem_extra_type = (telem_extra_type+1) % 2;
+        if (telem_extra_type == 0 || telem_ack_value != last_telem_ack_value) {
+            last_telem_ack_value = telem_ack_value;
+            // key 0 is telem ack
+            return telem_ack_value;
+        }
+        // key 1 is firmware version
+        return (1U<<8) | FIRMWARE_VERSION;
+    }
     }
 
     // map into 11 bit range

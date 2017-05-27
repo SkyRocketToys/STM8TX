@@ -922,7 +922,7 @@ static void send_normal_packet(void)
             chan = chan_order[i];
         }
         if (chan == 6 && dsm.invert_seed) {
-            // send telem acks as extra channel on every 2nd packet
+            // send extra data on every 2nd packet
             chan = 7;
         }
         v = (((uint16_t)chan)<<11) | channel_value(chan);
