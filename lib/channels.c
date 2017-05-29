@@ -2,10 +2,12 @@
 #include "adc.h"
 #include "gpio.h"
 #include "config.h"
+#include "util.h"
 
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
 extern uint8_t telem_ack_value;
 static uint8_t last_telem_ack_value;
+static uint8_t telem_ack_send_count;
 static uint8_t telem_extra_type;
 
 /*
@@ -77,14 +79,30 @@ uint16_t channel_value(uint8_t chan)
         break;
     case 7: {
         /* return extra data in channel 8. Use top 3 bits for data type */
-        telem_extra_type = (telem_extra_type+1) % 2;
-        if (telem_extra_type == 0 || telem_ack_value != last_telem_ack_value) {
+        telem_extra_type = (telem_extra_type+1) % 4;
+
+        if (telem_extra_type == 0 ||
+            telem_ack_value != last_telem_ack_value ||
+            telem_ack_send_count < 20) {
+            if (last_telem_ack_value != telem_ack_value) {
+                telem_ack_send_count = 0;
+            }
             last_telem_ack_value = telem_ack_value;
+            telem_ack_send_count++;
             // key 0 is telem ack
             return telem_ack_value;
         }
-        // key 1 is firmware version
-        return (1U<<8) | FIRMWARE_VERSION;
+        switch (telem_extra_type) {
+        case 1:
+            // key 1 is year
+            return (1U<<8) | (BUILD_DATE_YEAR-2017);
+        case 2:
+            // key 2 is month
+            return (2U<<8) | BUILD_DATE_MONTH;
+        case 3:
+            // key 3 is day
+            return (3U<<8) | BUILD_DATE_DAY;
+        }
     }
     }
 
