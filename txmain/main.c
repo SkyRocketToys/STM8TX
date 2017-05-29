@@ -32,19 +32,27 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
 }
 
 /*
-  check for sticks in bind position at startup
+  check for buttons in bind position at startup
  */
-static bool bind_stick_check_dsm2(void)
+static bool bind_buttons_check_dsm2(void)
 {
     return (gpio_get(PIN_LEFT_BUTTON) == 0);
 }
 
 /*
-  check for sticks in bind position at startup
+  check for buttons in bind position at startup
  */
-static bool bind_stick_check_dsmx(void)
+static bool bind_buttons_check_dsmx(void)
 {
     return (gpio_get(PIN_RIGHT_BUTTON) == 0);
+}
+
+/*
+  check for buttons in FCC test mode state
+ */
+static bool check_buttons_FCC_test(void)
+{
+    return (gpio_get(PIN_LEFT_BUTTON) == 0) && (gpio_get(PIN_RIGHT_BUTTON) == 0);
 }
 
 
@@ -71,6 +79,9 @@ static struct telem_status last_status;
 #define LED_PATTERN_BLINK2 0xFFF0
 #define LED_PATTERN_BLINK3 0xF0F0
 #define LED_PATTERN_RAPID  0xAAAA
+#define LED_PATTERN_FCC1   0x1000
+#define LED_PATTERN_FCC2   0x1100
+#define LED_PATTERN_FCC3   0x1110
 
 enum control_mode_t {
     STABILIZE =     0,  // manual airframe angle with manual throttle
@@ -99,6 +110,32 @@ enum control_mode_t {
 static void status_update(bool have_link)
 {
     static bool last_have_link;
+
+    uint8_t FCC_test = get_FCC_test();
+    if (FCC_test != 0) {
+        if (gpio_get(PIN_LEFT_BUTTON) == 0) {
+            cypress_next_FCC_test();
+            FCC_test = get_FCC_test();
+            printf("FCC test mode %u\n", FCC_test);
+            buzzer_tune(TONE_NOTIFY_POSITIVE_TUNE);
+        }
+        switch (FCC_test) {
+        case 1:
+            yellow_led_pattern = LED_PATTERN_FCC1;
+            green_led_pattern = LED_PATTERN_FCC1;
+            break;
+        case 2:
+            yellow_led_pattern = LED_PATTERN_FCC2;
+            green_led_pattern = LED_PATTERN_FCC2;
+            break;
+        case 3:
+            yellow_led_pattern = LED_PATTERN_FCC3;
+            green_led_pattern = LED_PATTERN_FCC3;
+            break;
+        }
+        return;
+    }
+    
     if (have_link) {
         if (!last_have_link) {
             last_have_link = true;
@@ -165,11 +202,14 @@ void main(void)
     // wait for initial stick inputs
     delay_ms(200);
 
-    if (bind_stick_check_dsm2()) {
+    if (check_buttons_FCC_test()) {
+        printf("FCC test start\n");
+        cypress_start_FCC_test();
+    } else if (bind_buttons_check_dsm2()) {
         printf("DSM2 bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
         cypress_start_bind_send(true);
-    } else if (bind_stick_check_dsmx()) {
+    } else if (bind_buttons_check_dsmx()) {
         printf("DSMX bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 0);
         cypress_start_bind_send(false);
@@ -185,11 +225,13 @@ void main(void)
 
     while (true) {
         uint8_t trx_count = get_telem_recv_count();
-        bool link_ok;
+        bool link_ok = false;
 
         printf("%u: ADC=[%u %u %u %u]",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3));
-        if (trx_count == 0) {
+        if (get_FCC_test() != 0) {
+            printf(" FCC %u\n", get_FCC_test());
+        } else if (trx_count == 0) {
             printf(" TX:%u NOSIGNAL PWR:%u\n", get_pps(), get_tx_power());
             link_ok = false;
         } else {

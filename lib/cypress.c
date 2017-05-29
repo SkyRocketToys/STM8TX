@@ -370,6 +370,7 @@ static struct {
     uint16_t rssi_sum;
     uint16_t rssi_count;
     uint8_t power_level;
+    uint8_t FCC_test_mode;
 } dsm;
 
 static void radio_init(void);
@@ -953,6 +954,65 @@ static void send_normal_packet(void)
 
 
 /*
+  send a FCC packet
+ */
+static void send_FCC_packet(void)
+{
+    uint8_t pkt[16];
+    uint16_t seed;
+    uint8_t i;
+
+    if (state != STATE_SEND) {
+        state = STATE_SEND;
+    }
+    
+    timer_call_after_ms(2, send_FCC_packet);
+    dsm.receive_telem = false;
+
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
+    write_register(CYRF_RX_ABORT, 0);
+    
+    memset(pkt, 0, 16);
+    
+    pkt[0] = ~dsm.mfg_id[2];
+    pkt[1] = ~dsm.mfg_id[3];
+
+    for (i=0; i<7; i++) {
+        int16_t v;
+        uint8_t chan = i;
+        v = (((uint16_t)chan)<<11) | channel_value(chan);
+        pkt[2*(i+1)+1] = v & 0xFF;
+        pkt[2*(i+1)] = v >> 8;
+    }
+    
+    /*
+      allow switching between min channel, mid-channel and max channel
+     */
+    dsm.current_channel = 0;
+
+    switch (dsm.FCC_test_mode % 4) {
+    case 0:
+    case 1:
+        dsm.current_rf_channel = 0;
+        break;
+    case 2:
+        dsm.current_rf_channel = DSM_MAX_CHANNEL/2;
+        break;
+    case 3:
+        dsm.current_rf_channel = DSM_MAX_CHANNEL-1;
+        break;
+    }
+    
+    seed = dsm.crc_seed;
+
+    dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
+                    dsm.sop_col, dsm.data_col, seed);
+    
+    cypress_transmit16(pkt);
+}
+
+
+/*
    Read the MFG id from the chip
  */
 static void get_mfg_id(uint8_t mfg_id[6])
@@ -981,6 +1041,20 @@ static void start_normal_send(void)
 #endif
     dsm_setup_transfer();
     timer_call_after_ms(10, send_normal_packet);
+}
+
+/*
+  start FCC send pattern
+ */
+static void start_FCC_send(void)
+{
+    state = STATE_SEND;
+    radio_set_config(cyrf_transfer_config, ARRAY_SIZE(cyrf_transfer_config));
+#if DISABLE_CRC
+    write_register(CYRF_RX_OVERRIDE, CYRF_DIS_RXCRC);
+#endif
+    dsm_setup_transfer();
+    timer_call_after_ms(10, send_FCC_packet);
 }
 
 /*
@@ -1078,6 +1152,25 @@ void cypress_start_bind_send(bool use_dsm2)
 
 
 /*
+  setup radio for FCC test
+ */
+void cypress_start_FCC_test(void)
+{
+    dsm.FCC_test_mode = 1;
+    is_dsm2 = true;
+
+    printf("Cypress: start_FCC test\n");
+
+    get_mfg_id(dsm.mfg_id);
+    
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
+    write_register(CYRF_RX_ABORT, 0);
+    
+    start_FCC_send();
+}
+
+
+/*
   setup radio for normal sending
  */
 void cypress_start_send(bool use_dsm2)
@@ -1125,6 +1218,10 @@ static void check_power_level(void)
     // always full power
     dsm.power_level = CYRF_PA_4;
 #endif
+    if (dsm.FCC_test_mode) {
+        // max power for FCC testing
+        dsm.power_level = CYRF_PA_4;        
+    }
     if (dsm.power_level != current_power_level) {
         dsm.sends_since_power_change = 0;
         write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.power_level);
@@ -1189,4 +1286,24 @@ uint8_t get_rssi(void)
     dsm.rssi_sum = 0;
     dsm.rssi_count = 0;
     return ret;
+}
+
+/*
+  switch between 3 FCC test modes
+ */
+void cypress_next_FCC_test(void)
+{
+    if (dsm.FCC_test_mode >= 3) {
+        dsm.FCC_test_mode = 1;
+    } else {
+        dsm.FCC_test_mode++;
+    }
+}
+
+/*
+  get FCC test mode
+ */
+uint8_t get_FCC_test(void)
+{
+    return dsm.FCC_test_mode;
 }
