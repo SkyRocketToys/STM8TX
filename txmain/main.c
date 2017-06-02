@@ -185,6 +185,10 @@ void main(void)
     
     chip_init();
     led_init();
+
+    // give indication of power on quickly for user
+    led_green_set(true);
+    
     adc_init();
     spi_init();
     timer_init();
