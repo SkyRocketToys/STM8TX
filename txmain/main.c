@@ -201,6 +201,9 @@ static void status_update(bool have_link)
         return;
     }
 
+    // consider telemetry to be stick activity
+    last_stick_activity = now;
+
     if (t_status.flight_mode != last_status.flight_mode) {
         switch (t_status.flight_mode) {
         case ALT_HOLD:
