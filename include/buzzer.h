@@ -17,6 +17,12 @@ void buzzer_tune(uint8_t t);
 #define TONE_RX_SEARCH                      3
 #define TONE_LOITER                         4
 #define TONE_ALT_HOLD                       5
+#define TONE_RTL                            6
+#define TONE_LAND                           7
+#define TONE_OTHER_MODE                     8
+#define TONE_BATT_WARNING                   9
 
-#define TONE_NUMBER_OF_TUNES 6
+#define TONE_NUMBER_OF_TUNES 10
+
+
 

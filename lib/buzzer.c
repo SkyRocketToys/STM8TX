@@ -37,6 +37,10 @@ static const char * const tune[TONE_NUMBER_OF_TUNES] = {
     ":d=1,o=4,b=2048:b",
     "loiter:d=4,o=6,b=400:8d,8d,a",
     "althold:d=4,o=6,b=400:8e,8e,8e,c",
+    "rtl:d=4,o=6,b=400:8c,8c,8c,d,8c,8c,8c,d",
+    "land:d=4,o=6,b=400:d,4b,4b,4b,4b",
+    "other_mode:d=4,o=6,b=400:4c,4b,4a",
+    "batt_warning:d=4,o=6,b=512:8a,8a,8a,8a,8a,8a,8a,8a,8a",
 };
 
 

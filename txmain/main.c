@@ -59,6 +59,8 @@ static bool check_buttons_FCC_test(void)
 static uint16_t green_led_pattern;
 static uint16_t yellow_led_pattern;
 
+static uint32_t last_batt_warn_ms;
+
 /*
   update led flashing
  */
@@ -110,7 +112,9 @@ enum control_mode_t {
 static void status_update(bool have_link)
 {
     static bool last_have_link;
-
+    uint32_t now = timer_get_ms();
+    bool played_tone = false;
+    
     uint8_t FCC_test = get_FCC_test();
     if (FCC_test != 0) {
         if (gpio_get(PIN_LEFT_BUTTON) == 0) {
@@ -144,35 +148,66 @@ static void status_update(bool have_link)
     } else {
         last_have_link = false;
     }
+
+    /*
+      the primary role of the green LED is to indicate GPS lock. The
+      primary role of the yellow LED is to indicate power and arming
+      state
+     */
+    
     if (!last_have_link) {
         buzzer_tune(TONE_RX_SEARCH);
-        yellow_led_pattern = LED_PATTERN_LOW;
-        green_led_pattern = LED_PATTERN_HIGH;
+        yellow_led_pattern = LED_PATTERN_HIGH;
+        green_led_pattern = LED_PATTERN_LOW;
         return;
     }
 
-    if (t_status.flags & TELEM_FLAG_GPS_OK) {
-        yellow_led_pattern = LED_PATTERN_SOLID;
-    } else {
-        yellow_led_pattern = LED_PATTERN_BLINK1;
-    }
-
-    if (t_status.flags & TELEM_FLAG_ARM_OK) {
-        if (t_status.flight_mode == LOITER) {
-            green_led_pattern = LED_PATTERN_SOLID;
-        } else {
-            green_led_pattern = LED_PATTERN_BLINK3;
+    if (t_status.flight_mode != last_status.flight_mode) {
+        switch (t_status.flight_mode) {
+        case ALT_HOLD:
+            buzzer_tune(TONE_ALT_HOLD);
+            break;
+        case LOITER:
+            buzzer_tune(TONE_LOITER);
+            break;
+        case RTL:
+            buzzer_tune(TONE_RTL);
+            break;
+        case LAND:
+            buzzer_tune(TONE_LAND);
+            break;
+        default:
+            buzzer_tune(TONE_OTHER_MODE);
+            break;
         }
+        played_tone = true;
+    }
+        
+    if (t_status.flags & TELEM_FLAG_GPS_OK) {
+        green_led_pattern = LED_PATTERN_SOLID;
     } else {
         green_led_pattern = LED_PATTERN_BLINK1;
     }
-    
-    if (t_status.flight_mode != last_status.flight_mode) {
-        if (t_status.flight_mode == ALT_HOLD) {
-            buzzer_tune(TONE_ALT_HOLD);
-        } else if (t_status.flight_mode == LOITER) {
-            buzzer_tune(TONE_LOITER);
+
+    if ((t_status.flags & TELEM_FLAG_BATT_OK) == 0) {
+        // low battery rapid flash
+        yellow_led_pattern = LED_PATTERN_RAPID;
+
+        // play battery warning every 5s when in battery failsafe
+        if (!played_tone && (now - last_batt_warn_ms > 5000U)) {
+            last_batt_warn_ms = now;
+            buzzer_tune(TONE_BATT_WARNING);
         }
+    } else if (t_status.flags & (TELEM_FLAG_ARM_OK | TELEM_FLAG_ARMED)) {
+        // when armed, indicate flight mode with yellow LED
+        if (t_status.flight_mode == LOITER) {
+            yellow_led_pattern = LED_PATTERN_SOLID;
+        } else {
+            yellow_led_pattern = LED_PATTERN_BLINK3;
+        }
+    } else {
+        // slow blink when waiting to be arm OK
+        yellow_led_pattern = LED_PATTERN_BLINK1;
     }
     
     memcpy(&last_status, &t_status, sizeof(t_status));
@@ -187,7 +222,7 @@ void main(void)
     led_init();
 
     // give indication of power on quickly for user
-    led_green_set(true);
+    led_yellow_set(true);
     
     adc_init();
     spi_init();
