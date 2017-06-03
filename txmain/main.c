@@ -56,6 +56,8 @@ static bool check_buttons_FCC_test(void)
 }
 
 
+static uint32_t last_stick_activity;
+
 static uint16_t green_led_pattern;
 static uint16_t yellow_led_pattern;
 
@@ -69,6 +71,32 @@ static void update_leds(void)
     uint8_t tick = (timer_get_ms() >> 6) & 0xF;
     led_yellow_set(yellow_led_pattern & (1U<<tick));
     led_green_set(green_led_pattern & (1U<<tick));
+}
+
+/*
+  check for stick activity
+ */
+static void check_stick_activity(void)
+{
+    uint8_t i;
+    bool active = false;
+    for (i=0; i<4; i++) {
+        uint16_t v = adc_value(i);
+        if (v < 400 || v > 600) {
+            active = true;
+        }
+    }
+    // any button counts as activity
+    if ((gpio_get(PIN_RIGHT_BUTTON)==0) ||
+        (gpio_get(PIN_LEFT_BUTTON)==0) ||
+        (gpio_get(PIN_SW1)==0) ||
+        (gpio_get(PIN_SW2)==0) ||
+        (gpio_get(PIN_USER)!=0)) {
+        active = true;
+    }
+    if (active) {
+        last_stick_activity = timer_get_ms();
+    }
 }
 
 extern struct telem_status t_status;
@@ -156,9 +184,20 @@ static void status_update(bool have_link)
      */
     
     if (!last_have_link) {
-        buzzer_tune(TONE_RX_SEARCH);
-        yellow_led_pattern = LED_PATTERN_HIGH;
-        green_led_pattern = LED_PATTERN_LOW;
+        if ((now - last_stick_activity)>>10 > 180U) {
+            // clear power control
+            printf("powering off\n");
+            gpio_clear(PIN_POWER);            
+        }
+        if ((now - last_stick_activity)>>10 > 170U) {
+            buzzer_tune(TONE_INACTIVITY);            
+            yellow_led_pattern = LED_PATTERN_RAPID;
+            green_led_pattern = LED_PATTERN_RAPID;
+        } else {
+            buzzer_tune(TONE_RX_SEARCH);
+            yellow_led_pattern = LED_PATTERN_HIGH;
+            green_led_pattern = LED_PATTERN_LOW;
+        }
         return;
     }
 
@@ -182,7 +221,7 @@ static void status_update(bool have_link)
         }
         played_tone = true;
     }
-        
+
     if (t_status.flags & TELEM_FLAG_GPS_OK) {
         green_led_pattern = LED_PATTERN_SOLID;
     } else {
@@ -290,6 +329,7 @@ void main(void)
         
         while (timer_get_ms() < next_ms) {
             update_leds();
+            check_stick_activity();
         }
         next_ms += 1000;
     }
