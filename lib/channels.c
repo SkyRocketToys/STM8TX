@@ -17,15 +17,34 @@ static bool latched_left_button(void)
 {
     static uint8_t counter;
     static bool latched;
-    if (gpio_get(PIN_LEFT_BUTTON) !=0 ) {
+    static bool ignore_left_button;
+
+    /*
+      the left button is latching to make flight mode changes more
+      reliable on lossy links. If any other button is pressed when
+      left button is held, then it is a button combination and mode
+      does not change
+     */
+    
+    if (gpio_get(PIN_LEFT_BUTTON) != 0) {
+        if (counter >= 10 && !ignore_left_button) {
+            latched = !latched;
+        }
         counter = 0;
+        ignore_left_button = false;
     } else {
         if (counter < 11) {
             counter++;
         }
-    }
-    if (counter == 10) {
-        latched = !latched;
+        if (gpio_get(PIN_SW1)==0 ||
+            gpio_get(PIN_SW2)==0 ||
+            gpio_get(PIN_USER)!=0 ||
+            gpio_get(PIN_RIGHT_BUTTON)==0) {
+            ignore_left_button = true;
+        }
+        if (ignore_left_button) {
+            counter = 0;
+        }
     }
     return latched;
 }
