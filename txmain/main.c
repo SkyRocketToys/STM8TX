@@ -144,6 +144,7 @@ static void status_update(bool have_link)
     bool played_tone = false;
     
     uint8_t FCC_test = get_FCC_test();
+    uint8_t FCC_power = get_FCC_power();
     if (FCC_test != 0) {
         if (gpio_get(PIN_LEFT_BUTTON) == 0) {
             cypress_next_FCC_test();
@@ -164,6 +165,16 @@ static void status_update(bool have_link)
             yellow_led_pattern = LED_PATTERN_FCC3;
             green_led_pattern = LED_PATTERN_FCC3;
             break;
+        }
+        if (gpio_get(PIN_RIGHT_BUTTON) == 0) {
+            uint8_t i;
+            cypress_next_FCC_power();
+            FCC_power = get_FCC_power();
+            printf("FCC power %u\n", FCC_power);
+            for (i=0; i<FCC_power; i++) {
+                buzzer_tune(TONE_RX_SEARCH);
+                delay_ms(100);
+            }
         }
         return;
     }

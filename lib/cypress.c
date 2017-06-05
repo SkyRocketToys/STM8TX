@@ -371,6 +371,7 @@ static struct {
     uint16_t rssi_count;
     uint8_t power_level;
     uint8_t FCC_test_mode;
+    uint8_t FCC_test_power;
 } dsm;
 
 static void radio_init(void);
@@ -646,7 +647,7 @@ static void dsm_setup_transfer_dsm2(void)
  */
 static void dsm_setup_transfer(void)
 {
-    if (is_DSM2()) {
+    if (is_DSM2() && !dsm.FCC_test_mode) {
         dsm_setup_transfer_dsm2();
     } else {
         dsm_setup_transfer_dsmx();
@@ -1157,6 +1158,7 @@ void cypress_start_bind_send(bool use_dsm2)
 void cypress_start_FCC_test(void)
 {
     dsm.FCC_test_mode = 1;
+    dsm.FCC_test_power = CYRF_PA_4;
     is_dsm2 = true;
 
     printf("Cypress: start_FCC test\n");
@@ -1219,8 +1221,8 @@ static void check_power_level(void)
     dsm.power_level = CYRF_PA_4;
 #endif
     if (dsm.FCC_test_mode) {
-        // max power for FCC testing
-        dsm.power_level = CYRF_PA_4;        
+        // choose power for FCC testing
+        dsm.power_level = dsm.FCC_test_power;
     }
     if (dsm.power_level != current_power_level) {
         dsm.sends_since_power_change = 0;
@@ -1301,9 +1303,25 @@ void cypress_next_FCC_test(void)
 }
 
 /*
+  switch between 3 FCC test modes
+ */
+void cypress_next_FCC_power(void)
+{
+    dsm.FCC_test_power = (dsm.FCC_test_power+1) % (CYRF_PA_4+1);
+}
+
+/*
   get FCC test mode
  */
 uint8_t get_FCC_test(void)
 {
     return dsm.FCC_test_mode;
+}
+
+/*
+  get FCC test power
+ */
+uint8_t get_FCC_power(void)
+{
+    return dsm.FCC_test_power+1;
 }
