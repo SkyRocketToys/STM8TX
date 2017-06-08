@@ -319,8 +319,9 @@ void main(void)
         uint8_t trx_count = get_telem_recv_count();
         bool link_ok = false;
 
-        printf("%u: ADC=[%u %u %u %u]",
-               counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3));
+        printf("%u: ADC=[%u %u %u %u] B:0x%x",
+               counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
+               (unsigned)get_buttons());
         if (get_FCC_test() != 0) {
             printf(" FCC %u\n", get_FCC_test());
         } else if (trx_count == 0) {

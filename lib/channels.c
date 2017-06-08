@@ -3,6 +3,7 @@
 #include "gpio.h"
 #include "config.h"
 #include "util.h"
+#include "channels.h"
 
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
 extern uint8_t telem_ack_value;
@@ -129,4 +130,27 @@ uint16_t channel_value(uint8_t chan)
     v = (((v - 500) * 27 / 32) + 512) * 2;
 
     return (uint16_t)v;
+}
+
+// get buttons
+uint16_t get_buttons(void)
+{
+    uint8_t ret = 0;
+
+    if (gpio_get(PIN_LEFT_BUTTON) == 0) {
+        ret |= BUTTON_LEFT;
+    }
+    if (gpio_get(PIN_RIGHT_BUTTON) == 0) {
+        ret |= BUTTON_RIGHT;
+    }
+    if (gpio_get(PIN_SW1)==0) {
+        ret |= BUTTON_LEFT_SHOULDER;
+    }
+    if (gpio_get(PIN_SW2)==0) {
+        ret |= BUTTON_RIGHT_SHOULDER;
+    }
+    if (gpio_get(PIN_USER)!=0) {
+        ret |= BUTTON_POWER;
+    }
+    return ret;
 }
