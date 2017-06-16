@@ -373,6 +373,8 @@ static struct {
     uint8_t FCC_test_mode;
     uint8_t FCC_test_power;
     uint8_t factory_test_mode;
+    bool last_CW_mode;
+    bool fcc_CW_mode;
 } dsm;
 
 static void radio_init(void);
@@ -961,6 +963,19 @@ static void send_normal_packet(void)
 
 
 /*
+  transmit an unmodulated signal for FCC testing
+ */
+static void cypress_transmit_unmodulated(void)
+{
+    write_register(CYRF_PREAMBLE,0x01);
+    write_register(CYRF_PREAMBLE,0x00);
+    write_register(CYRF_PREAMBLE,0x00);
+    
+    write_register(CYRF_TX_OVERRIDE, CYRF_FRC_PRE);
+    write_register(CYRF_TX_CTRL, CYRF_TX_GO);    
+}
+
+/*
   send a FCC packet
  */
 static void send_FCC_packet(void)
@@ -976,8 +991,10 @@ static void send_FCC_packet(void)
     timer_call_after_ms(2, send_FCC_packet);
     dsm.receive_telem = false;
 
-    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
-    write_register(CYRF_RX_ABORT, 0);
+    if (!dsm.fcc_CW_mode) {
+        write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
+        write_register(CYRF_RX_ABORT, 0);
+    }
     
     memset(pkt, 0, 16);
     
@@ -987,7 +1004,7 @@ static void send_FCC_packet(void)
     for (i=0; i<7; i++) {
         int16_t v;
         uint8_t chan = i;
-        v = (((uint16_t)chan)<<11) | channel_value(chan);
+        v = (((uint16_t)chan)<<11) | i*100;
         pkt[2*(i+1)+1] = v & 0xFF;
         pkt[2*(i+1)] = v >> 8;
     }
@@ -1012,10 +1029,31 @@ static void send_FCC_packet(void)
     
     seed = dsm.crc_seed;
 
-    dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
-                    dsm.sop_col, dsm.data_col, seed);
+    if (dsm.power_level != dsm.FCC_test_power) {
+        dsm.power_level = dsm.FCC_test_power;
+        write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.FCC_test_power);
+    }
     
-    cypress_transmit16(pkt);
+    if (dsm.fcc_CW_mode) {
+        if (!dsm.last_CW_mode) {
+            dsm_set_channel(dsm.current_rf_channel, true, dsm.sop_col, dsm.data_col, seed);
+
+            cypress_transmit_unmodulated();
+        }
+        dsm.last_CW_mode = true;
+    } else {
+        if (dsm.last_CW_mode) {
+            dsm.last_CW_mode = false;
+            // setup default preamble
+            write_register(CYRF_PREAMBLE,0x02);
+            write_register(CYRF_PREAMBLE,0x33);
+            write_register(CYRF_PREAMBLE,0x33);
+            radio_set_config(cyrf_transfer_config, ARRAY_SIZE(cyrf_transfer_config));
+            write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.FCC_test_power);
+        }
+        dsm_set_channel(dsm.current_rf_channel, true, dsm.sop_col, dsm.data_col, seed);
+        cypress_transmit16(pkt);
+    }
 }
 
 
@@ -1343,4 +1381,12 @@ uint8_t get_FCC_test(void)
 uint8_t get_FCC_power(void)
 {
     return dsm.FCC_test_power+1;
+}
+
+/*
+  set CW mode for FCC testing
+ */
+void cypress_set_CW_mode(bool cw)
+{
+    dsm.fcc_CW_mode = cw;
 }

@@ -130,6 +130,8 @@ enum control_mode_t {
     GUIDED_NOGPS = 20,  // guided mode but only accepts attitude and altitude
 };
 
+static bool fcc_CW_mode;
+
 /*
    notify user when we have link, flight mode changes etc
  */
@@ -141,8 +143,10 @@ static void status_update(bool have_link)
     
     uint8_t FCC_test = get_FCC_test();
     uint8_t FCC_power = get_FCC_power();
+    uint8_t buttons = get_buttons();
+    
     if (FCC_test != 0) {
-        if (gpio_get(PIN_LEFT_BUTTON) == 0) {
+        if (buttons == BUTTON_LEFT) {
             cypress_next_FCC_test();
             FCC_test = get_FCC_test();
             printf("FCC test mode %u\n", FCC_test);
@@ -162,7 +166,7 @@ static void status_update(bool have_link)
             green_led_pattern = LED_PATTERN_FCC3;
             break;
         }
-        if (gpio_get(PIN_RIGHT_BUTTON) == 0) {
+        if (buttons == BUTTON_RIGHT) {
             uint8_t i;
             cypress_next_FCC_power();
             FCC_power = get_FCC_power();
@@ -171,6 +175,12 @@ static void status_update(bool have_link)
                 buzzer_tune(TONE_RX_SEARCH);
                 delay_ms(100);
             }
+        }
+        if (buttons == BUTTON_POWER) {
+            fcc_CW_mode = !fcc_CW_mode;
+            cypress_set_CW_mode(fcc_CW_mode);
+            buzzer_tune(fcc_CW_mode?TONE_LOITER:TONE_ALT_HOLD);
+            printf("CW mode %u\n", fcc_CW_mode);
         }
         return;
     }
@@ -347,24 +357,23 @@ void main(void)
         uint8_t trx_count = get_telem_recv_count();
         bool link_ok = false;
 
-        printf("%u: ADC=[%u %u %u %u] B:0x%x",
+        printf("%u: ADC=[%u %u %u %u] B:0x%x PWR:%u",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
-               (unsigned)get_buttons());
+               (unsigned)get_buttons(), get_tx_power());
         if (get_FCC_test() != 0) {
-            printf(" FCC %u\n", get_FCC_test());
+            printf(" FCC %u CW:%u\n", get_FCC_test(), fcc_CW_mode);
         } else if (trx_count == 0) {
-            printf(" TX:%u NOSIGNAL PWR:%u\n", get_pps(), get_tx_power());
+            printf(" TX:%u NOSIGNAL\n", get_pps());
             link_ok = false;
         } else {
-            printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u F:0x%x M:%u PWR:%u\n",
+            printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u F:0x%x M:%u\n",
                    get_pps(),
                    trx_count,
                    get_rssi(),
                    get_rx_rssi(),
                    get_rx_pps(),
                    t_status.flags,
-                   t_status.flight_mode,
-                   get_tx_power());
+                   t_status.flight_mode);
             link_ok = true;
         }
 
