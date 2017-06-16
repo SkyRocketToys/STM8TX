@@ -1243,7 +1243,7 @@ static void check_power_level(void)
         // choose power for FCC testing
         dsm.power_level = dsm.FCC_test_power;
     }
-    if (dsm.power_level != current_power_level) {
+    if (dsm.power_level != current_power_level && state != STATE_BIND_SEND) {
         dsm.sends_since_power_change = 0;
         write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.power_level);
     }
