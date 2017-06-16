@@ -3,6 +3,7 @@ void cypress_irq();
 void cypress_start_bind_send(bool use_dsm2);
 void cypress_start_send(bool use_dsm2);
 void cypress_start_FCC_test(void);
+void cypress_start_factory_test(uint8_t test_mode);
 void cypress_next_FCC_test(void);
 void cypress_next_FCC_power(void);
 uint8_t get_rx_pps(void);

@@ -133,7 +133,7 @@ uint16_t channel_value(uint8_t chan)
 }
 
 // get buttons
-uint16_t get_buttons(void)
+uint8_t get_buttons(void)
 {
     uint8_t ret = 0;
 

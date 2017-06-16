@@ -15,4 +15,4 @@ uint16_t channel_value(uint8_t chan);
 #define BUTTON_POWER 0x10
 
 // get buttons
-uint16_t get_buttons(void);
+uint8_t get_buttons(void);

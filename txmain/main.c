@@ -12,6 +12,7 @@
 #include "buzzer.h"
 #include "gpio.h"
 #include "config.h"
+#include "channels.h"
 #include "telem_structure.h"
 #include <string.h>
 
@@ -31,30 +32,25 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
     timer_irq();
 }
 
-/*
-  check for buttons in bind position at startup
- */
-static bool bind_buttons_check_dsm2(void)
+// get buttons without power button
+static uint8_t get_buttons_no_power(void)
 {
-    return (gpio_get(PIN_LEFT_BUTTON) == 0);
+    return get_buttons() & ~BUTTON_POWER;
 }
 
 /*
-  check for buttons in bind position at startup
+  get bootloader version
  */
-static bool bind_buttons_check_dsmx(void)
+static uint8_t get_bl_version(void)
 {
-    return (gpio_get(PIN_RIGHT_BUTTON) == 0);
+    const uint8_t *v = (const uint8_t *)0x8080;
+    if (v[1] == v[0]+1 &&
+        v[2] == v[0]+2 &&
+        v[3] == v[0]+3) {
+        return v[0];
+    }
+    return 0;
 }
-
-/*
-  check for buttons in FCC test mode state
- */
-static bool check_buttons_FCC_test(void)
-{
-    return (gpio_get(PIN_LEFT_BUTTON) == 0) && (gpio_get(PIN_RIGHT_BUTTON) == 0);
-}
-
 
 static uint32_t last_stick_activity;
 
@@ -270,6 +266,7 @@ void main(void)
 {
     uint16_t counter=0;
     uint32_t next_ms;
+    uint8_t factory_mode = 0;
     
     chip_init();
     led_init();
@@ -291,27 +288,58 @@ void main(void)
 
     enableInterrupts();
 
+    printf("BL_VERSION %u\n", get_bl_version());
+    
     // wait for initial stick inputs
     delay_ms(200);
 
-    if (check_buttons_FCC_test()) {
+    switch (get_buttons_no_power()) {
+    case BUTTON_LEFT | BUTTON_RIGHT:
         printf("FCC test start\n");
         cypress_start_FCC_test();
-    } else if (bind_buttons_check_dsm2()) {
+        break;
+        
+    case BUTTON_LEFT:
         printf("DSM2 bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
         cypress_start_bind_send(true);
-    } else if (bind_buttons_check_dsmx()) {
+        break;
+
+    case BUTTON_RIGHT:
         printf("DSMX bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 0);
         cypress_start_bind_send(false);
-    } else {
+        break;
+
+    case BUTTON_LEFT_SHOULDER: {
+        uint16_t adc2 = adc_value(2);
+        uint16_t adc3 = adc_value(3);
+        if (adc3 > 800 && adc2 > 300 && adc2 < 700) {
+            factory_mode = 1;
+        } else if (adc2 > 800 && adc3 > 300 && adc3 < 700) {
+            factory_mode = 2;
+        } else if (adc3 < 200 && adc2 > 300 && adc2 < 700) {
+            factory_mode = 3;
+        } else if (adc2 < 200 && adc3 > 300 && adc3 < 700) {
+            factory_mode = 4;
+        }
+        printf("Factory mode %u adc2=%u adc3=%u\n", factory_mode, adc2, adc3);
+        cypress_start_factory_test(factory_mode);
+        break;
+    }
+        
+    default: {
         bool use_dsm2 = eeprom_read(EEPROM_DSMPROT_OFFSET);
         cypress_start_send(use_dsm2);
+        break;
+    }
     }
 
-    buzzer_tune(TONE_STARTUP_TUNE);
-    //buzzer_tune(TONE_STARWARS);
+    if (factory_mode == 0) {
+        buzzer_tune(TONE_STARTUP_TUNE);
+    } else {
+        buzzer_tune(TONE_BATT_WARNING);        
+    }
 
     next_ms = timer_get_ms() + 1000;
 

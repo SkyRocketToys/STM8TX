@@ -62,6 +62,8 @@ static const __at(0x8000) struct ivector vectors[32] = {
     VECTOR(31)
 };
 
+static const __at(0x8080) uint8_t bl_version[4] = { BL_VERSION, BL_VERSION+1, BL_VERSION+2, BL_VERSION+3 };
+
 static void delay_ms(uint16_t d)
 {
     // empirically tuned

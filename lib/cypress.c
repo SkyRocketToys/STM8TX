@@ -372,6 +372,7 @@ static struct {
     uint8_t power_level;
     uint8_t FCC_test_mode;
     uint8_t FCC_test_power;
+    uint8_t factory_test_mode;
 } dsm;
 
 static void radio_init(void);
@@ -636,8 +637,13 @@ static void dsm_setup_transfer_dsm2(void)
     dsm.sop_col = (dsm.mfg_id[0] + dsm.mfg_id[1] + dsm.mfg_id[2] + 2) & 0x07;
     dsm.data_col = 7 - dsm.sop_col;
 
-    // scan for best channels
-    scan_channels();
+    if (dsm.factory_test_mode == 0) {
+        // scan for best channels
+        scan_channels();
+    } else {
+        dsm.channels[0] = (dsm.factory_test_mode*7) % DSM_MAX_CHANNEL;
+        dsm.channels[1] = (dsm.channels[0] + 5) % DSM_MAX_CHANNEL;
+    }
 
     printf("Setup for DSM2 send\n");
 }
@@ -1181,7 +1187,11 @@ void cypress_start_send(bool use_dsm2)
 
     printf("Cypress: start_send DSM2=%u\n", is_dsm2);
 
-    get_mfg_id(dsm.mfg_id);
+    if (dsm.factory_test_mode != 0) {
+        dsm.mfg_id[0] = dsm.factory_test_mode;
+    } else {
+        get_mfg_id(dsm.mfg_id);
+    }
     
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
@@ -1190,6 +1200,15 @@ void cypress_start_send(bool use_dsm2)
            dsm.mfg_id[0], dsm.mfg_id[1], dsm.mfg_id[2], dsm.mfg_id[3]);
 
     start_normal_send();
+}
+
+/*
+  setup for factory mode
+ */
+void cypress_start_factory_test(uint8_t test_mode)
+{
+    dsm.factory_test_mode = test_mode;
+    cypress_start_send(true);
 }
 
 /*
