@@ -122,7 +122,7 @@ static void check_new_firmware(void)
     uint32_t new_crc = *(int32_t *)(NEW_FIRMWARE_BASE+2);
     uint32_t calc_crc, calc_crc2, calc_crc3;
 
-    if (new_size < 0x1000 || new_size > 0x4000) {
+    if (new_size < 0x1000 || new_size > (NEW_FIRMWARE_BASE-CODELOC)) {
         toggle_code(5);
         // not valid
         return;
