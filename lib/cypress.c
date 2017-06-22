@@ -1372,5 +1372,12 @@ void cypress_set_CW_mode(bool cw)
 
 void cypress_change_FCC_channel(int8_t change)
 {
-    dsm.FCC_test_chan = (dsm.FCC_test_chan + change) % DSM_MAX_CHANNEL;
+    int8_t newchan = dsm.FCC_test_chan + change;
+    if (newchan >= DSM_MAX_CHANNEL) {
+        newchan = 0;
+    }
+    if (newchan < 0) {
+        newchan = DSM_MAX_CHANNEL-1;
+    }
+    dsm.FCC_test_chan = newchan;
 }
