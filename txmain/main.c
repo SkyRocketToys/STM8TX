@@ -164,10 +164,11 @@ static void status_update(bool have_link)
         }
         if (buttons == BUTTON_LEFT_SHOULDER) {
             cypress_change_FCC_channel(-1);
+            buzzer_tune(TONE_RX_SEARCH);
         }
         if (buttons == BUTTON_RIGHT_SHOULDER || buttons == BUTTON_LEFT) {
-            buzzer_tune(TONE_RX_SEARCH);
             cypress_change_FCC_channel(1);
+            buzzer_tune(TONE_RX_SEARCH);
         }
         return;
     }
