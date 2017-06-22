@@ -373,7 +373,7 @@ static struct {
     uint8_t FCC_test_mode;
     uint8_t FCC_test_power;
     uint8_t factory_test_mode;
-    bool last_CW_mode;
+    uint8_t last_CW_mode;
     bool fcc_CW_mode;
 } dsm;
 
@@ -1035,15 +1035,15 @@ static void send_FCC_packet(void)
     }
     
     if (dsm.fcc_CW_mode) {
-        if (!dsm.last_CW_mode) {
+        if (dsm.last_CW_mode != dsm.FCC_test_mode) {
             dsm_set_channel(dsm.current_rf_channel, true, dsm.sop_col, dsm.data_col, seed);
 
             cypress_transmit_unmodulated();
         }
-        dsm.last_CW_mode = true;
+        dsm.last_CW_mode = dsm.FCC_test_mode;
     } else {
         if (dsm.last_CW_mode) {
-            dsm.last_CW_mode = false;
+            dsm.last_CW_mode = 0;
             // setup default preamble
             write_register(CYRF_PREAMBLE,0x02);
             write_register(CYRF_PREAMBLE,0x33);
