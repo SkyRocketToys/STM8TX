@@ -105,9 +105,7 @@ static struct telem_status last_status;
 #define LED_PATTERN_BLINK2 0xFFF0
 #define LED_PATTERN_BLINK3 0xF0F0
 #define LED_PATTERN_RAPID  0xAAAA
-#define LED_PATTERN_FCC1   0x1000
-#define LED_PATTERN_FCC2   0x1100
-#define LED_PATTERN_FCC3   0x1110
+#define LED_PATTERN_FCC    0x1000
 
 enum control_mode_t {
     STABILIZE =     0,  // manual airframe angle with manual throttle
@@ -141,31 +139,13 @@ static void status_update(bool have_link)
     uint32_t now = timer_get_ms();
     bool played_tone = false;
     
-    uint8_t FCC_test = get_FCC_test();
+    int8_t FCC_chan = get_FCC_chan();
     uint8_t FCC_power = get_FCC_power();
     uint8_t buttons = get_buttons();
     
-    if (FCC_test != 0) {
-        if (buttons == BUTTON_LEFT) {
-            cypress_next_FCC_test();
-            FCC_test = get_FCC_test();
-            printf("FCC test mode %u\n", FCC_test);
-            buzzer_tune(TONE_NOTIFY_POSITIVE_TUNE);
-        }
-        switch (FCC_test) {
-        case 1:
-            yellow_led_pattern = LED_PATTERN_FCC1;
-            green_led_pattern = LED_PATTERN_FCC1;
-            break;
-        case 2:
-            yellow_led_pattern = LED_PATTERN_FCC2;
-            green_led_pattern = LED_PATTERN_FCC2;
-            break;
-        case 3:
-            yellow_led_pattern = LED_PATTERN_FCC3;
-            green_led_pattern = LED_PATTERN_FCC3;
-            break;
-        }
+    if (FCC_chan != -1) {
+        yellow_led_pattern = LED_PATTERN_FCC;
+        green_led_pattern = LED_PATTERN_FCC;
         if (buttons == BUTTON_RIGHT) {
             uint8_t i;
             cypress_next_FCC_power();
@@ -181,6 +161,13 @@ static void status_update(bool have_link)
             cypress_set_CW_mode(fcc_CW_mode);
             buzzer_tune(fcc_CW_mode?TONE_LOITER:TONE_ALT_HOLD);
             printf("CW mode %u\n", fcc_CW_mode);
+        }
+        if (buttons == BUTTON_LEFT_SHOULDER) {
+            cypress_change_FCC_channel(-1);
+        }
+        if (buttons == BUTTON_RIGHT_SHOULDER || buttons == BUTTON_LEFT) {
+            buzzer_tune(TONE_RX_SEARCH);
+            cypress_change_FCC_channel(1);
         }
         return;
     }
@@ -356,12 +343,13 @@ void main(void)
     while (true) {
         uint8_t trx_count = get_telem_recv_count();
         bool link_ok = false;
-
+        int8_t FCC_chan = get_FCC_chan();
+        
         printf("%u: ADC=[%u %u %u %u] B:0x%x PWR:%u",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
                (unsigned)get_buttons(), get_tx_power());
-        if (get_FCC_test() != 0) {
-            printf(" FCC %u CW:%u\n", get_FCC_test(), fcc_CW_mode);
+        if (FCC_chan != -1) {
+            printf(" FCC %d CW:%u\n", FCC_chan, fcc_CW_mode);
         } else if (trx_count == 0) {
             printf(" TX:%u NOSIGNAL\n", get_pps());
             link_ok = false;
@@ -383,6 +371,10 @@ void main(void)
             update_leds();
             check_stick_activity();
         }
-        next_ms += 1000;
+        if (FCC_chan != -1) {
+            next_ms += 500;
+        } else {
+            next_ms += 1000;
+        }
     }
 }

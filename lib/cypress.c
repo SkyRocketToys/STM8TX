@@ -370,10 +370,11 @@ static struct {
     uint16_t rssi_sum;
     uint16_t rssi_count;
     uint8_t power_level;
-    uint8_t FCC_test_mode;
+    bool FCC_test_mode;
+    uint8_t FCC_test_chan;
     uint8_t FCC_test_power;
     uint8_t factory_test_mode;
-    uint8_t last_CW_mode;
+    int8_t last_CW_chan;
     bool fcc_CW_mode;
 } dsm;
 
@@ -1013,19 +1014,7 @@ static void send_FCC_packet(void)
       allow switching between min channel, mid-channel and max channel
      */
     dsm.current_channel = 0;
-
-    switch (dsm.FCC_test_mode % 4) {
-    case 0:
-    case 1:
-        dsm.current_rf_channel = 0;
-        break;
-    case 2:
-        dsm.current_rf_channel = DSM_MAX_CHANNEL/2;
-        break;
-    case 3:
-        dsm.current_rf_channel = DSM_MAX_CHANNEL-1;
-        break;
-    }
+    dsm.current_rf_channel = dsm.FCC_test_chan;
     
     seed = dsm.crc_seed;
 
@@ -1035,15 +1024,15 @@ static void send_FCC_packet(void)
     }
     
     if (dsm.fcc_CW_mode) {
-        if (dsm.last_CW_mode != dsm.FCC_test_mode) {
+        if (dsm.last_CW_chan != (int8_t)dsm.FCC_test_chan) {
             dsm_set_channel(dsm.current_rf_channel, true, dsm.sop_col, dsm.data_col, seed);
 
             cypress_transmit_unmodulated();
         }
-        dsm.last_CW_mode = dsm.FCC_test_mode;
+        dsm.last_CW_chan = dsm.FCC_test_chan;
     } else {
-        if (dsm.last_CW_mode) {
-            dsm.last_CW_mode = 0;
+        if (dsm.last_CW_chan != -1) {
+            dsm.last_CW_chan = -1;
             // setup default preamble
             write_register(CYRF_PREAMBLE,0x02);
             write_register(CYRF_PREAMBLE,0x33);
@@ -1201,8 +1190,10 @@ void cypress_start_bind_send(bool use_dsm2)
  */
 void cypress_start_FCC_test(void)
 {
-    dsm.FCC_test_mode = 1;
+    dsm.FCC_test_chan = 0;
     dsm.FCC_test_power = CYRF_PA_4;
+    dsm.last_CW_chan = -1;
+    dsm.FCC_test_mode = true;
     is_dsm2 = true;
 
     printf("Cypress: start_FCC test\n");
@@ -1350,29 +1341,17 @@ uint8_t get_rssi(void)
 /*
   switch between 3 FCC test modes
  */
-void cypress_next_FCC_test(void)
-{
-    if (dsm.FCC_test_mode >= 3) {
-        dsm.FCC_test_mode = 1;
-    } else {
-        dsm.FCC_test_mode++;
-    }
-}
-
-/*
-  switch between 3 FCC test modes
- */
 void cypress_next_FCC_power(void)
 {
     dsm.FCC_test_power = (dsm.FCC_test_power+1) % (CYRF_PA_4+1);
 }
 
 /*
-  get FCC test mode
+  get FCC test chan
  */
-uint8_t get_FCC_test(void)
+int8_t get_FCC_chan(void)
 {
-    return dsm.FCC_test_mode;
+    return dsm.FCC_test_mode?dsm.FCC_test_chan:-1;
 }
 
 /*
@@ -1389,4 +1368,9 @@ uint8_t get_FCC_power(void)
 void cypress_set_CW_mode(bool cw)
 {
     dsm.fcc_CW_mode = cw;
+}
+
+void cypress_change_FCC_channel(int8_t change)
+{
+    dsm.FCC_test_chan = (dsm.FCC_test_chan + change) % DSM_MAX_CHANNEL;
 }
