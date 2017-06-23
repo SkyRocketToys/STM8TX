@@ -376,6 +376,11 @@ static struct {
     uint8_t factory_test_mode;
     int8_t last_CW_chan;
     bool fcc_CW_mode;
+    uint16_t last_tx_count;
+    uint16_t last_tr_count;
+    uint8_t current_telem_rssi;
+    uint8_t current_telem_pps;
+    uint8_t current_send_pps;
 } dsm;
 
 static void radio_init(void);
@@ -1314,28 +1319,52 @@ uint8_t get_tx_power(void)
     return dsm.power_level;
 }
 
-uint8_t get_telem_recv_count(void)
+/*
+  called once per main loop to get packets rates and average RSSI values
+ */
+void cypress_set_pps_rssi(void)
 {
-    static uint16_t last_tr;
-    uint8_t ret = dsm.telem_recv_count - last_tr;
-    last_tr = dsm.telem_recv_count;
-    return ret;
+    // get current send pps
+    dsm.current_send_pps = dsm.send_count - dsm.last_tx_count;
+    dsm.last_tx_count = dsm.send_count;
+
+    // get telemetry pps
+    dsm.current_telem_pps = dsm.telem_recv_count - dsm.last_tr_count;
+    dsm.last_tr_count = dsm.telem_recv_count;
+
+    // get rssi average
+    if (dsm.rssi_count > 0) {
+        dsm.current_telem_rssi = dsm.rssi_sum / dsm.rssi_count;
+        dsm.rssi_sum = 0;
+        dsm.rssi_count = 0;
+    } else {
+        dsm.current_telem_rssi = 0;
+    }
+    
 }
 
-uint8_t get_pps(void)
+/*
+  get the average RSSI from telemetry packets
+ */
+uint8_t get_telem_rssi(void)
 {
-    static uint16_t last_tx;
-    uint8_t ret = dsm.send_count - last_tx;
-    last_tx = dsm.send_count;
-    return ret;
+    return dsm.current_telem_rssi;
 }
 
-uint8_t get_rssi(void)
+/*
+  get the send rate in PPS
+ */
+uint8_t get_send_pps(void)
 {
-    uint8_t ret = dsm.rssi_sum / dsm.rssi_count;
-    dsm.rssi_sum = 0;
-    dsm.rssi_count = 0;
-    return ret;
+    return dsm.current_send_pps;
+}
+
+/*
+  get the telemetry receive rate in pps
+ */
+uint8_t get_telem_pps(void)
+{
+    return dsm.current_telem_pps;
 }
 
 /*

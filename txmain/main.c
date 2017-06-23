@@ -189,12 +189,14 @@ static void status_update(bool have_link)
      */
     
     if (!last_have_link) {
-        if ((now - last_stick_activity)>>10 > 180U) {
+        uint32_t time_since_activity = now - last_stick_activity;
+        uint8_t time_since_activity_s = time_since_activity >> 10;
+        if (time_since_activity_s > 180) {
             // clear power control
             printf("powering off\n");
             gpio_clear(PIN_POWER);            
         }
-        if ((now - last_stick_activity)>>10 > 170U) {
+        if (time_since_activity_s > 170) {
             buzzer_tune(TONE_INACTIVITY);            
             yellow_led_pattern = LED_PATTERN_RAPID;
             green_led_pattern = LED_PATTERN_RAPID;
@@ -342,23 +344,27 @@ void main(void)
     next_ms = timer_get_ms() + 1000;
 
     while (true) {
-        uint8_t trx_count = get_telem_recv_count();
+        uint8_t telem_pps;
         bool link_ok = false;
         int8_t FCC_chan = get_FCC_chan();
+
+        cypress_set_pps_rssi();
+
+        telem_pps = get_telem_pps();
         
         printf("%u: ADC=[%u %u %u %u] B:0x%x PWR:%u",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
                (unsigned)get_buttons(), get_tx_power());
         if (FCC_chan != -1) {
             printf(" FCC %d CW:%u\n", FCC_chan, fcc_CW_mode);
-        } else if (trx_count == 0) {
-            printf(" TX:%u NOSIGNAL\n", get_pps());
+        } else if (telem_pps == 0) {
+            printf(" TX:%u NOSIGNAL\n", get_send_pps());
             link_ok = false;
         } else {
             printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u F:0x%x M:%u\n",
-                   get_pps(),
-                   trx_count,
-                   get_rssi(),
+                   get_send_pps(),
+                   telem_pps,
+                   get_telem_rssi(),
                    get_rx_rssi(),
                    get_rx_pps(),
                    t_status.flags,
@@ -373,9 +379,9 @@ void main(void)
             check_stick_activity();
         }
         if (FCC_chan != -1) {
-            next_ms += 500;
+            next_ms += 400;
         } else {
-            next_ms += 1000;
+            next_ms += 800;
         }
     }
 }

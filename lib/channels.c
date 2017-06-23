@@ -4,6 +4,7 @@
 #include "config.h"
 #include "util.h"
 #include "channels.h"
+#include "cypress.h"
 
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
 extern uint8_t telem_ack_value;
@@ -84,7 +85,7 @@ uint16_t channel_value(uint8_t chan)
         v = gpio_get(PIN_RIGHT_BUTTON)==0?1000:0;
         break;
     case 6:
-        // encode 3 switches onto final channel
+        // encode 3 switches onto channel 7
         v = 0;
         if (gpio_get(PIN_SW1)==0) {
             v |= 1;
@@ -98,8 +99,9 @@ uint16_t channel_value(uint8_t chan)
         v *= 100;
         break;
     case 7: {
+        uint8_t tvalue=0;
         /* return extra data in channel 8. Use top 3 bits for data type */
-        telem_extra_type = (telem_extra_type+1) % 4;
+        telem_extra_type = (telem_extra_type+1) % 6;
 
         if (telem_extra_type == 0 ||
             telem_ack_value != last_telem_ack_value ||
@@ -115,14 +117,27 @@ uint16_t channel_value(uint8_t chan)
         switch (telem_extra_type) {
         case 1:
             // key 1 is year
-            return (1U<<8) | (BUILD_DATE_YEAR-2017);
+            tvalue = BUILD_DATE_YEAR-2017;
+            break;
         case 2:
             // key 2 is month
-            return (2U<<8) | BUILD_DATE_MONTH;
+            tvalue = BUILD_DATE_MONTH;
+            break;
         case 3:
             // key 3 is day
-            return (3U<<8) | BUILD_DATE_DAY;
+            tvalue = BUILD_DATE_DAY;
+            break;
+        case 4:
+            // key 4 telem RSSI
+            tvalue = get_telem_rssi();
+            break;
+        case 5:
+            // key 5 telem pps
+            tvalue = get_telem_pps();
+            break;
         }
+
+        return (((uint16_t)telem_extra_type)<<8) | tvalue;
     }
     }
 
