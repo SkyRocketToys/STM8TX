@@ -98,6 +98,7 @@ static void check_stick_activity(void)
 extern struct telem_status t_status;
 static struct telem_status last_status;
 
+#define LED_PATTERN_OFF    0x0000
 #define LED_PATTERN_LOW    0x0003
 #define LED_PATTERN_HIGH   0xFFFC
 #define LED_PATTERN_SOLID  0xFFFF
@@ -232,8 +233,10 @@ static void status_update(bool have_link)
         played_tone = true;
     }
 
-    if (t_status.flags & TELEM_FLAG_GPS_OK) {
+    if (t_status.flags & TELEM_FLAG_POS_OK) {
         green_led_pattern = LED_PATTERN_SOLID;
+    } else if (t_status.flags & TELEM_FLAG_GPS_OK) {
+        green_led_pattern = LED_PATTERN_BLINK2;
     } else {
         green_led_pattern = LED_PATTERN_BLINK1;
     }
@@ -247,13 +250,9 @@ static void status_update(bool have_link)
             last_batt_warn_ms = now;
             buzzer_tune(TONE_BATT_WARNING);
         }
-    } else if (t_status.flags & (TELEM_FLAG_ARM_OK | TELEM_FLAG_ARMED)) {
-        // when armed, indicate flight mode with yellow LED
-        if (t_status.flight_mode == LOITER) {
-            yellow_led_pattern = LED_PATTERN_SOLID;
-        } else {
-            yellow_led_pattern = LED_PATTERN_BLINK3;
-        }
+    } else if (t_status.flight_mode == ALT_HOLD) {
+        // indoor mode LED
+        yellow_led_pattern = LED_PATTERN_SOLID;
     } else {
         // slow blink when waiting to be arm OK
         yellow_led_pattern = LED_PATTERN_BLINK1;
