@@ -581,6 +581,21 @@ static void scan_channels(void)
     uint8_t best = 0;
     uint8_t best_rssi = 32;
     static uint8_t rssi[DSM_MAX_CHANNEL/2];
+    uint8_t wifi_chan = eeprom_read(EEPROM_WIFICHAN_OFFSET);
+    uint8_t avoid_chan = ((wifi_chan-1) * 5) + 10;
+    uint8_t avoid_chan_low=0, avoid_chan_high=0;
+
+    printf("WiFi: %u\n", wifi_chan);
+    
+    if (wifi_chan != 0) {
+        // avoid 22MHz band around WiFi channel
+        if (avoid_chan < 11) {
+            avoid_chan_low = 0;
+        } else {
+            avoid_chan_low = avoid_chan - 11;
+        }
+        avoid_chan_high = avoid_chan + 11;
+    }
     
     write_register(CYRF_XACT_CFG, CYRF_MODE_RX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
@@ -591,6 +606,16 @@ static void scan_channels(void)
     while (true) {
         uint16_t samples = 1500;
         uint8_t highest = 0;
+
+        if (i >= avoid_chan_low && i <= avoid_chan_high) {
+            printf("%u:WF ", i);
+            rssi[i/2] = 0xff;
+            i += 2;
+            if (i >= DSM_MAX_CHANNEL) {
+                break;
+            }
+            continue;
+        }
         
         set_channel(i);
         while (samples--) {
@@ -1300,18 +1325,6 @@ static void cypress_transmit16(const uint8_t data[16])
     dsm.send_count++;
     dsm.sends_since_recv++;
     dsm.sends_since_power_change++;
-}
-
-// get receiver packets per second
-uint8_t get_rx_pps(void)
-{
-    return t_status.pps;
-}
-
-// get receiver RSSI
-uint8_t get_rx_rssi(void)
-{
-    return t_status.rssi;
 }
 
 uint8_t get_tx_power(void)

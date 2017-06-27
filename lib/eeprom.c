@@ -23,9 +23,11 @@ void progmem_unlock(void)
 
 void eeprom_write(uint16_t offset, uint8_t value)
 {
-    eeprom_unlock();
-    (EEPROM_START_ADDR)[offset] = value;
-    eeprom_lock();
+    if ((EEPROM_START_ADDR)[offset] != value) {
+        eeprom_unlock();
+        (EEPROM_START_ADDR)[offset] = value;
+        eeprom_lock();
+    }
 }
 
 uint8_t eeprom_read(uint16_t offset)

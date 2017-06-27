@@ -16,8 +16,6 @@
 #include "telem_structure.h"
 #include <string.h>
 
-#define EEPROM_DSMPROT_OFFSET 0
-
 /*
   note that the interrupt vector table is at 0x8700, not 0x8000
  */
@@ -254,8 +252,11 @@ static void status_update(bool have_link)
         // indoor mode LED
         yellow_led_pattern = LED_PATTERN_SOLID;
     } else {
-        // slow blink when waiting to be arm OK
-        yellow_led_pattern = LED_PATTERN_BLINK1;
+        yellow_led_pattern = LED_PATTERN_OFF;
+    }
+
+    if (t_status.wifi_chan != last_status.wifi_chan) {
+        eeprom_write(EEPROM_WIFICHAN_OFFSET, t_status.wifi_chan);
     }
     
     memcpy(&last_status, &t_status, sizeof(t_status));
@@ -364,8 +365,8 @@ void main(void)
                    get_send_pps(),
                    telem_pps,
                    get_telem_rssi(),
-                   get_rx_rssi(),
-                   get_rx_pps(),
+                   t_status.rssi,
+                   t_status.pps,
                    t_status.flags,
                    t_status.flight_mode);
             link_ok = true;

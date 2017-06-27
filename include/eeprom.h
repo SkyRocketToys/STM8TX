@@ -6,3 +6,6 @@ void eeprom_unlock(void);
 void progmem_unlock(void);
 void eeprom_lock(void);
 #define progmem_lock() eeprom_lock()
+
+#define EEPROM_DSMPROT_OFFSET 0
+#define EEPROM_WIFICHAN_OFFSET 1

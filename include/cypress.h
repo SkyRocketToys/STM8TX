@@ -7,8 +7,6 @@ void cypress_start_factory_test(uint8_t test_mode);
 void cypress_next_FCC_power(void);
 void cypress_set_CW_mode(bool cw);
 void cypress_change_FCC_channel(int8_t change);
-uint8_t get_rx_pps(void);
-uint8_t get_rx_rssi(void);
 uint8_t get_tx_power(void);
 int8_t get_FCC_chan(void);
 uint8_t get_FCC_power(void);
