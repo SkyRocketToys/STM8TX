@@ -381,6 +381,7 @@ static struct {
     uint8_t current_telem_rssi;
     uint8_t current_telem_pps;
     uint8_t current_send_pps;
+    uint8_t tx_max_power;
 } dsm;
 
 static void radio_init(void);
@@ -400,6 +401,8 @@ static void cypress_reset(void)
 
 void cypress_init(void)
 {
+    uint8_t tx_max;
+    
     printf("cypress_init\n");
 
     // setup RST pin on PD0
@@ -415,6 +418,14 @@ void cypress_init(void)
 
     // setup interrupt
     gpio_config(RADIO_INT, GPIO_INPUT_FLOAT_IRQ);
+
+    tx_max = eeprom_read(EEPROM_TXMAX);
+    // don't use power levels below 4
+    if (tx_max > 3 && tx_max < 9) {
+        dsm.tx_max_power = tx_max-1;
+    } else {
+        dsm.tx_max_power = 3;
+    }
     
     cypress_reset();
 
@@ -785,6 +796,10 @@ static void process_telem_packet(const struct telem_packet *pkt)
     case TELEM_STATUS:
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
         dsm.sends_since_recv = 0;
+        if (t_status.tx_max > 3 && t_status.tx_max < 9) {
+            // adjust power level on the fly
+            dsm.tx_max_power = t_status.tx_max-1;
+        }
         break;
     case TELEM_FW: {
         struct telem_firmware fw;
@@ -1278,11 +1293,11 @@ static void check_power_level(void)
 {
     uint8_t current_power_level = dsm.power_level;
 #if DYNAMIC_POWER_ADJUSTMENT
-    if (dsm.sends_since_recv > 512 && dsm.power_level < CYRF_PA_4) {
+    if (dsm.sends_since_recv > 512 && dsm.power_level < dsm.tx_max_power) {
         dsm.power_level++;
         dsm.sends_since_recv = 0;        
     }
-    if (dsm.sends_since_recv > 512 && dsm.power_level == CYRF_PA_4) {
+    if (dsm.sends_since_recv > 512 && dsm.power_level == dsm.tx_max_power) {
         dsm.power_level -= 3;
         dsm.sends_since_recv = 0;        
     }
@@ -1290,7 +1305,7 @@ static void check_power_level(void)
         if (dsm.power_level > 0 && t_status.rssi > 26) {
             dsm.power_level--;
         }
-        if (dsm.power_level < CYRF_PA_4 && t_status.rssi < 20) {
+        if (dsm.power_level < dsm.tx_max_power && t_status.rssi < 20) {
             dsm.power_level++;
         }
     }
@@ -1298,6 +1313,12 @@ static void check_power_level(void)
     // always full power
     dsm.power_level = CYRF_PA_4;
 #endif
+
+    if (dsm.tx_max_power <= 3) {
+        // don't do dynamic power at low power levels
+        dsm.power_level = dsm.tx_max_power;
+    }
+    
     if (dsm.FCC_test_mode) {
         // choose power for FCC testing
         dsm.power_level = dsm.FCC_test_power;

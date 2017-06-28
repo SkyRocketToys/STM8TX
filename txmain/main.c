@@ -255,8 +255,14 @@ static void status_update(bool have_link)
         yellow_led_pattern = LED_PATTERN_OFF;
     }
 
+    // remember wifi chan
     if (t_status.wifi_chan != last_status.wifi_chan) {
         eeprom_write(EEPROM_WIFICHAN_OFFSET, t_status.wifi_chan);
+    }
+
+    // remember tx power
+    if (t_status.tx_max != last_status.tx_max) {
+        eeprom_write(EEPROM_TXMAX, t_status.tx_max);
     }
     
     memcpy(&last_status, &t_status, sizeof(t_status));
