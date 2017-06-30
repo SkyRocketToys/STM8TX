@@ -10,3 +10,5 @@ void eeprom_lock(void);
 #define EEPROM_DSMPROT_OFFSET 0
 #define EEPROM_WIFICHAN_OFFSET 1
 #define EEPROM_TXMAX 2
+#define EEPROM_NOTE_ADJUST 3
+

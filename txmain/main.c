@@ -95,6 +95,7 @@ static void check_stick_activity(void)
 
 extern struct telem_status t_status;
 static struct telem_status last_status;
+extern uint8_t note_adjust;
 
 #define LED_PATTERN_OFF    0x0000
 #define LED_PATTERN_LOW    0x0003
@@ -264,6 +265,15 @@ static void status_update(bool have_link)
     if (t_status.tx_max != last_status.tx_max) {
         eeprom_write(EEPROM_TXMAX, t_status.tx_max);
     }
+
+    // remember note adjust
+    if (t_status.note_adjust != last_status.note_adjust) {
+        note_adjust = t_status.note_adjust;
+        if (note_adjust > 40) {
+            note_adjust = 40;
+        }
+        eeprom_write(EEPROM_NOTE_ADJUST, note_adjust);
+    }
     
     memcpy(&last_status, &t_status, sizeof(t_status));
 }
@@ -341,6 +351,11 @@ void main(void)
     }
     }
 
+    note_adjust = eeprom_read(EEPROM_NOTE_ADJUST);
+    if (note_adjust > 40) {
+        note_adjust = 20;
+    }
+    
     if (factory_mode == 0) {
         buzzer_tune(TONE_STARTUP_TUNE);
     } else {
