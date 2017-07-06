@@ -129,6 +129,7 @@ enum control_mode_t {
 };
 
 static bool fcc_CW_mode;
+static uint8_t video_tone_counter;
 
 /*
    notify user when we have link, flight mode changes etc
@@ -254,6 +255,14 @@ static void status_update(bool have_link)
         yellow_led_pattern = LED_PATTERN_SOLID;
     } else {
         yellow_led_pattern = LED_PATTERN_OFF;
+    }
+
+    if (!played_tone && (t_status.flags & TELEM_FLAG_VIDEO)) {
+        video_tone_counter++;
+        if (video_tone_counter == 2) {
+            video_tone_counter = 0;
+            buzzer_tune(TONE_VIDEO);
+        }
     }
 
     // remember wifi chan

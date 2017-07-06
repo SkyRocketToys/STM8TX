@@ -22,8 +22,9 @@ void buzzer_tune(uint8_t t);
 #define TONE_OTHER_MODE                     8
 #define TONE_BATT_WARNING                   9
 #define TONE_INACTIVITY                    10
+#define TONE_VIDEO                         11
 
-#define TONE_NUMBER_OF_TUNES 11
+#define TONE_NUMBER_OF_TUNES 12
 
 
 

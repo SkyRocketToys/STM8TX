@@ -42,6 +42,7 @@ static const char * const tune[TONE_NUMBER_OF_TUNES] = {
     "other_mode:d=4,o=6,b=400:4c,4b,4a",
     "batt_warning:d=4,o=6,b=512:8a,8a,8a,8a,8a,8a,8a,8a,8a",
     "inactivity:d=4,o=6,b=512:8c,8c,8c,8c,8c",
+    "video:d=4,o=6,b=600:8b",
 };
 
 
