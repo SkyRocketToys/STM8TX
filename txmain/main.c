@@ -95,6 +95,8 @@ static void check_stick_activity(void)
 
 extern struct telem_status t_status;
 static struct telem_status last_status;
+static uint8_t last_mode;
+
 extern uint8_t note_adjust;
 
 #define LED_PATTERN_OFF    0x0000
@@ -230,6 +232,7 @@ static void status_update(bool have_link)
             buzzer_tune(TONE_OTHER_MODE);
             break;
         }
+        last_mode = last_status.flight_mode;
         played_tone = true;
     }
 
@@ -250,7 +253,8 @@ static void status_update(bool have_link)
             last_batt_warn_ms = now;
             buzzer_tune(TONE_BATT_WARNING);
         }
-    } else if (t_status.flight_mode == ALT_HOLD) {
+    } else if (t_status.flight_mode == ALT_HOLD ||
+               (t_status.flight_mode == LAND && last_mode == ALT_HOLD)) {
         // indoor mode LED
         yellow_led_pattern = LED_PATTERN_SOLID;
     } else {
