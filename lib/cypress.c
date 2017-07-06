@@ -248,6 +248,9 @@ enum {
 
 #define DSM_MAX_CHANNEL 0x4F
 
+#define DSM_SCAN_MIN_CH 8
+#define DSM_SCAN_MAX_CH 70
+
 /* The PN codes */
 static const uint8_t pn_codes[5][9][8] = {
 { /* Row 0 */
@@ -618,6 +621,13 @@ static void scan_channels(void)
         uint16_t samples = 1500;
         uint8_t highest = 0;
 
+        if (i < DSM_SCAN_MIN_CH || i > DSM_SCAN_MAX_CH) {
+            // avoid low and high channels
+            rssi[i/2] = 0xff;
+            i += 2;
+            continue;
+        }
+
         if (i >= avoid_chan_low && i <= avoid_chan_high) {
             printf("%u:WF ", i);
             rssi[i/2] = 0xff;
@@ -644,7 +654,7 @@ static void scan_channels(void)
         }
 
         i += 2;
-        if (i >= DSM_MAX_CHANNEL) {
+        if (i > DSM_SCAN_MAX_CH) {
             break;
         }
     }
@@ -657,7 +667,7 @@ static void scan_channels(void)
     best_rssi = 32;
     
     // find the second channel
-    for (i=0; i<DSM_MAX_CHANNEL; i+=2) {
+    for (i=0; i<=DSM_SCAN_MAX_CH; i+=2) {
         if (i != dsm.channels[0] && (i>dsm.channels[0]+10 || i<dsm.channels[0]-10)) {
             if (rssi[i/2] < best_rssi) {
                 best_rssi = rssi[i/2];
@@ -1436,11 +1446,11 @@ void cypress_set_CW_mode(bool cw)
 void cypress_change_FCC_channel(int8_t change)
 {
     int8_t newchan = dsm.FCC_test_chan + change;
-    if (newchan >= DSM_MAX_CHANNEL) {
+    if (newchan >= DSM_SCAN_MAX_CH) {
         newchan = 0;
     }
     if (newchan < 0) {
-        newchan = DSM_MAX_CHANNEL-1;
+        newchan = DSM_SCAN_MAX_CH;
     }
     dsm.FCC_test_chan = newchan;
 }
