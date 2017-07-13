@@ -1320,7 +1320,7 @@ void cypress_start_bind_send(bool use_dsm2)
  */
 void cypress_start_FCC_test(void)
 {
-    dsm.FCC_test_chan = 0;
+    dsm.FCC_test_chan = DSM_SCAN_MIN_CH;
     dsm.FCC_test_power = CYRF_PA_4;
     dsm.last_CW_chan = -1;
     dsm.FCC_test_mode = true;
@@ -1522,9 +1522,9 @@ void cypress_change_FCC_channel(int8_t change)
 {
     int8_t newchan = dsm.FCC_test_chan + change;
     if (newchan >= DSM_SCAN_MAX_CH) {
-        newchan = 0;
+        newchan = DSM_SCAN_MIN_CH;
     }
-    if (newchan < 0) {
+    if (newchan < DSM_SCAN_MIN_CH) {
         newchan = DSM_SCAN_MAX_CH;
     }
     dsm.FCC_test_chan = newchan;
