@@ -950,8 +950,6 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
  */
 static void autobind_send(void)
 {
-    static uint8_t ab_counter;
-    
     state = STATE_AUTOBIND_SEND;
 
     is_dsm2 = true;
@@ -961,7 +959,7 @@ static void autobind_send(void)
     // send auto-bind at low (and fixed) power. This allows for RSSI to be used by RX
     // to detect that TX is a long way from RX, to avoid accidential auto-bind
     write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | CYRF_PA_M18);
-        
+
     send_bind_packet();
 }
 
@@ -981,7 +979,8 @@ static void send_normal_packet(void)
     uint8_t chan_count = is_DSM2()?2:23;
     uint16_t seed;
     bool send_zero = false;
-
+    bool send_autobind = false;
+    
     if (state == STATE_AUTOBIND_SEND) {
         // reset power level after autobind
         write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.power_level);
@@ -1025,10 +1024,10 @@ static void send_normal_packet(void)
         is_dsm2 &&
         dsm.autobind_count > 4 && dsm.telem_recv_count == 0) {
         dsm.autobind_count = 0;
-        autobind_send();
-        return;
+        send_autobind = true;
+    } else {
+        dsm.autobind_count++;
     }
-    dsm.autobind_count++;
         
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
@@ -1077,10 +1076,14 @@ static void send_normal_packet(void)
         seed = ~seed;
     }
 
-    dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
-                    dsm.sop_col, dsm.data_col, seed);
+    if (send_autobind) {
+        autobind_send();
+    } else {
+        dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
+                        dsm.sop_col, dsm.data_col, seed);
     
-    cypress_transmit16(pkt);
+        cypress_transmit16(pkt);
+    }
 }
 
 
