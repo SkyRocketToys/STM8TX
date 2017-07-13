@@ -12,6 +12,8 @@ static uint8_t last_telem_ack_value;
 static uint8_t telem_ack_send_count;
 static uint8_t telem_extra_type;
 
+extern uint8_t get_bl_version(void);
+
 /*
   latch left button with debouncing
  */
@@ -101,7 +103,7 @@ uint16_t channel_value(uint8_t chan)
     case 7: {
         uint8_t tvalue=0;
         /* return extra data in channel 8. Use top 3 bits for data type */
-        telem_extra_type = (telem_extra_type+1) % 6;
+        telem_extra_type = (telem_extra_type+1) % 7;
 
         if (telem_extra_type == 0 ||
             telem_ack_value != last_telem_ack_value ||
@@ -134,6 +136,10 @@ uint16_t channel_value(uint8_t chan)
         case 5:
             // key 5 telem pps
             tvalue = get_telem_pps();
+            break;
+        case 6:
+            // bl version
+            tvalue = get_bl_version();
             break;
         }
 

@@ -39,7 +39,7 @@ static uint8_t get_buttons_no_power(void)
 /*
   get bootloader version
  */
-static uint8_t get_bl_version(void)
+uint8_t get_bl_version(void)
 {
     const uint8_t *v = (const uint8_t *)0x8080;
     if (v[1] == v[0]+1 &&
