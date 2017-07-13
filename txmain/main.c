@@ -334,11 +334,13 @@ void main(void)
         cypress_start_bind_send(true);
         break;
 
+#if SUPPORT_DSMX
     case BUTTON_RIGHT:
         printf("DSMX bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 0);
         cypress_start_bind_send(false);
         break;
+#endif
 
     case BUTTON_LEFT_SHOULDER: {
         uint16_t adc2 = adc_value(2);

@@ -22,13 +22,17 @@
 #include "eeprom.h"
 
 #define DISABLE_CRC 0
+#if SUPPORT_DSMX
 #define is_DSM2() is_dsm2
+#else
+#define is_DSM2() true
+#endif
 
 #define DYNAMIC_POWER_ADJUSTMENT 1
 
 // if we have never seen a telemetry packet then we send a autobind
 // packet on channel 11 every 4 packets to allow for auto-bind
-#define AUTOBIND_CHANNEL 11
+#define AUTOBIND_CHANNEL 12
 
 static bool is_dsm2 = false;
 
@@ -523,6 +527,7 @@ static void radio_set_config(const struct reg_config *conf, uint8_t size)
     }
 }
 
+#if SUPPORT_DSMX
 /*
   Generate the DSMX channels from the manufacturer ID
  */
@@ -592,6 +597,7 @@ static void dsm_setup_transfer_dsmx(void)
     dsm_generate_channels_dsmx(dsm.mfg_id, dsm.channels);
     printf("Setup for DSMX send\n");
 }
+#endif // SUPPORT_DSMX
 
 /*
   scan for best channels
@@ -716,8 +722,10 @@ static void dsm_setup_transfer(void)
 {
     if (is_DSM2() && !dsm.FCC_test_mode) {
         dsm_setup_transfer_dsm2();
+#if SUPPORT_DSMX
     } else {
         dsm_setup_transfer_dsmx();
+#endif
     }
 }
 
@@ -942,23 +950,13 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
  */
 static void autobind_send(void)
 {
-    uint8_t data_code[16];
-
+    static uint8_t ab_counter;
+    
     state = STATE_AUTOBIND_SEND;
+
+    is_dsm2 = true;
     
-    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
-    write_register(CYRF_RX_ABORT, 0);
-    
-    write_register(CYRF_CRC_SEED_LSB, 0);
-    write_register(CYRF_CRC_SEED_MSB, 0);
-
-    write_multiple(CYRF_SOP_CODE, 8, pn_codes[0][0]);
-
-    memcpy(data_code, pn_codes[0][8], 8);
-    memcpy(&data_code[8], pn_bind, 8);
-    write_multiple(CYRF_DATA_CODE, 16, data_code);
-
-    set_channel(AUTOBIND_CHANNEL);
+    dsm_set_channel(AUTOBIND_CHANNEL, true, 0, 0, 0);
 
     // send auto-bind at low (and fixed) power. This allows for RSSI to be used by RX
     // to detect that TX is a long way from RX, to avoid accidential auto-bind
@@ -968,8 +966,10 @@ static void autobind_send(void)
 }
 
 
+#if SUPPORT_DSMX
 // order of channels in DSMX packet
 static const uint8_t chan_order[7] = { 1, 5, 2, 4, 6, 0, 3 };
+#endif
 
 /*
   send a normal packet
@@ -1038,17 +1038,21 @@ static void send_normal_packet(void)
     if (is_DSM2()) {
         pkt[0] = ~dsm.mfg_id[2];
         pkt[1] = ~dsm.mfg_id[3];
+#if SUPPORT_DSMX
     } else {
         pkt[0] = dsm.mfg_id[2];
         pkt[1] = dsm.mfg_id[3];
+#endif
     }
 
     for (i=0; i<7; i++) {
         int16_t v;
         uint8_t chan = i;
+#if SUPPORT_DSMX
         if (!is_DSM2()) {
             chan = chan_order[i];
         }
+#endif
         if (chan == 6 && dsm.invert_seed) {
             // send extra data on every 2nd packet
             chan = 7;
@@ -1233,8 +1237,10 @@ static void send_bind_packet(void)
     pkt[11] = 7; // num_channels
     if (is_DSM2()) {
         pkt[12] = DSM_DSM2_2;
+#if SUPPORT_DSMX
     } else {
         pkt[12] = DSM_DSMX_2;
+#endif
     }
     pkt[13] = 0;
 
@@ -1399,7 +1405,7 @@ static void check_power_level(void)
         // choose power for FCC testing
         dsm.power_level = dsm.FCC_test_power;
     }
-    if (dsm.power_level != current_power_level && state != STATE_BIND_SEND) {
+    if (dsm.power_level != current_power_level && state != STATE_BIND_SEND && state != STATE_AUTOBIND_SEND) {
         dsm.sends_since_power_change = 0;
         write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.power_level);
     }

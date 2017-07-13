@@ -58,3 +58,7 @@
 
 // location in flash of new firmware
 #define NEW_FIRMWARE_BASE 0xC000
+
+// should we support DSMX ?
+#define SUPPORT_DSMX 0
+
