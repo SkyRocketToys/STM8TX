@@ -26,11 +26,16 @@
 
 #define DYNAMIC_POWER_ADJUSTMENT 1
 
+// if we have never seen a telemetry packet then we send a autobind
+// packet on channel 11 every 4 packets to allow for auto-bind
+#define AUTOBIND_CHANNEL 11
+
 static bool is_dsm2 = false;
 
 static enum {
     STATE_NONE,
     STATE_BIND_SEND,
+    STATE_AUTOBIND_SEND,
     STATE_SEND,
     STATE_RECV_WAIT,
     STATE_RECV_TELEM
@@ -326,14 +331,14 @@ static const struct reg_config cyrf_config[] = {
         {CYRF_TX_OFFSET_LSB, 0x55},                                             // From manual, typical configuration
         {CYRF_TX_OFFSET_MSB, 0x05},                                             // From manual, typical configuration
         {CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX | CYRF_FRC_END},                     // Force in Synth RX mode
-        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_SDR | CYRF_PA_0},  // Enable 64 chip codes, SDR mode and amplifier +0dBm
+        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_SDR | CYRF_PA_M18},// Enable 64 chip codes, SDR mode and amplifier M18
         {CYRF_DATA64_THOLD, 0x0E},                                              // From manual, typical configuration
         {CYRF_XACT_CFG, CYRF_MODE_SYNTH_RX},                                    // Set in Synth RX mode (again, really needed?)
         {CYRF_IO_CFG, CYRF_IRQ_POL},                                            // IRQ active high
 };
 
 static const struct reg_config cyrf_bind_config[] = {
-        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_SDR | CYRF_PA_0},   // Enable 64 chip codes, SDR mode and amplifier +0dBm
+        {CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_SDR | CYRF_PA_M18}, // Enable 64 chip codes, SDR mode and amplifier M18
         {CYRF_FRAMING_CFG, CYRF_SOP_LEN | 0xE},                                  // Set SOP CODE to 64 chips and SOP Correlator Threshold to 0xE
         {CYRF_RX_OVERRIDE, CYRF_FRC_RXDR | CYRF_DIS_RXCRC},                      // Force receive data rate and disable receive CRC checker
         {CYRF_EOP_CTRL, 0x02},                                                   // Only enable EOP symbol count of 2
@@ -385,12 +390,14 @@ static struct {
     uint8_t current_telem_pps;
     uint8_t current_send_pps;
     uint8_t tx_max_power;
+    uint8_t autobind_count;
 } dsm;
 
 static void radio_init(void);
 static void cypress_transmit16(const uint8_t data[16]);
 static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint8_t data_col, uint16_t crc_seed);
 static void send_normal_packet(void);
+static void send_bind_packet(void);
 
 
 static void cypress_reset(void)
@@ -788,12 +795,12 @@ static void write_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len)
 
     FLASH_CR1 = 0;
     FLASH_CR2 = 0x40;
-    FLASH_NCR2 = ~0x40;
+    FLASH_NCR2 = (uint8_t)(~0x40);
     memcpy(&ptr1[0], &data[0], 4);
 
     if (len > 4) {
         FLASH_CR2 = 0x40;
-        FLASH_NCR2 = ~0x40;
+        FLASH_NCR2 = (uint8_t)~0x40;
         memcpy(&ptr1[4], &data[4], 4);
     }
     
@@ -881,6 +888,7 @@ void cypress_irq(void)
     
     switch (state) {
     case STATE_BIND_SEND:
+    case STATE_AUTOBIND_SEND:
     case STATE_SEND:
     case STATE_RECV_WAIT:
         irq_handler_send(tx_status);
@@ -924,6 +932,42 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
     }
 }
 
+/*
+  send a DSM2 autobind packet
+
+  The autobind packet is sent using normal transfer modulation but
+  with SOP and data codes that are independent of the mfg code. This
+  ensures it takes the same time to send as a normal packet, which is
+  important to retain correct timing
+ */
+static void autobind_send(void)
+{
+    uint8_t data_code[16];
+
+    state = STATE_AUTOBIND_SEND;
+    
+    write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
+    write_register(CYRF_RX_ABORT, 0);
+    
+    write_register(CYRF_CRC_SEED_LSB, 0);
+    write_register(CYRF_CRC_SEED_MSB, 0);
+
+    write_multiple(CYRF_SOP_CODE, 8, pn_codes[0][0]);
+
+    memcpy(data_code, pn_codes[0][8], 8);
+    memcpy(&data_code[8], pn_bind, 8);
+    write_multiple(CYRF_DATA_CODE, 16, data_code);
+
+    set_channel(AUTOBIND_CHANNEL);
+
+    // send auto-bind at low (and fixed) power. This allows for RSSI to be used by RX
+    // to detect that TX is a long way from RX, to avoid accidential auto-bind
+    write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | CYRF_PA_M18);
+        
+    send_bind_packet();
+}
+
+
 // order of channels in DSMX packet
 static const uint8_t chan_order[7] = { 1, 5, 2, 4, 6, 0, 3 };
 
@@ -937,6 +981,11 @@ static void send_normal_packet(void)
     uint8_t chan_count = is_DSM2()?2:23;
     uint16_t seed;
     bool send_zero = false;
+
+    if (state == STATE_AUTOBIND_SEND) {
+        // reset power level after autobind
+        write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.power_level);
+    }
 
     if (state != STATE_SEND) {
         state = STATE_SEND;
@@ -968,11 +1017,24 @@ static void send_normal_packet(void)
         dsm.receive_telem = true;
     }
 
+    /*
+      send AUTOBIND packets every 4 sends when we have never received
+      a telemetry packet in DSM2 mode
+     */
+    if (dsm.receive_telem == false &&
+        is_dsm2 &&
+        dsm.autobind_count > 4 && dsm.telem_recv_count == 0) {
+        dsm.autobind_count = 0;
+        autobind_send();
+        return;
+    }
+    dsm.autobind_count++;
+        
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
     
     memset(pkt, 0, 16);
-    
+
     if (is_DSM2()) {
         pkt[0] = ~dsm.mfg_id[2];
         pkt[1] = ~dsm.mfg_id[3];
@@ -1184,6 +1246,10 @@ static void send_bind_packet(void)
     pkt[15] = (bind_sum&0xFF);
 
     cypress_transmit16(pkt);
+
+    if (state == STATE_AUTOBIND_SEND) {
+        return;
+    }
 
     if (timer_get_ms() > dsm.bind_send_end_ms) {
         // finished bind send, go to transmit mode
