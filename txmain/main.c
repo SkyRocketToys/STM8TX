@@ -184,11 +184,11 @@ static void status_update(bool have_link)
             printf("CW mode %u\n", fcc_CW_mode);
         }
         if (buttons == BUTTON_LEFT_SHOULDER) {
-            cypress_change_FCC_channel(-1);
+            cypress_change_FCC_channel(1);
             buzzer_tune(TONE_RX_SEARCH);
         }
-        if (buttons == BUTTON_RIGHT_SHOULDER || buttons == BUTTON_LEFT) {
-            cypress_change_FCC_channel(1);
+        if (buttons == BUTTON_RIGHT_SHOULDER) {
+            cypress_FCC_toggle_scan();
             buzzer_tune(TONE_RX_SEARCH);
         }
         return;

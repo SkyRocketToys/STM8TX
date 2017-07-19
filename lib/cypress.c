@@ -385,6 +385,8 @@ static struct {
     uint16_t rssi_count;
     uint8_t power_level;
     bool FCC_test_mode;
+    bool FCC_scan_mode;
+    uint8_t FCC_scan_count;
     uint8_t FCC_test_chan;
     uint8_t FCC_test_power;
     uint8_t factory_test_mode;
@@ -1119,7 +1121,7 @@ static void send_FCC_packet(void)
         state = STATE_SEND;
     }
     
-    timer_call_after_ms(2, send_FCC_packet);
+    timer_call_after_ms(4, send_FCC_packet);
     dsm.receive_telem = false;
 
     if (!dsm.fcc_CW_mode) {
@@ -1145,6 +1147,17 @@ static void send_FCC_packet(void)
      */
     dsm.current_channel = 0;
     dsm.current_rf_channel = dsm.FCC_test_chan;
+
+    if (dsm.FCC_scan_mode) {
+        dsm.FCC_scan_count++;
+        if (dsm.FCC_scan_count == 200) {
+            dsm.FCC_scan_count = 0;
+            dsm.FCC_test_chan += 2;
+            if (dsm.FCC_test_chan >= DSM_SCAN_MAX_CH) {
+                dsm.FCC_test_chan = DSM_SCAN_MIN_CH;
+            }
+        }
+    }
     
     seed = dsm.crc_seed;
 
@@ -1537,5 +1550,13 @@ void cypress_change_FCC_channel(int8_t change)
     case DSM_SCAN_MAX_CH:
         dsm.FCC_test_chan = change==1?DSM_SCAN_MIN_CH:DSM_SCAN_MID_CH;
         break;
+    }
+}
+
+void cypress_FCC_toggle_scan(void)
+{
+    dsm.FCC_scan_mode = !dsm.FCC_scan_mode;
+    if (!dsm.FCC_scan_mode) {
+        dsm.FCC_test_chan = DSM_SCAN_MIN_CH;
     }
 }
