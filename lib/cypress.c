@@ -260,6 +260,7 @@ enum {
 
 #define DSM_SCAN_MIN_CH 8
 #define DSM_SCAN_MAX_CH 70
+#define DSM_SCAN_MID_CH ((DSM_SCAN_MIN_CH+DSM_SCAN_MAX_CH)/2)
 
 /* The PN codes */
 static const uint8_t pn_codes[5][9][8] = {
@@ -1525,12 +1526,16 @@ void cypress_set_CW_mode(bool cw)
 
 void cypress_change_FCC_channel(int8_t change)
 {
-    int8_t newchan = dsm.FCC_test_chan + change;
-    if (newchan >= DSM_SCAN_MAX_CH) {
-        newchan = DSM_SCAN_MIN_CH;
+    switch (dsm.FCC_test_chan) {
+    case DSM_SCAN_MIN_CH:
+        dsm.FCC_test_chan = change==1?DSM_SCAN_MID_CH:DSM_SCAN_MAX_CH;
+        break;
+    case DSM_SCAN_MID_CH:
+        dsm.FCC_test_chan = change==1?DSM_SCAN_MAX_CH:DSM_SCAN_MIN_CH;
+        break;
+    default:
+    case DSM_SCAN_MAX_CH:
+        dsm.FCC_test_chan = change==1?DSM_SCAN_MIN_CH:DSM_SCAN_MID_CH;
+        break;
     }
-    if (newchan < DSM_SCAN_MIN_CH) {
-        newchan = DSM_SCAN_MAX_CH;
-    }
-    dsm.FCC_test_chan = newchan;
 }
