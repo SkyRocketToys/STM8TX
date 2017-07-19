@@ -163,6 +163,7 @@ static void status_update(bool have_link)
     int8_t FCC_chan = get_FCC_chan();
     uint8_t FCC_power = get_FCC_power();
     uint8_t buttons = get_buttons();
+    uint8_t desired_mode;
     
     if (FCC_chan != -1) {
         yellow_led_pattern = LED_PATTERN_FCC;
@@ -258,12 +259,24 @@ static void status_update(bool have_link)
         played_tone = true;
     }
 
-    if (t_status.flags & TELEM_FLAG_POS_OK) {
-        green_led_pattern = LED_PATTERN_SOLID;
-    } else if (t_status.flags & TELEM_FLAG_GPS_OK) {
-        green_led_pattern = LED_PATTERN_BLINK2;
+    // cope with hybrid mode for mode display
+    if (t_status.flight_mode == ALT_HOLD && (t_status.flags & TELEM_FLAG_HYBRID) != 0) {
+        desired_mode = LOITER;
     } else {
-        green_led_pattern = LED_PATTERN_BLINK1;
+        desired_mode = t_status.flight_mode;
+    }
+    
+    if (desired_mode == ALT_HOLD) {
+        // GPS LED always off in "indoor" mode
+        green_led_pattern = LED_PATTERN_OFF;
+    } else {
+        if (t_status.flags & TELEM_FLAG_POS_OK) {
+            green_led_pattern = LED_PATTERN_SOLID;
+        } else if (t_status.flags & TELEM_FLAG_GPS_OK) {
+            green_led_pattern = LED_PATTERN_BLINK2;
+        } else {
+            green_led_pattern = LED_PATTERN_BLINK1;
+        }
     }
 
     if ((t_status.flags & TELEM_FLAG_BATT_OK) == 0) {
@@ -275,11 +288,12 @@ static void status_update(bool have_link)
             last_batt_warn_ms = now;
             buzzer_tune(TONE_BATT_WARNING);
         }
-    } else if (t_status.flight_mode == ALT_HOLD ||
+    } else if (desired_mode == ALT_HOLD ||
                (t_status.flight_mode == LAND && last_mode == ALT_HOLD)) {
-        // indoor mode LED
+        // indoor mode LED on
         yellow_led_pattern = LED_PATTERN_SOLID;
     } else {
+        // indoor mode LED off
         yellow_led_pattern = LED_PATTERN_OFF;
     }
 
