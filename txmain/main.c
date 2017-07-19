@@ -57,6 +57,15 @@ static uint16_t yellow_led_pattern;
 
 static uint32_t last_batt_warn_ms;
 
+extern bool power_off_disarm;
+static uint32_t last_link_ms;
+
+extern struct telem_status t_status;
+static struct telem_status last_status;
+
+static uint8_t last_mode;
+extern uint8_t note_adjust;
+
 /*
   update led flashing
  */
@@ -91,13 +100,22 @@ static void check_stick_activity(void)
     if (active) {
         last_stick_activity = timer_get_ms();
     }
+
+    if (power_off_disarm) {
+        // if the user holds down power button for
+        // POWER_OFF_DISARMED_MS and the vehicle is disarmed then
+        // power off
+        if (timer_get_ms() - last_link_ms < 1500 &&
+            (t_status.flags & TELEM_FLAG_ARMED) == 0) {
+            printf("power off disarmed\n");
+            gpio_clear(PIN_POWER);
+            buzzer_tune(TONE_ERROR_TUNE);
+            // loop forever
+            while (true) ;
+        }
+    }
+    
 }
-
-extern struct telem_status t_status;
-static struct telem_status last_status;
-static uint8_t last_mode;
-
-extern uint8_t note_adjust;
 
 #define LED_PATTERN_OFF    0x0000
 #define LED_PATTERN_LOW    0x0003
@@ -216,6 +234,7 @@ static void status_update(bool have_link)
 
     // consider telemetry to be stick activity
     last_stick_activity = now;
+    last_link_ms = now;
 
     if (t_status.flight_mode != last_status.flight_mode) {
         switch (t_status.flight_mode) {

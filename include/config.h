@@ -55,6 +55,7 @@
 
 // time to power off, ms
 #define POWER_OFF_MS 2000
+#define POWER_OFF_DISARMED_MS 500
 
 // location in flash of new firmware
 #define NEW_FIRMWARE_BASE 0xC000

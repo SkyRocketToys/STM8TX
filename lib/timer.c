@@ -21,6 +21,7 @@ void timer_init(void)
 
 static uint16_t power_pin_count;
 static bool activate_power_pin;
+bool power_off_disarm = false;
 
 void timer_irq(void)
 {
@@ -39,6 +40,9 @@ void timer_irq(void)
         }
         if (pin_user && activate_power_pin) {
             power_pin_count++;
+            if (power_pin_count > POWER_OFF_DISARMED_MS) {
+                power_off_disarm = true;
+            }
             if (power_pin_count > POWER_OFF_MS) {
                 // clear power control
                 gpio_clear(PIN_POWER);
