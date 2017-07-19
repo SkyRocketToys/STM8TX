@@ -49,7 +49,8 @@ static const char * const tune[TONE_NUMBER_OF_TUNES] = {
 static const char *tune_ptr;
 
 // allow for uploaded tunes for development of new tunes
-static uint8_t temp_tune[65];
+#define MAX_TUNE_LEN 90
+static uint8_t temp_tune[MAX_TUNE_LEN+1];
 static uint8_t temp_tune_len;
 static bool temp_tune_pending;
 
@@ -405,12 +406,12 @@ void buzzer_tune(uint8_t t)
 
 void buzzer_tune_add(uint16_t offset, const uint8_t *data, uint8_t length)
 {
-    if (offset + length > 64) {
+    if (offset + length > MAX_TUNE_LEN) {
         return;
     }
     memcpy(&temp_tune[offset], data, length);
     temp_tune_len = offset+length;
-    if (length < 8 || temp_tune_len == 64) {
+    if (length < 8 || temp_tune_len == MAX_TUNE_LEN) {
         // must be the end of the tune
         temp_tune[temp_tune_len] = 0;
         printf("tune of length %u: %s\n", temp_tune_len, (const char *)temp_tune);
