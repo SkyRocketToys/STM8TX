@@ -5,6 +5,7 @@
 #include <eeprom.h>
 #include <timer.h>
 #include <uart.h>
+#include <string.h>
 
 #define OPTION_BYTE2 *(volatile uint8_t *)0x4803
 #define OPTION_NBYTE2 *(volatile uint8_t *)0x4804
@@ -44,6 +45,13 @@ static const char * const tune[TONE_NUMBER_OF_TUNES] = {
     "inactivity:d=4,o=6,b=512:8c,8c,8c,8c,8c",
     "video:d=4,o=6,b=600:8b",
 };
+
+static const char *tune_ptr;
+
+// allow for uploaded tunes for development of new tunes
+static uint8_t temp_tune[65];
+static uint8_t temp_tune_len;
+static bool temp_tune_pending;
 
 
 // map 49 tones onto 30 available frequencies. Thanks to Carl for the
@@ -160,7 +168,7 @@ static bool play()
     }
     if ((cur_time - prev_time) > duration){
         stop_note();
-        if(tune[tune_num][tune_pos] == '\0'){
+        if(tune_ptr[tune_pos] == '\0'){
             tune_num = -1;
             tune_pos = 0;
             tune_comp = true;
@@ -186,10 +194,10 @@ static bool set_note()
     
     duration = 0;
 
-    while (isdigit(tune[tune_num][tune_pos])) {
+    while (isdigit(tune_ptr[tune_pos])) {
         //this is a safe while loop as it can't go further than
         //the length of the rtttl tone string
-        num = (num * 10) + (tune[tune_num][tune_pos++] - '0');
+        num = (num * 10) + (tune_ptr[tune_pos++] - '0');
     }
     if (num) {
         duration = wholenote / num;
@@ -199,7 +207,7 @@ static bool set_note()
     
     // now get the note
     note = 0;
-    c = tune[tune_num][tune_pos];
+    c = tune_ptr[tune_pos];
 
     switch (c) {
     case 'c':
@@ -231,26 +239,26 @@ static bool set_note()
     tune_pos++;
 
     // now, get optional '#' sharp
-    if (tune[tune_num][tune_pos] == '#'){
+    if (tune_ptr[tune_pos] == '#'){
         note++;
         tune_pos++;
     }
 
     // now, get optional '.' dotted note
-    if (tune[tune_num][tune_pos] == '.'){
+    if (tune_ptr[tune_pos] == '.'){
         duration += duration/2;
         tune_pos++;
     }
 
     // now, get scale
-    if (isdigit(tune[tune_num][tune_pos])) {
-        scale = tune[tune_num][tune_pos] - '0';
+    if (isdigit(tune_ptr[tune_pos])) {
+        scale = tune_ptr[tune_pos] - '0';
         tune_pos++;
     } else{
         scale = default_oct;
     }
 
-    if (tune[tune_num][tune_pos] == ',') {
+    if (tune_ptr[tune_pos] == ',') {
         tune_pos++;       // skip comma for next note (or we may be at the end)
     }
     // now play the note
@@ -281,21 +289,18 @@ static bool init_tune()
     default_oct = 6;
     bpm = 63;
     prev_tune_num = tune_num;
-    if (tune_num <0 || tune_num > TONE_NUMBER_OF_TUNES) {
-        return false;
-    }
 
-    have_name = (tune[tune_num][tune_pos] != ':');
+    have_name = (tune_ptr[tune_pos] != ':');
     if (have_name) {
         printf("Playing tune '");
     }
     
     tune_comp = false;
-    while (tune[tune_num][tune_pos] != ':') {
-        if (tune[tune_num][tune_pos] == '\0') {
+    while (tune_ptr[tune_pos] != ':') {
+        if (tune_ptr[tune_pos] == '\0') {
             return false;
         }
-        uart2_putchar(tune[tune_num][tune_pos]);
+        uart2_putchar(tune_ptr[tune_pos]);
         tune_pos++;
     }
     if (have_name) {
@@ -303,12 +308,12 @@ static bool init_tune()
     }
     tune_pos++;
 
-    if (tune[tune_num][tune_pos] == 'd'){
+    if (tune_ptr[tune_pos] == 'd'){
         tune_pos+=2;
         num = 0;
 
-        while(isdigit(tune[tune_num][tune_pos])){
-            num = (num * 10) + (tune[tune_num][tune_pos++] - '0');
+        while(isdigit(tune_ptr[tune_pos])){
+            num = (num * 10) + (tune_ptr[tune_pos++] - '0');
         }
         if(num > 0){
             default_dur = num;
@@ -319,10 +324,10 @@ static bool init_tune()
 
     // get default octave
 
-    if(tune[tune_num][tune_pos] == 'o')
+    if(tune_ptr[tune_pos] == 'o')
     {
         tune_pos+=2;              // skip "o="
-        num = tune[tune_num][tune_pos++] - '0';
+        num = tune_ptr[tune_pos++] - '0';
         if(num >= 3 && num <=7){
             default_oct = num;
         }
@@ -331,11 +336,11 @@ static bool init_tune()
 
     // get BPM
 
-    if(tune[tune_num][tune_pos] == 'b'){
+    if(tune_ptr[tune_pos] == 'b'){
         tune_pos+=2;              // skip "b="
         num = 0;
-        while(isdigit(tune[tune_num][tune_pos])){
-            num = (num * 10) + (tune[tune_num][tune_pos++] - '0');
+        while(isdigit(tune_ptr[tune_pos])){
+            num = (num * 10) + (tune_ptr[tune_pos++] - '0');
         }
         bpm = num;
         tune_pos++;                   // skip colon
@@ -382,10 +387,42 @@ void buzzer_init(void)
 void buzzer_tune(uint8_t t)
 {
     tune_num = t;
+    if (t == TONE_PENDING) {
+        tune_ptr = (const char *)temp_tune;
+    } else if (t < TONE_NUMBER_OF_TUNES) {
+        tune_ptr = tune[t];
+    } else {
+        printf("Bad tune %u\n", t);
+        return;
+    }
     state = 0;
     tune_comp = 0;
     while (!tune_comp) {
         tune_tick();
         delay_ms(1);
     }
+}
+
+void buzzer_tune_add(uint16_t offset, const uint8_t *data, uint8_t length)
+{
+    if (offset + length > 64) {
+        return;
+    }
+    memcpy(&temp_tune[offset], data, length);
+    temp_tune_len = offset+length;
+    if (length < 8 || temp_tune_len == 64) {
+        // must be the end of the tune
+        temp_tune[temp_tune_len] = 0;
+        printf("tune of length %u: %s\n", temp_tune_len, (const char *)temp_tune);
+        temp_tune_pending = true;
+    }
+}
+
+void buzzer_play_pending(void)
+{
+    if (!temp_tune_pending) {
+        return;
+    }
+    temp_tune_pending = false;
+    buzzer_tune(TONE_PENDING);
 }

@@ -34,7 +34,7 @@ struct telem_play {
     uint8_t tune_index;
 };
 
-// write to new firmware
+// write to new firmware. This is also used to play a tune
 struct telem_firmware {
     uint8_t seq;
     uint8_t len;

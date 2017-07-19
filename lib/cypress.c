@@ -18,7 +18,8 @@
 #include <channels.h>
 #include <crc.h>
 #include <adc.h>
-#include <telemetry.h>
+#include <telem_structure.h>
+#include <buzzer.h>
 #include "eeprom.h"
 
 #define DISABLE_CRC 0
@@ -826,12 +827,16 @@ static void process_telem_packet(const struct telem_packet *pkt)
             dsm.tx_max_power = t_status.tx_max-1;
         }
         break;
-    case TELEM_FW: {
+    case TELEM_FW:
+    case TELEM_PLAY: {
         struct telem_firmware fw;
         memcpy(&fw, &pkt->payload.fw, sizeof(fw));
         fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
-        //printf("got fw seq=%u offset=%u len=%u\n", fw.seq, fw.offset, fw.len);
-        write_flash_copy(fw.offset, &fw.data[0], fw.len);
+        if (pkt->type == TELEM_FW) {
+            write_flash_copy(fw.offset, &fw.data[0], fw.len);
+        } else {
+            buzzer_tune_add(fw.offset, &fw.data[0], fw.len);
+        }
         telem_ack_value = fw.seq;
         break;
     }

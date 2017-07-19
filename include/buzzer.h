@@ -10,6 +10,8 @@ void buzzer_init(void);
 
 void buzzer_tone(enum beep_tone tone, uint16_t width_ms, uint8_t repeats);
 void buzzer_tune(uint8_t t);
+void buzzer_tune_add(uint16_t offset, const uint8_t *data, uint8_t length);
+void buzzer_play_pending(void);
 
 #define TONE_STARTUP_TUNE                   0
 #define TONE_ERROR_TUNE                     1
@@ -23,6 +25,7 @@ void buzzer_tune(uint8_t t);
 #define TONE_BATT_WARNING                   9
 #define TONE_INACTIVITY                    10
 #define TONE_VIDEO                         11
+#define TONE_PENDING                      127
 
 #define TONE_NUMBER_OF_TUNES 12
 

@@ -185,6 +185,9 @@ static void status_update(bool have_link)
         last_have_link = false;
     }
 
+    // play pending tune (if any)
+    buzzer_play_pending();
+    
     /*
       the primary role of the green LED is to indicate GPS lock. The
       primary role of the yellow LED is to indicate power and arming
