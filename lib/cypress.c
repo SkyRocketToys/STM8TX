@@ -259,8 +259,8 @@ enum {
 #define DSM_MAX_CHANNEL 0x4F
 
 #define DSM_SCAN_MIN_CH 8
+#define DSM_SCAN_MID_CH 40
 #define DSM_SCAN_MAX_CH 70
-#define DSM_SCAN_MID_CH ((DSM_SCAN_MIN_CH+DSM_SCAN_MAX_CH)/2)
 
 /* The PN codes */
 static const uint8_t pn_codes[5][9][8] = {
