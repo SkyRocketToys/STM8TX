@@ -330,6 +330,7 @@ struct reg_config {
 /*The CYRF initial config, binding config and transfer config */
 static const struct reg_config cyrf_config[] = {
         {CYRF_MODE_OVERRIDE, CYRF_RST},                                         // Reset the device
+        {CYRF_XTAL_CFG, 0x08},                                                  // crystal start delay enable
         {CYRF_CLK_EN, CYRF_RXF},                                                // Enable the clock
         {CYRF_AUTO_CAL_TIME, 0x3C},                                             // From manual, needed for initialization
         {CYRF_AUTO_CAL_OFFSET, 0x14},                                           // From manual, needed for initialization
