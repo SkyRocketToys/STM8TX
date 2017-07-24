@@ -392,13 +392,13 @@ void main(void)
             factory_mode = 3;
         } else if (adc2 < 200 && adc3 > 300 && adc3 < 700) {
             factory_mode = 4;
-        } else if (adc1 > 800 && adc0 > 300 && adc0 < 700) {
-            factory_mode = 5;
         } else if (adc0 > 800 && adc1 > 300 && adc1 < 700) {
+            factory_mode = 5;
+        } else if (adc1 > 800 && adc0 > 300 && adc0 < 700) {
             factory_mode = 6;
-        } else if (adc1 < 200 && adc0 > 300 && adc0 < 700) {
-            factory_mode = 7;
         } else if (adc0 < 200 && adc1 > 300 && adc1 < 700) {
+            factory_mode = 7;
+        } else if (adc1 < 200 && adc0 > 300 && adc0 < 700) {
             factory_mode = 8;
         }
         printf("Factory mode %u adc=[%u %u %u %u]\n", factory_mode,
