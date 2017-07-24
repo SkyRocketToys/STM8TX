@@ -109,6 +109,7 @@ static void check_stick_activity(void)
             (t_status.flags & TELEM_FLAG_ARMED) == 0) {
             printf("power off disarmed\n");
             gpio_clear(PIN_POWER);
+            disableInterrupts();
             buzzer_tune(TONE_ERROR_TUNE);
             // loop forever
             while (true) ;
