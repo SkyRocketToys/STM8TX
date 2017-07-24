@@ -379,6 +379,8 @@ void main(void)
 #endif
 
     case BUTTON_LEFT_SHOULDER: {
+        uint16_t adc0 = adc_value(0);
+        uint16_t adc1 = adc_value(1);
         uint16_t adc2 = adc_value(2);
         uint16_t adc3 = adc_value(3);
         if (adc3 > 800 && adc2 > 300 && adc2 < 700) {
@@ -389,8 +391,17 @@ void main(void)
             factory_mode = 3;
         } else if (adc2 < 200 && adc3 > 300 && adc3 < 700) {
             factory_mode = 4;
+        } else if (adc1 > 800 && adc0 > 300 && adc0 < 700) {
+            factory_mode = 5;
+        } else if (adc0 > 800 && adc1 > 300 && adc1 < 700) {
+            factory_mode = 6;
+        } else if (adc1 < 200 && adc0 > 300 && adc0 < 700) {
+            factory_mode = 7;
+        } else if (adc0 < 200 && adc1 > 300 && adc1 < 700) {
+            factory_mode = 8;
         }
-        printf("Factory mode %u adc2=%u adc3=%u\n", factory_mode, adc2, adc3);
+        printf("Factory mode %u adc=[%u %u %u %u]\n", factory_mode,
+            adc0, adc1, adc2, adc3);
         cypress_start_factory_test(factory_mode);
         break;
     }

@@ -1030,6 +1030,7 @@ static void send_normal_packet(void)
       a telemetry packet in DSM2 mode
      */
     if (dsm.receive_telem == false &&
+        dsm.factory_test_mode == 0 &&
         is_dsm2 &&
         dsm.autobind_count > 4 && dsm.telem_recv_count == 0) {
         dsm.autobind_count = 0;
