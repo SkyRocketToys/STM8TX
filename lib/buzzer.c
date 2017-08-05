@@ -44,6 +44,7 @@ static const char * const tune[TONE_NUMBER_OF_TUNES] = {
     "batt_warning:d=4,o=6,b=512:8a,8a,8a,8a,8a,8a,8a,8a,8a",
     "inactivity:d=4,o=6,b=512:8c,8c,8c,8c,8c",
     "video:d=4,o=6,b=600:8b",
+    "disarm:d=4,o=6,b=400:8c,p,8c"
 };
 
 static const char *tune_ptr;

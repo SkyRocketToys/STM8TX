@@ -298,11 +298,20 @@ static void status_update(bool have_link)
         yellow_led_pattern = LED_PATTERN_OFF;
     }
 
+    // check for disarm tone
+    if (!played_tone &&
+        (t_status.flags & TELEM_FLAG_ARMED) == 0 &&
+        (last_status.flags & TELEM_FLAG_ARMED)) {
+        buzzer_tune(TONE_DISARM);
+        played_tone = true;
+    }
+    
     if (!played_tone && (t_status.flags & TELEM_FLAG_VIDEO)) {
         video_tone_counter++;
         if (video_tone_counter == 2) {
             video_tone_counter = 0;
             buzzer_tune(TONE_VIDEO);
+            played_tone = true;
         }
     }
 

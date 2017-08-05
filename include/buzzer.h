@@ -25,9 +25,10 @@ void buzzer_play_pending(void);
 #define TONE_BATT_WARNING                   9
 #define TONE_INACTIVITY                    10
 #define TONE_VIDEO                         11
+#define TONE_DISARM                        12
 #define TONE_PENDING                      127
 
-#define TONE_NUMBER_OF_TUNES 12
+#define TONE_NUMBER_OF_TUNES 13
 
 
 
