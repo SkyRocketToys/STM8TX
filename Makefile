@@ -2,7 +2,7 @@ BUILD_DATE_YEAR=$(shell date +%Y)
 BUILD_DATE_MONTH=$(shell date +%m | sed 's/^0//g')
 BUILD_DATE_DAY=$(shell date +%d | sed 's/^0//g')
 
-BL_VERSION=1
+BL_VERSION=2
 
 CC=sdcc
 CODELOC=0x8700
