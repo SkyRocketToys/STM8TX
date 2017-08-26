@@ -266,8 +266,10 @@ static void status_update(bool have_link)
     } else {
         desired_mode = t_status.flight_mode;
     }
-    
-    if (desired_mode == ALT_HOLD) {
+
+    if (desired_mode == THROW && (t_status.flags & TELEM_FLAG_ARMED)) {
+        green_led_pattern = LED_PATTERN_RAPID;
+    } else if (desired_mode == ALT_HOLD) {
         // GPS LED always off in "indoor" mode
         green_led_pattern = LED_PATTERN_OFF;
     } else {
