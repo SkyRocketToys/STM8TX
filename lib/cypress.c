@@ -1363,6 +1363,10 @@ void cypress_start_FCC_test(void)
  */
 void cypress_start_send(bool use_dsm2)
 {
+#if !SUPPORT_DSMX
+    use_dsm2 = true;
+#endif
+    
     is_dsm2 = use_dsm2;
 
     printf("Cypress: start_send DSM2=%u\n", is_dsm2);
