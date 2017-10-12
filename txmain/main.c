@@ -288,7 +288,7 @@ static void status_update(bool have_link)
         yellow_led_pattern = LED_PATTERN_RAPID;
 
         // play battery warning every 5s when in battery failsafe
-        if (!played_tone && (now - last_batt_warn_ms > 5000U)) {
+        if (!played_tone && (now - last_batt_warn_ms > 1000U)) {
             last_batt_warn_ms = now;
             buzzer_tune(TONE_BATT_WARNING);
         }
