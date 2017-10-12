@@ -41,7 +41,7 @@ static const char * const tune[TONE_NUMBER_OF_TUNES] = {
     "rtl:d=4,o=6,b=400:8c,8c,8c,d,8c,8c,8c,d",
     "land:d=4,o=6,b=400:d,4b,4b,4b,4b",
     "other_mode:d=4,o=6,b=400:4c,4b,4a",
-    "batt_warning:d=4,o=6,b=512:8a,8a,8a,8a,8a,8a,8a,8a,8a",
+    "batt_warning:d=4,o=1,b=512:d,d,d,d",
     "inactivity:d=4,o=6,b=512:8c,8c,8c,8c,8c",
     "video:d=4,o=6,b=600:8b",
     "disarm:d=4,o=6,b=400:8c,p,8c"
