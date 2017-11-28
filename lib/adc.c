@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include "util.h"
 
-/** \addtogroup ADC Analog to Digital Conversion
+/** \addtogroup adc Analog to Digital Conversion
 @{ */
 
 #define NUM_CHANS 4

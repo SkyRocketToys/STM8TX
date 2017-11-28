@@ -7,9 +7,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "gpio.h"
+#include "util.h"
 
 // -----------------------------------------------------------------------------
-/** \addtogroup UTIL Utility functions
+/** \addtogroup util Utility functions
 Support utility functions such as chip setup, LED, timing and maths.
 @{ */
 
@@ -79,8 +80,10 @@ void led_yellow_toggle(void)
 }
 
 // -----------------------------------------------------------------------------
-/** Busy loop to wait a number of milliseconds. */
-void delay_ms(uint16_t d)
+/** Busy loop to wait a number of milliseconds (up to about 65 seconds) (empirically tuned on one CPU)
+The scale factor is precise to <1% accuracy if it is accurate */
+void delay_ms(
+	uint16_t d) ///< The number of milliseconds to wait
 {
     // empirically tuned
     uint32_t counter=((uint32_t)d)*DELAY_MS_LOOP_SCALE;
@@ -88,8 +91,10 @@ void delay_ms(uint16_t d)
 }
 
 // -----------------------------------------------------------------------------
-/** Busy loop to wait a number of microseconds. */
-void delay_us(uint16_t d)
+/** Busy loop to wait a number of microseconds (up to about 65ms) (empirically tuned on one CPU)
+Only vaguely accurate since scale factor has no bits of resolution. */
+void delay_us(
+	uint16_t d) ///< The number of microseconds to wait
 {
     // empirically tuned
     uint16_t counter=((uint16_t)d)*DELAY_US_LOOP_SCALE;

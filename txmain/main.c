@@ -1,6 +1,7 @@
-/*
-  main entry point for transmitter firmware
- */
+// -----------------------------------------------------------------------------
+// Main entry point for transmitter firmware
+// -----------------------------------------------------------------------------
+
 #include "config.h"
 #include "stm8l.h"
 #include <string.h>
@@ -18,8 +19,18 @@
 #include "channels.h"
 #include "telem_structure.h"
 
-/*
-  note that the interrupt vector table is at 0x8700, not 0x8000
+// -----------------------------------------------------------------------------
+/** \addtogroup txmain Main transmitter code
+@{ */
+
+/* Resources:
+	Timer4 = 1ms timer (timer.c)
+*/
+
+// -----------------------------------------------------------------------------
+/* Interrupt handlers.
+	Note that the interrupt vector table is at 0x8700, not 0x8000.
+	The bootloader vector table jumps directly to this table.
  */
 
 #ifndef INTERRUPT_HANDLER
@@ -36,15 +47,15 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
     timer_irq();
 }
 
+// -----------------------------------------------------------------------------
 // get buttons without power button
 static uint8_t get_buttons_no_power(void)
 {
     return get_buttons() & ~BUTTON_POWER;
 }
 
-/*
-  get bootloader version
- */
+// -----------------------------------------------------------------------------
+/* get bootloader version */
 uint8_t get_bl_version(void)
 {
     const uint8_t *v = (const uint8_t *)0x8080;
@@ -72,9 +83,8 @@ static struct telem_status last_status;
 static uint8_t last_mode;
 extern uint8_t note_adjust;
 
-/*
-  update led flashing
- */
+// -----------------------------------------------------------------------------
+/* update led flashing */
 static void update_leds(void)
 {
     uint8_t tick = (timer_get_ms() >> 6) & 0xF;
@@ -82,9 +92,8 @@ static void update_leds(void)
     led_green_set(green_led_pattern & (1U<<tick));
 }
 
-/*
-  check for stick activity
- */
+// -----------------------------------------------------------------------------
+/* check for stick activity */
 static void check_stick_activity(void)
 {
     uint8_t i;
@@ -124,6 +133,7 @@ static void check_stick_activity(void)
 
 }
 
+// -----------------------------------------------------------------------------
 #define LED_PATTERN_OFF    0x0000
 #define LED_PATTERN_LOW    0x0003
 #define LED_PATTERN_HIGH   0xFFFC
@@ -134,34 +144,34 @@ static void check_stick_activity(void)
 #define LED_PATTERN_RAPID  0xAAAA
 #define LED_PATTERN_FCC    0x1000
 
+/** The current control mode */
 enum control_mode_t {
-    STABILIZE =     0,  // manual airframe angle with manual throttle
-    ACRO =          1,  // manual body-frame angular rate with manual throttle
-    ALT_HOLD =      2,  // manual airframe angle with automatic throttle
-    AUTO =          3,  // fully automatic waypoint control using mission commands
-    GUIDED =        4,  // fully automatic fly to coordinate or fly at velocity/direction using GCS immediate commands
-    LOITER =        5,  // automatic horizontal acceleration with automatic throttle
-    RTL =           6,  // automatic return to launching point
-    CIRCLE =        7,  // automatic circular flight with automatic throttle
-    LAND =          9,  // automatic landing with horizontal position control
-    DRIFT =        11,  // semi-automous position, yaw and throttle control
-    SPORT =        13,  // manual earth-frame angular rate control with manual throttle
-    FLIP =         14,  // automatically flip the vehicle on the roll axis
-    AUTOTUNE =     15,  // automatically tune the vehicle's roll and pitch gains
-    POSHOLD =      16,  // automatic position hold with manual override, with automatic throttle
-    BRAKE =        17,  // full-brake using inertial/GPS system, no pilot input
-    THROW =        18,  // throw to launch mode using inertial/GPS system, no pilot input
-    AVOID_ADSB =   19,  // automatic avoidance of obstacles in the macro scale - e.g. full-sized aircraft
-    GUIDED_NOGPS = 20,  // guided mode but only accepts attitude and altitude
-    FLOWHOLD     = 21,  // hold with flow sensor
+    STABILIZE =     0,  ///< manual airframe angle with manual throttle
+    ACRO =          1,  ///< manual body-frame angular rate with manual throttle
+    ALT_HOLD =      2,  ///< manual airframe angle with automatic throttle
+    AUTO =          3,  ///< fully automatic waypoint control using mission commands
+    GUIDED =        4,  ///< fully automatic fly to coordinate or fly at velocity/direction using GCS immediate commands
+    LOITER =        5,  ///< automatic horizontal acceleration with automatic throttle
+    RTL =           6,  ///< automatic return to launching point
+    CIRCLE =        7,  ///< automatic circular flight with automatic throttle
+    LAND =          9,  ///< automatic landing with horizontal position control
+    DRIFT =        11,  ///< semi-automous position, yaw and throttle control
+    SPORT =        13,  ///< manual earth-frame angular rate control with manual throttle
+    FLIP =         14,  ///< automatically flip the vehicle on the roll axis
+    AUTOTUNE =     15,  ///< automatically tune the vehicle's roll and pitch gains
+    POSHOLD =      16,  ///< automatic position hold with manual override, with automatic throttle
+    BRAKE =        17,  ///< full-brake using inertial/GPS system, no pilot input
+    THROW =        18,  ///< throw to launch mode using inertial/GPS system, no pilot input
+    AVOID_ADSB =   19,  ///< automatic avoidance of obstacles in the macro scale - e.g. full-sized aircraft
+    GUIDED_NOGPS = 20,  ///< guided mode but only accepts attitude and altitude
+    FLOWHOLD     = 21,  ///< hold with flow sensor
 };
 
 static bool fcc_CW_mode;
 static uint8_t video_tone_counter;
 
-/*
-   notify user when we have link, flight mode changes etc
- */
+// -----------------------------------------------------------------------------
+// notify user when we have link, flight mode changes etc
 static void status_update(bool have_link)
 {
     static bool last_have_link;
@@ -349,6 +359,8 @@ static void status_update(bool have_link)
     memcpy(&last_status, &t_status, sizeof(t_status));
 }
 
+// -----------------------------------------------------------------------------
+/** Main entry point for the program */
 void main(void)
 {
     uint16_t counter=0;
@@ -491,3 +503,5 @@ void main(void)
         }
     }
 }
+
+/** @}*/

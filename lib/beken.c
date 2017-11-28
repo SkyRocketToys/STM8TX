@@ -1,6 +1,6 @@
-/*
-  driver for Beken BK2425 radio
- */
+// -----------------------------------------------------------------------------
+// driver for Beken BK2425 radio
+// -----------------------------------------------------------------------------
 
 #include "config.h"
 #include "stm8l.h"
@@ -14,6 +14,9 @@
 #include "beken.h"
 
 #if SUPPORT_BEKEN
+
+/** \addtogroup beken Beken BK2425 radio module
+@{ */
 
 // ----------------------------------------------------------------------------
 // Packet format definition
@@ -1130,5 +1133,7 @@ uint8_t get_FCC_power(void)
 	//...
 	return 0;
 }
+
+/** @}*/
 
 #endif

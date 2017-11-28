@@ -1,11 +1,14 @@
-/*
-  structures for telemetry packets
-  This header is common to ArduPilot AP_Radio and STM8 TX code
- */
+// -----------------------------------------------------------------------------
+// Structures for telemetry packets
+// This header is common to ArduPilot AP_Radio and STM8 TX code
+// -----------------------------------------------------------------------------
 
 #pragma once
 
 /** @file */
+/** \addtogroup telemetry Telemetry packet interface
+@{ */
+
 /** The type of telemetry packet */
 enum telem_type {
     TELEM_STATUS= 0, ///< a telem_status packet
@@ -27,9 +30,9 @@ struct telem_status {
     uint8_t rssi; ///< lowpass rssi
     uint8_t flags; ///< TELEM_FLAG_*
     uint8_t flight_mode; ///< flight mode
-    uint8_t wifi_chan;
-    uint8_t tx_max;
-    uint8_t note_adjust;
+    uint8_t wifi_chan; ///< Wi-Fi channel
+    uint8_t tx_max; ///< tx max
+    uint8_t note_adjust; ///< Note adjustment
 };
 
 /** Telemetry packet for the command to play a tune */
@@ -58,10 +61,11 @@ struct telem_packet {
 };
 
 
+/** Type of telemetry data */
 enum tx_telem_type {
-    TXTELEM_RSSI = 0,
-    TXTELEM_CRC1 = 1,
-    TXTELEM_CRC2 = 2,
+    TXTELEM_RSSI = 0, ///< The data word is the RSSI
+    TXTELEM_CRC1 = 1, ///< The data word is part 1 of the CRC
+    TXTELEM_CRC2 = 2, ///< The data word is part 2 of the CRC
 };
 
 /** tx_status structure sent one byte at a time to RX.
@@ -69,6 +73,8 @@ enum tx_telem_type {
  */
 struct telem_tx_status {
     uint8_t crc; ///< Simple crc
-    enum tx_telem_type type;
-    uint16_t data;
+    enum tx_telem_type type; ///< type of telemetry word
+    uint16_t data; ///< The telemetry word.
 };
+
+/** @}*/

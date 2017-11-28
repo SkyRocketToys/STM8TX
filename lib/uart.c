@@ -6,8 +6,9 @@
 #include "stm8l.h"
 #include <string.h>
 #include <stdint.h>
+#include "uart.h"
 
-/** \addtogroup UART UART input/output
+/** \addtogroup uart UART input/output
 @{ */
 
 // -----------------------------------------------------------------------------

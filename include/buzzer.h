@@ -1,4 +1,12 @@
+// -----------------------------------------------------------------------------
+// Support the sound buzzer
+// -----------------------------------------------------------------------------
+
 #include <stdint.h>
+
+/** @file */
+/** \addtogroup buzzer Sound buzzer module
+@{ */
 
 enum beep_tone {
     BEEP_1KHZ=0,
@@ -13,23 +21,23 @@ void buzzer_tune(uint8_t t);
 void buzzer_tune_add(uint16_t offset, const uint8_t *data, uint8_t length);
 void buzzer_play_pending(void);
 
-#define TONE_STARTUP_TUNE                   0
-#define TONE_ERROR_TUNE                     1
-#define TONE_NOTIFY_POSITIVE_TUNE           2
-#define TONE_RX_SEARCH                      3
-#define TONE_LOITER                         4
-#define TONE_ALT_HOLD                       5
-#define TONE_RTL                            6
-#define TONE_LAND                           7
-#define TONE_OTHER_MODE                     8
-#define TONE_BATT_WARNING                   9
-#define TONE_INACTIVITY                    10
-#define TONE_VIDEO                         11
-#define TONE_DISARM                        12
-#define TONE_PENDING                      127
+/** The index into the tune table. */
+enum tune_index {
+	TONE_STARTUP_TUNE                 =  0,
+	TONE_ERROR_TUNE                   =  1,
+	TONE_NOTIFY_POSITIVE_TUNE         =  2,
+	TONE_RX_SEARCH                    =  3,
+	TONE_LOITER                       =  4,
+	TONE_ALT_HOLD                     =  5,
+	TONE_RTL                          =  6,
+	TONE_LAND                         =  7,
+	TONE_OTHER_MODE                   =  8,
+	TONE_BATT_WARNING                 =  9,
+	TONE_INACTIVITY                   = 10,
+	TONE_VIDEO                        = 11,
+	TONE_DISARM                       = 12,
+	TONE_NUMBER_OF_TUNES              = 13,
+	TONE_PENDING                      =127
+};
 
-#define TONE_NUMBER_OF_TUNES 13
-
-
-
-
+/** @}*/

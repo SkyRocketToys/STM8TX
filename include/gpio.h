@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 /** @file */
-/** \addtogroup GPIO General Purpose Input/Output
+/** \addtogroup gpio General Purpose Input/Output
 @{ */
 
 /** Definition of ports; one of these can be ored with one or more pin bits to refer to

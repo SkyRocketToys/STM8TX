@@ -1,3 +1,4 @@
+// -----------------------------------------------------------------------------
 /*
   driver for CYRF6936 radio
 
@@ -5,6 +6,7 @@
   configuration code and register defines
    https://github.com/esden/superbitrf-firmware
  */
+// -----------------------------------------------------------------------------
 
 #include "config.h"
 #include "stm8l.h"
@@ -24,6 +26,9 @@
 #include "cypress.h"
 
 #if SUPPORT_CYPRESS
+
+/** \addtogroup cypress Cypress CYRF6936 radio module
+@{ */
 
 #define DISABLE_CRC 0
 #if SUPPORT_DSMX
@@ -1571,4 +1576,7 @@ void cypress_FCC_toggle_scan(void)
         dsm.FCC_test_chan = DSM_SCAN_MIN_CH;
     }
 }
+
+/** @}*/
+
 #endif

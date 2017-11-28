@@ -1,4 +1,13 @@
+// -----------------------------------------------------------------------------
+// Driver for CYRF6936 radio
+// -----------------------------------------------------------------------------
+
 #if SUPPORT_CYPRESS
+
+/** @file */
+/** \addtogroup cypress Cypress CYRF6936 radio module
+@{ */
+
 #define SUPPORT_RSSI 1
 
 void cypress_init(void);
@@ -30,4 +39,7 @@ uint8_t get_telem_pps(void);
 #define radio_change_FCC_channel cypress_change_FCC_channel
 #define radio_FCC_toggle_scan cypress_FCC_toggle_scan
 #define radio_set_pps_rssi cypress_set_pps_rssi
+
+/** @}*/
+
 #endif

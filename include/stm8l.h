@@ -27,6 +27,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/** @file */
+/** \addtogroup stm8l STM8 hardware interface
+@{ */
+
 typedef unsigned char U8;
 typedef unsigned int U16;
 typedef unsigned long U32;
@@ -540,6 +544,8 @@ typedef unsigned long U32;
 
 // CCR REGISTER: bits 3&5 should be 1 if you wanna change EXTI_CRx
 #define CCR			*(volatile U8*)0x7F0A
+
+/** @}*/
 
 #endif // __STM8L_H__
 

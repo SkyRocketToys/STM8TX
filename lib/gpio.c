@@ -7,7 +7,7 @@
 #include "gpio.h"
 
 // -----------------------------------------------------------------------------
-/** \addtogroup GPIO General Purpose Input/Output
+/** \addtogroup gpio General Purpose Input/Output
 Support raw GPIO access
 
 This module is for configuring and using GPIO pins directly within the project.
@@ -96,7 +96,7 @@ void gpio_toggle(
 // -----------------------------------------------------------------------------
 /** Get the current state of an input pin.
 	Assumes the port is configured for digital input.
-	\return Returns true if at least one specified GPIO pin is high (false if all are low). */
+	\return true if at least one specified GPIO pin is high (false if all are low). */
 bool gpio_get(
 	uint16_t pin) ///< One or more pins to test on a single specified GPIO port. See #gpio_pins
 {

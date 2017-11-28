@@ -1,5 +1,13 @@
+// -----------------------------------------------------------------------------
+// Support Utility functions
+// -----------------------------------------------------------------------------
+
 #include <stdbool.h>
 #include <stdint.h>
+
+/** @file */
+/** \addtogroup util Utility functions
+@{ */
 
 // chip level functions
 void chip_init(void);
@@ -26,3 +34,5 @@ uint16_t get_random16(void);
 void printf(const char *fmt, ...);
 
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+
+/** @}*/

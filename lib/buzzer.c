@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Support the sound buzzer
+// -----------------------------------------------------------------------------
+
 #include "config.h"
 #include "stm8l.h"
 #include "buzzer.h"
@@ -8,14 +12,16 @@
 #include "uart.h"
 #include "string.h"
 
+/** \addtogroup buzzer Sound buzzer module
+@{ */
+
 #define OPTION_BYTE2 *(volatile uint8_t *)0x4803
 #define OPTION_NBYTE2 *(volatile uint8_t *)0x4804
 
 #define isdigit(c) ((c)>='0' && (c)<='9')
 
-/*
-  tune playing code based on ToneAlarm code from ArduPilot
- */
+// -----------------------------------------------------------------------------
+// tune playing code based on ToneAlarm code from ArduPilot
 
 static uint8_t state;
 static int8_t tune_num;
@@ -31,21 +37,22 @@ static uint8_t default_oct;
 static uint8_t default_dur;
 static uint16_t bpm;
 
-// List of RTTTL tones
+// -----------------------------------------------------------------------------
+// List of RTTTL tones, stored as a table of const strings.
 static const char * const tune[TONE_NUMBER_OF_TUNES] = {
-    "Startup:d=8,o=6,b=480:a,d7,c7,a,d7,c7,a,d7,16d7,16c7,16d7,16c7,16d7,16c7,16d7,16c7",
-    "Error:d=4,o=6,b=400:8a,8a,8a,p,a,a,a,p",
-    "notify_pos:d=4,o=6,b=400:8e,8e,a",
-    ":d=1,o=4,b=2048:b",
-    "loiter:d=4,o=6,b=400:8d,8d,a",
-    "althold:d=4,o=6,b=400:8e,8e,8e,c",
-    "rtl:d=4,o=6,b=400:8c,8c,8c,d,8c,8c,8c,d",
-    "land:d=4,o=6,b=400:d,4b,4b,4b,4b",
-    "other_mode:d=4,o=6,b=400:4c,4b,4a",
-    "batt_warning:d=4,o=1,b=512:d,d,d,d",
-    "inactivity:d=4,o=6,b=512:8c,8c,8c,8c,8c",
-    "video:d=4,o=6,b=600:8b",
-    "disarm:d=4,o=6,b=400:8c,p,8c"
+    "Startup:d=8,o=6,b=480:a,d7,c7,a,d7,c7,a,d7,16d7,16c7,16d7,16c7,16d7,16c7,16d7,16c7",  // TONE_STARTUP_TUNE
+    "Error:d=4,o=6,b=400:8a,8a,8a,p,a,a,a,p",                                              // TONE_ERROR_TUNE
+    "notify_pos:d=4,o=6,b=400:8e,8e,a",                                                    // TONE_NOTIFY_POSITIVE_TUNE
+    ":d=1,o=4,b=2048:b",                                                                   // TONE_RX_SEARCH
+    "loiter:d=4,o=6,b=400:8d,8d,a",                                                        // TONE_LOITER
+    "althold:d=4,o=6,b=400:8e,8e,8e,c",                                                    // TONE_ALT_HOLD
+    "rtl:d=4,o=6,b=400:8c,8c,8c,d,8c,8c,8c,d",                                             // TONE_RTL
+    "land:d=4,o=6,b=400:d,4b,4b,4b,4b",                                                    // TONE_LAND
+    "other_mode:d=4,o=6,b=400:4c,4b,4a",                                                   // TONE_OTHER_MODE
+    "batt_warning:d=4,o=1,b=512:d,d,d,d",                                                  // TONE_BATT_WARNING
+    "inactivity:d=4,o=6,b=512:8c,8c,8c,8c,8c",                                             // TONE_INACTIVITY
+    "video:d=4,o=6,b=600:8b",                                                              // TONE_VIDEO
+    "disarm:d=4,o=6,b=400:8c,p,8c"                                                         // TONE_DISARM
 };
 
 static const char *tune_ptr;
@@ -57,6 +64,7 @@ static uint8_t temp_tune_len;
 static bool temp_tune_pending;
 
 
+// -----------------------------------------------------------------------------
 // map 49 tones onto 30 available frequencies. Thanks to Carl for the
 // mapping spreadsheet behind this
 // Everything below NOTE_C6 is the same note though
@@ -66,7 +74,6 @@ static bool temp_tune_pending;
 #define BEEP_LOW BEEP_1KHZ
 #define BEEP_MED BEEP_2KHZ
 #define BEEP_HIGH BEEP_4KHZ
-
 
 #define NOTE_C4  NOTEBITS(BEEP_LOW, 30)
 #define NOTE_CS4 NOTEBITS(BEEP_LOW, 30)
@@ -117,15 +124,12 @@ static bool temp_tune_pending;
 #define NOTE_AS7 NOTEBITS(BEEP_MED, 15)
 #define NOTE_B7  NOTEBITS(BEEP_HIGH, 30)
 
-
-
 #define NOTE_IDX_B5 23
 
 uint8_t note_adjust;
 
-/*
-  map to approximate notes with note adjustment
- */
+// -----------------------------------------------------------------------------
+/* map to approximate notes with note adjustment */
 static void play_note(uint8_t note)
 {
     uint8_t csr = 0;
@@ -147,17 +151,15 @@ static void play_note(uint8_t note)
     BEEP_CSR |= 0x20;
 }
 
-/*
-  stop playing
- */
+// -----------------------------------------------------------------------------
+/* stop playing */
 static void stop_note(void)
 {
     BEEP_CSR &= ~0x20;
 }
 
-/*
-  continue playing note until duration is reached
- */
+// -----------------------------------------------------------------------------
+/* continue playing note until duration is reached */
 static bool play()
 {
     uint16_t cur_time = timer_get_ms();
@@ -183,9 +185,8 @@ static bool play()
     return false;
 }
 
-/*
-  setup note and duration
- */
+// -----------------------------------------------------------------------------
+/* setup note and duration */
 static bool set_note()
 {
     // first, get note duration, if available
@@ -281,9 +282,8 @@ static bool set_note()
 
 }
 
-/*
-  initialise state for tune_num
- */
+// -----------------------------------------------------------------------------
+// Initialise a tune, using tune_num as the new song to trigger
 static bool init_tune()
 {
     uint16_t num;
@@ -354,9 +354,8 @@ static bool init_tune()
     return true;
 }
 
-/*
-  advance state machine by one tick
- */
+// -----------------------------------------------------------------------------
+/* Advance state machine by one tick. Assumes this is called every fixed number of milliseconds. */
 static void tune_tick()
 {
     if(state == 0) {
@@ -374,6 +373,8 @@ static void tune_tick()
     }
 }
 
+// -----------------------------------------------------------------------------
+/** Initialise the sound buzzer module */
 void buzzer_init(void)
 {
     // enable AFR7 in options byte to enable buzzer
@@ -385,10 +386,10 @@ void buzzer_init(void)
     eeprom_lock();
 }
 
-/*
-  play the given tune number. See buzzer.h for tunes
- */
-void buzzer_tune(uint8_t t)
+// -----------------------------------------------------------------------------
+/** Start playing the given tune number. Only one tune can be played at a time */
+void buzzer_tune(
+	uint8_t t) ///< The tune number. See #tune_index
 {
     tune_num = t;
     if (t == TONE_PENDING) {
@@ -407,6 +408,7 @@ void buzzer_tune(uint8_t t)
     }
 }
 
+// -----------------------------------------------------------------------------
 void buzzer_tune_add(uint16_t offset, const uint8_t *data, uint8_t length)
 {
     if (offset + length > MAX_TUNE_LEN) {
@@ -422,6 +424,7 @@ void buzzer_tune_add(uint16_t offset, const uint8_t *data, uint8_t length)
     }
 }
 
+// -----------------------------------------------------------------------------
 void buzzer_play_pending(void)
 {
     if (!temp_tune_pending) {
@@ -430,3 +433,5 @@ void buzzer_play_pending(void)
     temp_tune_pending = false;
     buzzer_tune(TONE_PENDING);
 }
+
+/** @}*/

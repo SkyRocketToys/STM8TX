@@ -3,7 +3,7 @@
 // -----------------------------------------------------------------------------
 
 /** @file */
-/** \addtogroup ADC Analog to Digital Conversion
+/** \addtogroup adc Analog to Digital Conversion
 @{ */
 
 void adc_init(void);

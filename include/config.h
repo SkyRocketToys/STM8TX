@@ -28,34 +28,42 @@
 #define SUPPORT_PROTOCOL 2 // Protocol 2 = raw channels
 #endif
 
+/** @file */
 
-/* The schematic "Streaming and Streaming with GPS Drone button board" v0.1 says
-A1 = BUTTON_STUNT
-A2 = BUTTON_VIDEO
-B0 = CH4 = ROLL (mode2) RightHorizontal
-B1 = CH3 = PITCH (mode2) RightVertical
-B2 = CH1 = THROTTLE (mode2) LeftVertical
-B3 = CH2 = YAW (mode2) LeftHorizontal
-B4 = PWR
-B5 = RADIO_PACTL
-C1 = BUTTON_GPS
-C2 = USER
-C3 = RADIO_IRQ
-C4 = RADIO_CS
-C5 = RADIO_SCK
-C6 = RADIO_MOSI
-C7 = RADIO_MISO
-D0 = BUTTON_MODE
-D1 = SWIM
-D2 = RADIO_CE
-D3 = LED_GPS
-D4 = BEEP
-D5 = UART_TX
-D6 = UART_RX
-D7 = LED_MODE
-E5 = BUTTON_LL
-F4 = VBAT_SENSE
+/** \page schematic PCB layout from schematic.
+The schematic "Streaming and Streaming with GPS Drone button board" v0.1 says
+\section pins GPIO pins
+Port | Meaning
+-----|--------
+A1 | BUTTON_STUNT
+A2 | BUTTON_VIDEO
+B0 | CH4 = ROLL (mode2) RightHorizontal
+B1 | CH3 = PITCH (mode2) RightVertical
+B2 | CH1 = THROTTLE (mode2) LeftVertical
+B3 | CH2 = YAW (mode2) LeftHorizontal
+B4 | PWR
+B5 | RADIO_PACTL
+C1 | BUTTON_GPS
+C2 | USER
+C3 | RADIO_IRQ
+C4 | RADIO_CS
+C5 | RADIO_SCK
+C6 | RADIO_MOSI
+C7 | RADIO_MISO
+D0 | BUTTON_MODE
+D1 | SWIM
+D2 | RADIO_CE
+D3 | LED_GPS
+D4 | BEEP
+D5 | UART_TX
+D6 | UART_RX
+D7 | LED_MODE
+E5 | BUTTON_LL
+F4 | VBAT_SENSE
 */
+
+/** \addtogroup config Product configuration
+@{ */
 
 // -----------------------------------------------------------------------------
 // hardware specific pin mapping and chip setup
@@ -130,3 +138,4 @@ F4 = VBAT_SENSE
 // location in flash of new firmware
 #define NEW_FIRMWARE_BASE 0xC000
 
+/** @}*/

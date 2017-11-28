@@ -1,3 +1,8 @@
+// -----------------------------------------------------------------------------
+// Support logical radio channels
+// This varies according to the protocol packet format
+// -----------------------------------------------------------------------------
+
 #include "config.h"
 #include <stdint.h>
 #include "adc.h"
@@ -6,6 +11,14 @@
 #include "channels.h"
 #include "cypress.h"
 
+// -----------------------------------------------------------------------------
+/** \addtogroup channels Protocol logical channels
+Support radio protocol logical channels
+@{ */
+
+
+// -----------------------------------------------------------------------------
+// Bodge
 #ifndef BUILD_DATE_YEAR
 #define BUILD_DATE_YEAR 2017
 #endif
@@ -24,9 +37,8 @@ static uint8_t telem_extra_type;
 
 extern uint8_t get_bl_version(void);
 
-/*
-  latch left button with debouncing
- */
+// -----------------------------------------------------------------------------
+/** latch left button with debouncing */
 static bool latched_left_button(void)
 {
     static uint8_t counter;
@@ -63,10 +75,11 @@ static bool latched_left_button(void)
     return latched;
 }
 
-/*
-  return an 11 bit channel output value
- */
-uint16_t channel_value(uint8_t chan)
+// -----------------------------------------------------------------------------
+/** Lookup a channel value required by the radio protocol
+	\return An 11 bit channel output value. */
+uint16_t channel_value(
+	uint8_t chan) ///< The index into the protocol channel
 {
     int16_t v = 0;
 
@@ -161,13 +174,17 @@ uint16_t channel_value(uint8_t chan)
 #endif
     }
 
+#if SUPPORT_PROTOCOL==1 // 2017 style channel data - scale the channels
     // map into 11 bit range
     v = (((v - 500) * 27 / 32) + 512) * 2;
+#endif
 
     return (uint16_t)v;
 }
 
-// get buttons
+// -----------------------------------------------------------------------------
+/** Return a byte that contains a bitset of pressed buttons
+	@return #button_bits The union of all the currently pressed buttons, sampled right now. */
 uint8_t get_buttons(void)
 {
     uint8_t ret = 0;
@@ -187,5 +204,12 @@ uint8_t get_buttons(void)
     if (gpio_get(PIN_USER)!=0) {
         ret |= BUTTON_POWER;
     }
+#if PRODUCT==2
+    if (gpio_get(PIN_SW5)==0) {
+        ret |= BUTTON_MODE;
+    }
+#endif
     return ret;
 }
+
+/** @}*/

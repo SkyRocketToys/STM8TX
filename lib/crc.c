@@ -6,7 +6,7 @@
 #include "crc.h"
 
 // -----------------------------------------------------------------------------
-/** \addtogroup CRC Cyclic Redundancy Check
+/** \addtogroup crc Cyclic Redundancy Check
 Support calculating CRCs
 @{ */
 

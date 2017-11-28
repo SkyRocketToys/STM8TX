@@ -27,29 +27,37 @@
  might be covered by the GNU General Public License.
  -------------------------------------------------------------------------*/
 
-/* following formats are supported :-
- format     output type       argument-type
- %d        decimal             int
- %ld       decimal             long
- %hd       decimal             char
- %u        decimal             unsigned int
- %lu       decimal             unsigned long
- %hu       decimal             unsigned char
- %x        hexadecimal         int
- %lx       hexadecimal         long
- %hx       hexadecimal         char
- %o        octal               int
- %lo       octal               long
- %ho       octal               char
- %c        character           char
- %s        character           generic pointer
- */
-
 #include "config.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include "uart.h"
+
+/** @file */
+/** \page format_string
+The following formats are supported by printf
+ format   |  output type       | argument-type
+ ---------|--------------------|-------------
+ \%d       | decimal            | int
+ \%ld      | decimal            | long
+ \%hd      | decimal            | char
+ \%u       | decimal            | unsigned int
+ \%lu      | decimal            | unsigned long
+ \%hu      | decimal            | unsigned char
+ \%x       | hexadecimal        | int
+ \%lx      | hexadecimal        | long
+ \%hx      | hexadecimal        | char
+ \%o       | octal              | int
+ \%lo      | octal              | long
+ \%ho      | octal              | char
+ \%c       | character          | char
+ \%s       | character          | generic pointer
+ */
+/** @}*/
+
+/** \addtogroup printf printf functions
+@{ */
+
 
 static char radix;
 static bool long_flag = 0;
@@ -116,7 +124,10 @@ static char *ltoa_invert(int32_t val, char *s, uint8_t base)
     return s;
 }
 
-void vprintfl(const char * fmt, va_list ap)
+/** Print a string using a va_list to hold the variable arguments */
+void vprintfl(
+	const char * fmt, ///< The format string. \ref format_string
+	va_list ap) ///< All other parameters
 {
 	for (; *fmt; fmt++) {
 		if (*fmt == '%') {
@@ -203,7 +214,10 @@ void vprintfl(const char * fmt, va_list ap)
 	}
 }
 
-void printf(const char *fmt, ...)
+/** Small implementation of the standard printf routine. */
+void printf(
+	const char *fmt, ///< The format string. \ref format_string
+	...) ///< All other parameters
 {
 	va_list ap;
 
@@ -211,3 +225,4 @@ void printf(const char *fmt, ...)
 	vprintfl(fmt, ap);
 }
 
+/** @}*/
