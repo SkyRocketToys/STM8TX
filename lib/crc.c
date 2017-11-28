@@ -1,9 +1,16 @@
+// -----------------------------------------------------------------------------
+// Support CRC calculation
+// -----------------------------------------------------------------------------
+
+#include "config.h"
 #include "crc.h"
 
-/*
-  based on trone crc from ArduPilot
- */
+// -----------------------------------------------------------------------------
+/** \addtogroup CRC Cyclic Redundancy Check
+Support calculating CRCs
+@{ */
 
+/* based on trone crc from ArduPilot */
 static const uint8_t crc8_table[] = {
     0x00, 0x07, 0x0e, 0x09, 0x1c, 0x1b, 0x12, 0x15, 0x38, 0x3f, 0x36, 0x31,
     0x24, 0x23, 0x2a, 0x2d, 0x70, 0x77, 0x7e, 0x79, 0x6c, 0x6b, 0x62, 0x65,
@@ -29,9 +36,8 @@ static const uint8_t crc8_table[] = {
     0xfa, 0xfd, 0xf4, 0xf3
 };
 
-/*
-  16 bit crc
- */
+// -----------------------------------------------------------------------------
+/** 16 bit crc */
 static uint16_t crc_crc16(const uint8_t *p, uint16_t len)
 {
     uint16_t i;
@@ -41,21 +47,19 @@ static uint16_t crc_crc16(const uint8_t *p, uint16_t len)
         i = (crc ^ *p++) & 0xFF;
         crc = (crc8_table[i] ^ (crc << 8));
     }
-    
+
     return crc;
 }
 
-/*
-  8-bit crc
- */
+// -----------------------------------------------------------------------------
+/** 8-bit crc */
 uint8_t crc_crc8(const uint8_t *p, uint16_t len)
 {
     return crc_crc16(p, len) & 0xFF;
 }
 
-/*
-  a poor-mans crc32, re-using the crc16 table
- */
+// -----------------------------------------------------------------------------
+/** a poor-mans crc32, re-using the crc16 table */
 uint32_t crc_crc32(const uint8_t *p, uint16_t len)
 {
     uint32_t crc;
@@ -63,3 +67,5 @@ uint32_t crc_crc32(const uint8_t *p, uint16_t len)
     crc |= ((uint32_t)crc_crc16(p+(len/2), len-(len/2))) << 16;
     return crc;
 }
+
+/** @}*/

@@ -1,4 +1,5 @@
-#include <stm8l.h>
+#include "config.h"
+#include "stm8l.h"
 
 void eeprom_unlock(void)
 {

@@ -1,10 +1,21 @@
-// ADC functions
+// -----------------------------------------------------------------------------
+// Support ADC functions
+// -----------------------------------------------------------------------------
+
+/** @file */
+/** \addtogroup ADC Analog to Digital Conversion
+@{ */
+
 void adc_init(void);
 uint16_t adc_value(uint8_t chan);
 void adc_irq(void);
 
-// mode2 stick mapping
-#define STICK_ROLL     1
-#define STICK_PITCH    0
-#define STICK_THROTTLE 3
-#define STICK_YAW      2
+/** The meaning of each analog channel, assuming mode2 stick mapping */
+enum adc_channel {
+	STICK_ROLL     = 1, ///< Right joystick horizontal axis
+	STICK_PITCH    = 0, ///< Right joystick vertical axis
+	STICK_THROTTLE = 3, ///< Left joystick vertical axis
+	STICK_YAW      = 2, ///< Left joystick horizontal axis
+};
+
+/** @}*/

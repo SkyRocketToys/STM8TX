@@ -1,9 +1,9 @@
-#include <timer.h>
-#include <stm8l.h>
-#include <util.h>
-#include <gpio.h>
-#include <config.h>
-#include <buzzer.h>
+#include "config.h"
+#include "stm8l.h"
+#include "timer.h"
+#include "util.h"
+#include "gpio.h"
+#include "buzzer.h"
 
 static volatile uint32_t g_time_ms;
 static volatile uint32_t g_callback_t_ms;
@@ -28,8 +28,8 @@ void timer_irq(void)
     if (TIM4_SR & TIM_SR1_UIF) {
         bool pin_user;
         // we have overflowed, increment ms counter
-        g_time_ms++;
-        if (g_callback_t_ms != 0 && g_time_ms >= g_callback_t_ms && g_callback != NULL) {
+        uint32_t time_ms = ++g_time_ms; // Non-volatile copy of this timer, to supress a warning
+        if (g_callback_t_ms != 0 && time_ms >= g_callback_t_ms && g_callback != NULL) {
             g_callback_t_ms = 0;
             g_callback();
         }

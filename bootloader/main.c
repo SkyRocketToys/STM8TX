@@ -2,18 +2,27 @@
   bootloader to allow for over the air update of main firmware
  */
 
+#include "config.h"
+#include "stm8l.h"
 #include <stdint.h>
 #include <string.h>
-#include "stm8l.h"
-#include "config.h"
 #include "gpio.h"
 #include "crc.h"
 #include "eeprom.h"
 
-#pragma noiv
+#ifdef _IAR_
+#define CODELOC 0x8700
+#define BLBASE 0x8000
+typedef void (*funcptr)(void);
+static const void (*main_app)(void) = CODELOC;
+#define __at(addr_)
+#else
+// Assumed to be SDCC
+#pragma noiv // Tell SDCC not to generate an interrupt vector table
 
 // location of interrupt vector table in main app
 static const void (*main_app)(void) = CODELOC;
+#endif
 
 /*
   create an interrupt vector table pointing at the applications vector table
@@ -161,7 +170,7 @@ int main()
 
     // power button
     gpio_config(PIN_POWER, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
-    
+
     // setup yellow led for bootloader indication
     gpio_config(LED_YELLOW, GPIO_OUTPUT_PUSHPULL|GPIO_CLEAR);
     gpio_config(LED_GREEN, GPIO_OUTPUT_PUSHPULL|GPIO_CLEAR);

@@ -5,10 +5,12 @@
 
 #pragma once
 
+/** @file */
+/** The type of telemetry packet */
 enum telem_type {
-    TELEM_STATUS= 0, // a telem_status packet
-    TELEM_PLAY  = 1, // play a tune
-    TELEM_FW    = 2, // update new firmware
+    TELEM_STATUS= 0, ///< a telem_status packet
+    TELEM_PLAY  = 1, ///< command to play a tune
+    TELEM_FW    = 2, ///< command to update new firmware
 };
 
 #define TELEM_FLAG_GPS_OK  (1U<<0)
@@ -19,23 +21,24 @@ enum telem_type {
 #define TELEM_FLAG_VIDEO   (1U<<6)
 #define TELEM_FLAG_HYBRID  (1U<<7)
 
+/** Telemetry status packet */
 struct telem_status {
-    uint8_t pps; // packets per second received
-    uint8_t rssi; // lowpass rssi
-    uint8_t flags; // TELEM_FLAG_*
-    uint8_t flight_mode; // flight mode
+    uint8_t pps; ///< packets per second received
+    uint8_t rssi; ///< lowpass rssi
+    uint8_t flags; ///< TELEM_FLAG_*
+    uint8_t flight_mode; ///< flight mode
     uint8_t wifi_chan;
     uint8_t tx_max;
     uint8_t note_adjust;
 };
 
-// play a tune
+/** Telemetry packet for the command to play a tune */
 struct telem_play {
     uint8_t seq;
     uint8_t tune_index;
 };
 
-// write to new firmware. This is also used to play a tune
+/** Telemetry packet for the command to write to new firmware. This is also used to play a tune. */
 struct telem_firmware {
     uint8_t seq;
     uint8_t len;
@@ -43,11 +46,9 @@ struct telem_firmware {
     uint8_t data[8];
 };
 
-/*
-  telemetry packet from RX to TX
- */
+/** telemetry packet from RX to TX */
 struct telem_packet {
-    uint8_t crc; // simple CRC
+    uint8_t crc; ///< simple CRC
     enum telem_type type;
     union {
         uint8_t pkt[14];
@@ -63,12 +64,11 @@ enum tx_telem_type {
     TXTELEM_CRC2 = 2,
 };
 
-/*
-  tx_status structure sent one byte at a time to RX. This is packed
-  into channels 8, 9 and 10 (using 32 bits of a possible 33)
+/** tx_status structure sent one byte at a time to RX.
+  This is packed into channels 8, 9 and 10 (using 32 bits of a possible 33)
  */
 struct telem_tx_status {
-    uint8_t crc;
+    uint8_t crc; ///< Simple crc
     enum tx_telem_type type;
     uint16_t data;
 };

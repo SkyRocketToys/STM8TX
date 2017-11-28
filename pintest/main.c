@@ -1,8 +1,8 @@
+#include "config.h"
 #include "stm8l.h"
 #include "util.h"
 #include "uart.h"
 #include "gpio.h"
-#include "config.h"
 
 static uint16_t pins[] = {
     LED_GREEN,
@@ -29,7 +29,7 @@ int main()
     for (i=0; i<ARRAY_SIZE(pins); i++) {
         gpio_config(pins[i], GPIO_OUTPUT_PUSHPULL);
     }
-    
+
     do {
         printf("pintest: pin %u\n", i);
         gpio_set(pins[i]);

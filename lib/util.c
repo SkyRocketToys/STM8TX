@@ -1,31 +1,49 @@
-#include "stm8l.h"
-#include <config.h>
+// -----------------------------------------------------------------------------
+// Support Utility functions
+// -----------------------------------------------------------------------------
 
+#include "config.h"
+#include "stm8l.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include <gpio.h>
+#include "gpio.h"
 
+// -----------------------------------------------------------------------------
+/** \addtogroup UTIL Utility functions
+Support utility functions such as chip setup, LED, timing and maths.
+@{ */
+
+// -----------------------------------------------------------------------------
+/** Initialise the chip and PCB.
+	This function is specific to the hardware layout */
 void chip_init(void)
 {
     CLK_CKDIVR = CLOCK_DIV;
     CLK_SPCKENR1 = 0xFF; // Enable all peripherals
 
     // power button
-    gpio_config(PIN_POWER, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
+    gpio_config(PIN_POWER, (enum gpio_config)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
 
-    // switches. 
+    // switches.
     gpio_config(PIN_SW1, GPIO_INPUT_PULLUP);
     gpio_config(PIN_SW2, GPIO_INPUT_PULLUP);
     gpio_config(PIN_SW3, GPIO_INPUT_PULLUP);
     gpio_config(PIN_SW4, GPIO_INPUT_PULLUP);
     gpio_config(PIN_USER, GPIO_INPUT_FLOAT);
+#if PRODUCT==2
+    gpio_config(PIN_SW5, GPIO_INPUT_PULLUP);
+#endif
 }
 
+// -----------------------------------------------------------------------------
+/** Initialise the LEDs */
 void led_init(void)
 {
-    gpio_config(LED_GREEN|LED_YELLOW, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
+    gpio_config(LED_GREEN|LED_YELLOW, (enum gpio_config)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
 }
 
+// -----------------------------------------------------------------------------
+/** Turn the green LED on or off as specified */
 void led_green_set(bool set)
 {
     if (!set) {
@@ -35,6 +53,8 @@ void led_green_set(bool set)
     }
 }
 
+// -----------------------------------------------------------------------------
+/** Turn the yellow LED on or off as specified */
 void led_yellow_set(bool set)
 {
     if (set) {
@@ -44,16 +64,22 @@ void led_yellow_set(bool set)
     }
 }
 
+// -----------------------------------------------------------------------------
+/** Toggle the green LED on or off  */
 void led_green_toggle(void)
 {
     gpio_toggle(LED_GREEN);
 }
 
+// -----------------------------------------------------------------------------
+/** Toggle the yellow LED on or off  */
 void led_yellow_toggle(void)
 {
     gpio_toggle(LED_YELLOW);
 }
 
+// -----------------------------------------------------------------------------
+/** Busy loop to wait a number of milliseconds. */
 void delay_ms(uint16_t d)
 {
     // empirically tuned
@@ -61,16 +87,17 @@ void delay_ms(uint16_t d)
     while (counter--) {}
 }
 
+// -----------------------------------------------------------------------------
+/** Busy loop to wait a number of microseconds. */
 void delay_us(uint16_t d)
 {
     // empirically tuned
-    uint16_t counter=((uint16_t)d)*DELAY_US_LOOP_SCALE;    
+    uint16_t counter=((uint16_t)d)*DELAY_US_LOOP_SCALE;
     while (counter--) {}
 }
 
-/*
-  simple 16 bit random number generator
- */
+// -----------------------------------------------------------------------------
+/** Simple 16 bit random number generator */
 uint16_t get_random16(void)
 {
     static uint32_t m_z = 1234;
@@ -80,3 +107,4 @@ uint16_t get_random16(void)
     return ((m_z << 16) + m_w) & 0xFFFF;
 }
 
+/** @}*/

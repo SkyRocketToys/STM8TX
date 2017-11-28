@@ -1,30 +1,36 @@
 /*
   main entry point for transmitter firmware
  */
+#include "config.h"
 #include "stm8l.h"
+#include <string.h>
 #include "util.h"
 #include "uart.h"
 #include "adc.h"
 #include "spi.h"
 #include "cypress.h"
+#include "beken.h"
+#include "cc2500.h"
 #include "timer.h"
 #include "eeprom.h"
 #include "buzzer.h"
 #include "gpio.h"
-#include "config.h"
 #include "channels.h"
 #include "telem_structure.h"
-#include <string.h>
 
 /*
   note that the interrupt vector table is at 0x8700, not 0x8000
  */
 
+#ifndef INTERRUPT_HANDLER
+#error "Wrong stm8l.h found or no compiler detected"
+#endif
+
 INTERRUPT_HANDLER(ADC1_IRQHandler, 22) {
     adc_irq();
 }
 INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5) {
-    cypress_irq();
+    radio_irq();
 }
 INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
     timer_irq();
@@ -115,7 +121,7 @@ static void check_stick_activity(void)
             while (true) ;
         }
     }
-    
+
 }
 
 #define LED_PATTERN_OFF    0x0000
@@ -161,18 +167,18 @@ static void status_update(bool have_link)
     static bool last_have_link;
     uint32_t now = timer_get_ms();
     bool played_tone = false;
-    
+
     int8_t FCC_chan = get_FCC_chan();
     uint8_t FCC_power = get_FCC_power();
     uint8_t buttons = get_buttons();
     uint8_t desired_mode;
-    
+
     if (FCC_chan != -1) {
         yellow_led_pattern = LED_PATTERN_FCC;
         green_led_pattern = LED_PATTERN_FCC;
         if (buttons == BUTTON_RIGHT) {
             uint8_t i;
-            cypress_next_FCC_power();
+            radio_next_FCC_power();
             FCC_power = get_FCC_power();
             printf("FCC power %u\n", FCC_power);
             for (i=0; i<FCC_power; i++) {
@@ -182,25 +188,25 @@ static void status_update(bool have_link)
         }
         if (buttons == BUTTON_POWER) {
             fcc_CW_mode = !fcc_CW_mode;
-            cypress_set_CW_mode(fcc_CW_mode);
+            radio_set_CW_mode(fcc_CW_mode);
             buzzer_tune(fcc_CW_mode?TONE_LOITER:TONE_ALT_HOLD);
             printf("CW mode %u\n", fcc_CW_mode);
         }
         if (buttons == BUTTON_LEFT_SHOULDER) {
-            cypress_change_FCC_channel(1);
+            radio_change_FCC_channel(1);
             buzzer_tune(TONE_RX_SEARCH);
         }
         if (buttons == BUTTON_RIGHT_SHOULDER) {
-            cypress_FCC_toggle_scan();
+            radio_FCC_toggle_scan();
             buzzer_tune(TONE_RX_SEARCH);
         }
         return;
     }
-    
+
     if (have_link) {
         if (!last_have_link) {
             last_have_link = true;
-            buzzer_tune(TONE_NOTIFY_POSITIVE_TUNE);            
+            buzzer_tune(TONE_NOTIFY_POSITIVE_TUNE);
         }
     } else {
         last_have_link = false;
@@ -208,23 +214,23 @@ static void status_update(bool have_link)
 
     // play pending tune (if any)
     buzzer_play_pending();
-    
+
     /*
       the primary role of the green LED is to indicate GPS lock. The
       primary role of the yellow LED is to indicate power and arming
       state
      */
-    
+
     if (!last_have_link) {
         uint32_t time_since_activity = now - last_stick_activity;
         uint8_t time_since_activity_s = time_since_activity >> 10;
         if (time_since_activity_s > 180) {
             // clear power control
             printf("powering off\n");
-            gpio_clear(PIN_POWER);            
+            gpio_clear(PIN_POWER);
         }
         if (time_since_activity_s > 170) {
-            buzzer_tune(TONE_INACTIVITY);            
+            buzzer_tune(TONE_INACTIVITY);
             yellow_led_pattern = LED_PATTERN_RAPID;
             green_led_pattern = LED_PATTERN_RAPID;
         } else {
@@ -311,7 +317,7 @@ static void status_update(bool have_link)
         buzzer_tune(TONE_DISARM);
         played_tone = true;
     }
-    
+
     if (!played_tone && (t_status.flags & TELEM_FLAG_VIDEO)) {
         video_tone_counter++;
         if (video_tone_counter == 2) {
@@ -339,7 +345,7 @@ static void status_update(bool have_link)
         }
         eeprom_write(EEPROM_NOTE_ADJUST, note_adjust);
     }
-    
+
     memcpy(&last_status, &t_status, sizeof(t_status));
 }
 
@@ -348,49 +354,49 @@ void main(void)
     uint16_t counter=0;
     uint32_t next_ms;
     uint8_t factory_mode = 0;
-    
+
     chip_init();
     led_init();
 
     // give indication of power on quickly for user
     led_yellow_set(true);
-    
+
     adc_init();
     spi_init();
     timer_init();
 
     delay_ms(1);
     uart2_init();
-    cypress_init();
+    radio_init();
 
     buzzer_init();
-    
+
     EXTI_CR1 = (1<<6) | (1<<4) | (1<<2) | (1<<0); // rising edge interrupts
 
     enableInterrupts();
 
     printf("BL_VERSION %u\n", get_bl_version());
-    
+
     // wait for initial stick inputs
     delay_ms(200);
 
     switch (get_buttons_no_power()) {
     case BUTTON_LEFT | BUTTON_RIGHT:
         printf("FCC test start\n");
-        cypress_start_FCC_test();
+        radio_start_FCC_test();
         break;
-        
+
     case BUTTON_LEFT:
         printf("DSM2 bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
-        cypress_start_bind_send(true);
+        radio_start_bind_send(true);
         break;
 
 #if SUPPORT_DSMX
     case BUTTON_RIGHT:
         printf("DSMX bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 0);
-        cypress_start_bind_send(false);
+        radio_start_bind_send(false);
         break;
 #endif
 
@@ -418,13 +424,13 @@ void main(void)
         }
         printf("Factory mode %u adc=[%u %u %u %u]\n", factory_mode,
             adc0, adc1, adc2, adc3);
-        cypress_start_factory_test(factory_mode);
+        radio_start_factory_test(factory_mode);
         break;
     }
-        
+
     default: {
         bool use_dsm2 = eeprom_read(EEPROM_DSMPROT_OFFSET);
-        cypress_start_send(use_dsm2);
+        radio_start_send(use_dsm2);
         break;
     }
     }
@@ -433,11 +439,11 @@ void main(void)
     if (note_adjust > 40) {
         note_adjust = 20;
     }
-    
+
     if (factory_mode == 0) {
         buzzer_tune(TONE_STARTUP_TUNE);
     } else {
-        buzzer_tune(TONE_BATT_WARNING);        
+        buzzer_tune(TONE_BATT_WARNING);
     }
 
     next_ms = timer_get_ms() + 1000;
@@ -447,11 +453,11 @@ void main(void)
         bool link_ok = false;
         int8_t FCC_chan = get_FCC_chan();
 
-        cypress_set_pps_rssi();
-
+#if SUPPORT_CYPRESS
+        radio_set_pps_rssi();
         telem_pps = get_telem_pps();
-        
-        printf("%u: ADC=[%u %u %u %u] B:0x%x PWR:%u",
+
+		printf("%u: ADC=[%u %u %u %u] B:0x%x PWR:%u",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
                (unsigned)get_buttons(), get_tx_power());
         if (FCC_chan != -1) {
@@ -470,9 +476,10 @@ void main(void)
                    t_status.flight_mode);
             link_ok = true;
         }
+#endif
 
         status_update(link_ok);
-        
+
         while (timer_get_ms() < next_ms) {
             update_leds();
             check_stick_activity();

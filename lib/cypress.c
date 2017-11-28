@@ -6,21 +6,24 @@
    https://github.com/esden/superbitrf-firmware
  */
 
+#include "config.h"
+#include "stm8l.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "stm8l.h"
-#include <config.h>
-#include <util.h>
-#include <spi.h>
-#include <gpio.h>
-#include <timer.h>
-#include <channels.h>
-#include <crc.h>
-#include <adc.h>
-#include <telem_structure.h>
-#include <buzzer.h>
+#include "util.h"
+#include "spi.h"
+#include "gpio.h"
+#include "timer.h"
+#include "channels.h"
+#include "crc.h"
+#include "adc.h"
+#include "telem_structure.h"
+#include "buzzer.h"
 #include "eeprom.h"
+#include "cypress.h"
+
+#if SUPPORT_CYPRESS
 
 #define DISABLE_CRC 0
 #if SUPPORT_DSMX
@@ -60,6 +63,7 @@ enum dsm_protocol {
     DSM_DSMX_2 = 0xB2,   // The original DSMX protocol with 2 packets of data
 };
 
+#if 0 // Unused at the moment
 static struct stats {
     uint32_t bad_packets;
     uint32_t recv_errors;
@@ -67,6 +71,7 @@ static struct stats {
     uint32_t lost_packets;
     uint32_t timeouts;
 } stats;
+#endif
 
 struct telem_status t_status;
 uint8_t telem_ack_value;
@@ -371,7 +376,7 @@ static struct {
     uint8_t data_col;
     uint8_t last_sop_code[8];
     uint8_t last_data_code[16];
-    
+
     uint16_t num_channels;
     uint16_t pwm_channels[MAX_CHANNELS];
     uint32_t bind_send_end_ms;
@@ -402,7 +407,7 @@ static struct {
     uint8_t autobind_count;
 } dsm;
 
-static void radio_init(void);
+static void cypress_radio_init(void);
 static void cypress_transmit16(const uint8_t data[16]);
 static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint8_t data_col, uint16_t crc_seed);
 static void send_normal_packet(void);
@@ -421,7 +426,7 @@ static void cypress_reset(void)
 void cypress_init(void)
 {
     uint8_t tx_max;
-    
+
     printf("cypress_init\n");
 
     // setup RST pin on PD0
@@ -445,10 +450,10 @@ void cypress_init(void)
     } else {
         dsm.tx_max_power = 3;
     }
-    
+
     cypress_reset();
 
-    radio_init();
+    cypress_radio_init();
 }
 
 /*
@@ -618,7 +623,7 @@ static void scan_channels(void)
     uint8_t avoid_chan_low=0, avoid_chan_high=0;
 
     printf("WiFi: %u\n", wifi_chan);
-    
+
     if (wifi_chan != 0) {
         // avoid 22MHz band around WiFi channel
         if (avoid_chan < 11) {
@@ -628,7 +633,7 @@ static void scan_channels(void)
         }
         avoid_chan_high = avoid_chan + 11;
     }
-    
+
     write_register(CYRF_XACT_CFG, CYRF_MODE_RX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
     delay_ms(1);
@@ -655,7 +660,7 @@ static void scan_channels(void)
             }
             continue;
         }
-        
+
         set_channel(i);
         while (samples--) {
             uint8_t r = read_register(CYRF_RSSI) & 0x1F;
@@ -663,7 +668,7 @@ static void scan_channels(void)
                 highest = r;
             }
         }
-        
+
         printf("%u:%u ", i, highest);
         rssi[i/2] = highest;
         if (highest < best_rssi) {
@@ -676,14 +681,14 @@ static void scan_channels(void)
             break;
         }
     }
-    
+
     printf("\n");
 
     dsm.channels[0] = best;
 
     best = 0;
     best_rssi = 32;
-    
+
     // find the second channel
     for (i=0; i<=DSM_SCAN_MAX_CH; i+=2) {
         if (i != dsm.channels[0] && (i>dsm.channels[0]+10 || i<dsm.channels[0]-10)) {
@@ -737,9 +742,9 @@ static void dsm_setup_transfer(void)
 /*
   initialise the radio
  */
-static void radio_init(void)
+static void cypress_radio_init(void)
 {
-    printf("Cypress: radio_init starting\n");
+    printf("Cypress: cypress_radio_init starting\n");
 
     // wait for radio to settle
     while (true) {
@@ -761,7 +766,7 @@ static void radio_init(void)
 #if DISABLE_CRC
     write_register(CYRF_RX_OVERRIDE, CYRF_DIS_RXCRC);
 #endif
-    
+
     write_register(CYRF_XTAL_CTRL,0x80);  // XOUT=BitSerial
     force_initial_state();
     write_register(CYRF_PWR_CTRL,0x20);   // Disable PMU
@@ -769,7 +774,7 @@ static void radio_init(void)
     // start in NONE state
     state = STATE_NONE;
 
-    printf("Cypress: radio_init done\n");
+    printf("Cypress: cypress_radio_init done\n");
 }
 
 /*
@@ -816,7 +821,7 @@ static void write_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len)
         FLASH_NCR2 = (uint8_t)~0x40;
         memcpy(&ptr1[4], &data[4], 4);
     }
-    
+
     progmem_lock();
 }
 
@@ -855,7 +860,7 @@ static void irq_handler_recv(uint8_t rx_status)
     struct telem_packet pkt;
     uint8_t rlen;
     uint8_t crc;
-    
+
     if ((rx_status & (CYRF_RXC_IRQ | CYRF_RXE_IRQ)) == 0) {
         // nothing interesting yet
         return;
@@ -902,7 +907,7 @@ void cypress_irq(void)
     uint8_t tx_status = read_status_debounced(CYRF_TX_IRQ_STATUS);
 
     //printf("rx_status=0x%x tx_status=0x%x\n", rx_status, tx_status);
-    
+
     switch (state) {
     case STATE_BIND_SEND:
     case STATE_AUTOBIND_SEND:
@@ -914,7 +919,7 @@ void cypress_irq(void)
     case STATE_RECV_TELEM:
         irq_handler_recv(rx_status);
         break;
-        
+
     default:
         break;
     }
@@ -928,7 +933,7 @@ static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint
     uint8_t pn_row = is_dsm2? channel % 5 : (channel-2) % 5;
 
     //printf("c=%u s=0x%x\n", channel, crc_seed);
-    
+
     // Change channel
     set_channel(channel);
 
@@ -962,7 +967,7 @@ static void autobind_send(void)
     state = STATE_AUTOBIND_SEND;
 
     is_dsm2 = true;
-    
+
     dsm_set_channel(AUTOBIND_CHANNEL, true, 0, 0, 0);
 
     // send auto-bind at low (and fixed) power. This allows for RSSI to be used by RX
@@ -989,7 +994,7 @@ static void send_normal_packet(void)
     uint16_t seed;
     bool send_zero = false;
     bool send_autobind = false;
-    
+
     if (state == STATE_AUTOBIND_SEND) {
         // reset power level after autobind
         write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.power_level);
@@ -998,7 +1003,7 @@ static void send_normal_packet(void)
     if (state != STATE_SEND) {
         state = STATE_SEND;
     }
-    
+
     /*
       when sending 7 channels with the DSMX_2 protocol we need to
       occasionally send a zero bit in the leading channel high bit in
@@ -1017,7 +1022,7 @@ static void send_normal_packet(void)
     // case)
     if (dsm.invert_seed) {
         // odd channels are sent every 3ms, even channels every 7ms, total frame time 10ms
-        timer_call_after_ms(2, send_normal_packet);    
+        timer_call_after_ms(2, send_normal_packet);
         dsm.receive_telem = false;
     } else {
         state = STATE_RECV_WAIT;
@@ -1038,10 +1043,10 @@ static void send_normal_packet(void)
     } else {
         dsm.autobind_count++;
     }
-        
+
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
-    
+
     memset(pkt, 0, 16);
 
     if (is_DSM2()) {
@@ -1073,14 +1078,14 @@ static void send_normal_packet(void)
         pkt[2*(i+1)+1] = v & 0xFF;
         pkt[2*(i+1)] = v >> 8;
     }
-    
+
     dsm.invert_seed = !dsm.invert_seed;
-    
+
     dsm.current_channel = (dsm.current_channel + 1);
     dsm.current_channel %= chan_count;
 
     dsm.current_rf_channel = dsm.channels[dsm.current_channel];
-    
+
     seed = dsm.crc_seed;
     if (dsm.invert_seed) {
         seed = ~seed;
@@ -1091,7 +1096,7 @@ static void send_normal_packet(void)
     } else {
         dsm_set_channel(dsm.current_rf_channel, is_DSM2(),
                         dsm.sop_col, dsm.data_col, seed);
-    
+
         cypress_transmit16(pkt);
     }
 }
@@ -1105,9 +1110,9 @@ static void cypress_transmit_unmodulated(void)
     write_register(CYRF_PREAMBLE,0x01);
     write_register(CYRF_PREAMBLE,0x00);
     write_register(CYRF_PREAMBLE,0x00);
-    
+
     write_register(CYRF_TX_OVERRIDE, CYRF_FRC_PRE);
-    write_register(CYRF_TX_CTRL, CYRF_TX_GO);    
+    write_register(CYRF_TX_CTRL, CYRF_TX_GO);
 }
 
 /*
@@ -1122,7 +1127,7 @@ static void send_FCC_packet(void)
     if (state != STATE_SEND) {
         state = STATE_SEND;
     }
-    
+
     timer_call_after_ms(4, send_FCC_packet);
     dsm.receive_telem = false;
 
@@ -1130,9 +1135,9 @@ static void send_FCC_packet(void)
         write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
         write_register(CYRF_RX_ABORT, 0);
     }
-    
+
     memset(pkt, 0, 16);
-    
+
     pkt[0] = ~dsm.mfg_id[2];
     pkt[1] = ~dsm.mfg_id[3];
 
@@ -1143,7 +1148,7 @@ static void send_FCC_packet(void)
         pkt[2*(i+1)+1] = v & 0xFF;
         pkt[2*(i+1)] = v >> 8;
     }
-    
+
     /*
       allow switching between min channel, mid-channel and max channel
      */
@@ -1160,14 +1165,14 @@ static void send_FCC_packet(void)
             }
         }
     }
-    
+
     seed = dsm.crc_seed;
 
     if (dsm.power_level != dsm.FCC_test_power) {
         dsm.power_level = dsm.FCC_test_power;
         write_register(CYRF_TX_CFG, CYRF_DATA_CODE_LENGTH | CYRF_DATA_MODE_8DR | dsm.FCC_test_power);
     }
-    
+
     if (dsm.fcc_CW_mode) {
         if (dsm.last_CW_chan != (int8_t)dsm.FCC_test_chan) {
             dsm_set_channel(dsm.current_rf_channel, true, dsm.sop_col, dsm.data_col, seed);
@@ -1244,7 +1249,7 @@ static void send_bind_packet(void)
     uint8_t pkt[16];
     uint16_t bind_sum = 384 - 0x10;
     uint8_t i;
-    
+
     pkt[0] = pkt[4] = ~dsm.mfg_id[0];
     pkt[1] = pkt[5] = ~dsm.mfg_id[1];
     pkt[2] = pkt[6] = ~dsm.mfg_id[2];
@@ -1254,7 +1259,7 @@ static void send_bind_packet(void)
     for (i = 0; i < 8; i++) {
         bind_sum += pkt[i];
     }
-    
+
     pkt[8] = (bind_sum>>8);
     pkt[9] = (bind_sum&0xFF);
     pkt[10] = 0x01;
@@ -1271,7 +1276,7 @@ static void send_bind_packet(void)
     for (i = 8; i < 14; i++) {
         bind_sum += pkt[i];
     }
-    
+
     pkt[14] = (bind_sum>>8);
     pkt[15] = (bind_sum&0xFF);
 
@@ -1300,14 +1305,14 @@ void cypress_start_bind_send(bool use_dsm2)
     uint32_t rr;
 
     is_dsm2 = use_dsm2;
-    
+
     printf("Cypress: start_bind_send DSM2=%u\n", is_dsm2);
 
     get_mfg_id(dsm.mfg_id);
-    
+
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
-    
+
     state = STATE_BIND_SEND;
 
     radio_set_config(cyrf_bind_config, ARRAY_SIZE(cyrf_bind_config));
@@ -1329,9 +1334,9 @@ void cypress_start_bind_send(bool use_dsm2)
     printf("mfg_id={0x%x, 0x%x, 0x%x, 0x%x} chan=%u\n",
            dsm.mfg_id[0], dsm.mfg_id[1], dsm.mfg_id[2], dsm.mfg_id[3],
            dsm.current_rf_channel);
-    
+
     set_channel(dsm.current_rf_channel);
-    
+
     send_bind_packet();
 }
 
@@ -1350,10 +1355,10 @@ void cypress_start_FCC_test(void)
     printf("Cypress: start_FCC test\n");
 
     get_mfg_id(dsm.mfg_id);
-    
+
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
-    
+
     start_FCC_send();
 }
 
@@ -1366,7 +1371,7 @@ void cypress_start_send(bool use_dsm2)
 #if !SUPPORT_DSMX
     use_dsm2 = true;
 #endif
-    
+
     is_dsm2 = use_dsm2;
 
     printf("Cypress: start_send DSM2=%u\n", is_dsm2);
@@ -1376,10 +1381,10 @@ void cypress_start_send(bool use_dsm2)
     } else {
         get_mfg_id(dsm.mfg_id);
     }
-    
+
     write_register(CYRF_XACT_CFG, CYRF_MODE_SYNTH_TX | CYRF_FRC_END);
     write_register(CYRF_RX_ABORT, 0);
-    
+
     printf("send start: mfg_id={0x%x, 0x%x, 0x%x, 0x%x}\n",
            dsm.mfg_id[0], dsm.mfg_id[1], dsm.mfg_id[2], dsm.mfg_id[3]);
 
@@ -1405,11 +1410,11 @@ static void check_power_level(void)
 #if DYNAMIC_POWER_ADJUSTMENT
     if (dsm.sends_since_recv > 512 && dsm.power_level < dsm.tx_max_power) {
         dsm.power_level++;
-        dsm.sends_since_recv = 0;        
+        dsm.sends_since_recv = 0;
     }
     if (dsm.sends_since_recv > 512 && dsm.power_level == dsm.tx_max_power) {
         dsm.power_level -= 3;
-        dsm.sends_since_recv = 0;        
+        dsm.sends_since_recv = 0;
     }
     if (dsm.sends_since_recv < 2 && dsm.sends_since_power_change > 256) {
         if (dsm.power_level > 0 && t_status.rssi > 26) {
@@ -1428,7 +1433,7 @@ static void check_power_level(void)
         // don't do dynamic power at low power levels
         dsm.power_level = dsm.tx_max_power;
     }
-    
+
     if (dsm.FCC_test_mode) {
         // choose power for FCC testing
         dsm.power_level = dsm.FCC_test_power;
@@ -1446,7 +1451,7 @@ static void check_power_level(void)
 static void cypress_transmit16(const uint8_t data[16])
 {
     check_power_level();
-    
+
     write_register(CYRF_TX_LENGTH, 16);
     write_register(CYRF_TX_CTRL, CYRF_TX_CLR);
 
@@ -1484,7 +1489,7 @@ void cypress_set_pps_rssi(void)
     } else {
         dsm.current_telem_rssi = 0;
     }
-    
+
 }
 
 /*
@@ -1566,3 +1571,4 @@ void cypress_FCC_toggle_scan(void)
         dsm.FCC_test_chan = DSM_SCAN_MIN_CH;
     }
 }
+#endif

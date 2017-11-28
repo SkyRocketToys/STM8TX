@@ -45,6 +45,7 @@
  %s        character           generic pointer
  */
 
+#include "config.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -58,7 +59,7 @@ static bool unsigned_flag = 0;
 static char *str;
 static long val;
 
-static void 
+static void
 output_char(register char c)
 {
     uart2_putchar(c);

@@ -1,3 +1,6 @@
+#PYTHON_DIR=/cygdrive/c/Python27
+PYTHON_DIR=C:/Python27
+
 BUILD_DATE_YEAR=$(shell date +%Y)
 BUILD_DATE_MONTH=$(shell date +%m | sed 's/^0//g')
 BUILD_DATE_DAY=$(shell date +%d | sed 's/^0//g')
@@ -14,7 +17,7 @@ CHIP=stm8s105c6
 #STLINK=stlink
 STLINK=stlinkv2
 
-LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c
+LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c lib/beken.c lib/cc2500.c
 LIBSRC += lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c lib/channels.c
 BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom.c
 
@@ -83,11 +86,15 @@ bootloader.flash: bootloader.ihx
 
 combined.ihx: txmain.ihx bootloader.ihx
 	@echo Building combined.ihx
-	@hex2bin.py bootloader.ihx bootloader.bin1
-	@hex2bin.py --size=1792 bootloader.ihx bootloader.bin
-	@hex2bin.py --size=14592 txmain.ihx txmain.bin
-	@cat bootloader.bin txmain.bin txmain.bin > combined.bin
-	@bin2hex.py --offset 0x8000 combined.bin combined.ihx
+	./WinTools/cheese dat2dat bootloader.ihx bootloader.bin
+	./WinTools/cheese dat2dat txmain.ihx txmain.bin
+	./WinTools/cheese extract combined.bin -pad 255 -i bootloader.bin $$8000 $$700 -i txmain.bin $$8700 $$3900 -i txmain.bin $$8700 $$3900
+	./WinTools/cheese dat2dat combined.bin combined.ihx
+#	@python $(PYTHON_DIR)/Scripts/hex2bin.py bootloader.ihx bootloader.bin1
+#	@python $(PYTHON_DIR)/Scripts/hex2bin.py --size=1792 bootloader.ihx bootloader.bin
+#	@python $(PYTHON_DIR)/Scripts/hex2bin.py --size=14592 txmain.ihx txmain.bin
+#	@cat bootloader.bin txmain.bin txmain.bin > combined.bin
+#	@python $(PYTHON_DIR)/Scripts/bin2hex.py --offset 0x8000 combined.bin combined.ihx
 
 combined.flash: combined.ihx
 	@echo Flashing combined to $(STLINK)

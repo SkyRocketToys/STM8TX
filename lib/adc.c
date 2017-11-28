@@ -1,12 +1,22 @@
+// -----------------------------------------------------------------------------
+// Support ADC functions
+// -----------------------------------------------------------------------------
+
+#include "config.h"
 #include "stm8l.h"
 #include <stdint.h>
-#include <util.h>
+#include "util.h"
+
+/** \addtogroup ADC Analog to Digital Conversion
+@{ */
 
 #define NUM_CHANS 4
 static uint8_t chan=0;
 static bool take_next;
 static uint16_t values[NUM_CHANS];
 
+// -----------------------------------------------------------------------------
+/** This is the interrupt routine for supporting ADC conversions */
 void adc_irq(void)
 {
     if (take_next) {
@@ -27,6 +37,8 @@ void adc_irq(void)
     take_next = !take_next;
 }
 
+// -----------------------------------------------------------------------------
+/** This function initialises the ADC module */
 void adc_init(void)
 {
     // Configure ADC
@@ -40,7 +52,13 @@ void adc_init(void)
     ADC_CR1 = 0x73; // turn on ADC (this needs second write operation)
 }
 
-uint16_t adc_value(uint8_t chan)
+// -----------------------------------------------------------------------------
+/** This function returns the most recently converted data from a specified channel
+@return Returns the raw input value (not normalised). */
+uint16_t adc_value(
+	uint8_t chan) ///< Which channel are we interested in now. See #adc_channel
 {
     return values[chan];
 }
+
+/** @}*/

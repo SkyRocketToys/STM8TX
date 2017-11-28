@@ -1,11 +1,12 @@
-#include <stm8l.h>
-#include <buzzer.h>
-#include <util.h>
-#include <gpio.h>
-#include <eeprom.h>
-#include <timer.h>
-#include <uart.h>
-#include <string.h>
+#include "config.h"
+#include "stm8l.h"
+#include "buzzer.h"
+#include "util.h"
+#include "gpio.h"
+#include "eeprom.h"
+#include "timer.h"
+#include "uart.h"
+#include "string.h"
 
 #define OPTION_BYTE2 *(volatile uint8_t *)0x4803
 #define OPTION_NBYTE2 *(volatile uint8_t *)0x4804
@@ -58,6 +59,7 @@ static bool temp_tune_pending;
 
 // map 49 tones onto 30 available frequencies. Thanks to Carl for the
 // mapping spreadsheet behind this
+// Everything below NOTE_C6 is the same note though
 
 #define NOTEBITS(range, divider) (((range)<<6) | divider)
 
@@ -120,7 +122,7 @@ static bool temp_tune_pending;
 #define NOTE_IDX_B5 23
 
 uint8_t note_adjust;
-    
+
 /*
   map to approximate notes with note adjustment
  */
@@ -129,7 +131,7 @@ static void play_note(uint8_t note)
     uint8_t csr = 0;
 
     note += note_adjust;
-    
+
     if (note < NOTE_IDX_B5) {
         csr = NOTEBITS(BEEP_LOW, 30);
     } else if (note < NOTE_IDX_B5+15) {
@@ -193,7 +195,7 @@ static bool set_note()
     if (tune_num < 0) {
         return false;
     }
-    
+
     duration = 0;
 
     while (isdigit(tune_ptr[tune_pos])) {
@@ -206,7 +208,7 @@ static bool set_note()
     } else {
         duration = wholenote / 4;  // we will need to check if we are a dotted note after
     }
-    
+
     // now get the note
     note = 0;
     c = tune_ptr[tune_pos];
@@ -286,7 +288,7 @@ static bool init_tune()
 {
     uint16_t num;
     bool have_name;
-    
+
     default_dur = 4;
     default_oct = 6;
     bpm = 63;
@@ -296,7 +298,7 @@ static bool init_tune()
     if (have_name) {
         printf("Playing tune '");
     }
-    
+
     tune_comp = false;
     while (tune_ptr[tune_pos] != ':') {
         if (tune_ptr[tune_pos] == '\0') {
@@ -348,7 +350,7 @@ static bool init_tune()
         tune_pos++;                   // skip colon
     }
 
-    wholenote = (60 * ((uint32_t)1000) / bpm) * 4; 
+    wholenote = (60 * ((uint32_t)1000) / bpm) * 4;
     return true;
 }
 

@@ -1,10 +1,20 @@
+#include "config.h"
 #include <stdint.h>
 #include "adc.h"
 #include "gpio.h"
-#include "config.h"
 #include "util.h"
 #include "channels.h"
 #include "cypress.h"
+
+#ifndef BUILD_DATE_YEAR
+#define BUILD_DATE_YEAR 2017
+#endif
+#ifndef BUILD_DATE_MONTH
+#define BUILD_DATE_MONTH 11
+#endif
+#ifndef BUILD_DATE_DAY
+#define BUILD_DATE_DAY 22
+#endif
 
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
 extern uint8_t telem_ack_value;
@@ -29,7 +39,7 @@ static bool latched_left_button(void)
       left button is held, then it is a button combination and mode
       does not change
      */
-    
+
     if (gpio_get(PIN_LEFT_BUTTON) != 0) {
         if (counter >= 10 && !ignore_left_button) {
             latched = !latched;
@@ -59,7 +69,7 @@ static bool latched_left_button(void)
 uint16_t channel_value(uint8_t chan)
 {
     int16_t v = 0;
-    
+
     switch (chan) {
     case 0:
     case 1:
@@ -76,6 +86,7 @@ uint16_t channel_value(uint8_t chan)
         }
         break;
     }
+#if SUPPORT_PROTOCOL==1 // 2017 style channel data - force to analog
     case 4:
         v = latched_left_button()?1000:0;
         if (!gpio_get(PIN_LEFT_BUTTON)) {
@@ -129,6 +140,7 @@ uint16_t channel_value(uint8_t chan)
             // key 3 is day
             tvalue = BUILD_DATE_DAY;
             break;
+#if SUPPORT_RSSI
         case 4:
             // key 4 telem RSSI
             tvalue = get_telem_rssi();
@@ -137,6 +149,7 @@ uint16_t channel_value(uint8_t chan)
             // key 5 telem pps
             tvalue = get_telem_pps();
             break;
+#endif
         case 6:
             // bl version
             tvalue = get_bl_version();
@@ -145,6 +158,7 @@ uint16_t channel_value(uint8_t chan)
 
         return (((uint16_t)telem_extra_type)<<8) | tvalue;
     }
+#endif
     }
 
     // map into 11 bit range

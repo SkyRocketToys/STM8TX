@@ -34,18 +34,53 @@ typedef unsigned long U32;
 #define NULL (void*)0
 #endif
 
-/* functions */
-#define enableInterrupts()    {__asm__("rim\n");}    // enable interrupts
-#define disableInterrupts()   {__asm__("sim\n");}    // disable interrupts
-#define iret()                {__asm__("iret\n");}   // Interrupt routine return
-#define pop_ccr()             {__asm__("pop cc\n");} // Pop CCR from the stack
-#define push_ccr()            {__asm__("push cc\n");}// Push CCR on the stack
-#define rim()                 {__asm__("rim\n");}    // enable interrupts
-#define sim()                 {__asm__("sim\n");}    // disable interrupts
-#define nop()                 {__asm__("nop\n");}    // No Operation
-#define trap()                {__asm__("trap\n");}   // Trap (soft IT)
-#define wfi()                 {__asm__("wfi\n");}    // Wait For Interrupt
-#define halt()                {__asm__("halt\n");}   // Halt
+#ifdef __IAR_SYSTEMS_ICC__
+#define _IAR_ 1
+#endif
+
+/* Intrinsic functions */
+#ifdef _RAISONANCE_
+ #include <intrins.h>
+ #define enableInterrupts()    _rim_()  /* enable interrupts */
+ #define disableInterrupts()   _sim_()  /* disable interrupts */
+ #define rim()                 _rim_()  /* enable interrupts */
+ #define sim()                 _sim_()  /* disable interrupts */
+ #define nop()                 _nop_()  /* No Operation */
+ #define trap()                _trap_() /* Trap (soft IT) */
+ #define wfi()                 _wfi_()  /* Wait For Interrupt */
+ #define halt()                _halt_() /* Halt */
+#elif defined(_COSMIC_)
+ #define enableInterrupts()    {_asm("rim\n");}  /* enable interrupts */
+ #define disableInterrupts()   {_asm("sim\n");}  /* disable interrupts */
+ #define rim()                 {_asm("rim\n");}  /* enable interrupts */
+ #define sim()                 {_asm("sim\n");}  /* disable interrupts */
+ #define nop()                 {_asm("nop\n");}  /* No Operation */
+ #define trap()                {_asm("trap\n");} /* Trap (soft IT) */
+ #define wfi()                 {_asm("wfi\n");}  /* Wait For Interrupt */
+ #define halt()                {_asm("halt\n");} /* Halt */
+#elif defined(_IAR_)
+ #include <intrinsics.h>
+ #define enableInterrupts()    __enable_interrupt()   /* enable interrupts */
+ #define disableInterrupts()   __disable_interrupt()  /* disable interrupts */
+ #define rim()                 __enable_interrupt()   /* enable interrupts */
+ #define sim()                 __disable_interrupt()  /* disable interrupts */
+ #define nop()                 __no_operation()       /* No Operation */
+ #define trap()                __trap()               /* Trap (soft IT) */
+ #define wfi()                 __wait_for_interrupt() /* Wait For Interrupt */
+ #define halt()                __halt()               /* Halt */
+#elif defined(SDCC)
+ #define enableInterrupts()    {__asm__("rim\n");}    // enable interrupts
+ #define disableInterrupts()   {__asm__("sim\n");}    // disable interrupts
+ #define iret()                {__asm__("iret\n");}   // Interrupt routine return
+ #define pop_ccr()             {__asm__("pop cc\n");} // Pop CCR from the stack
+ #define push_ccr()            {__asm__("push cc\n");}// Push CCR on the stack
+ #define rim()                 {__asm__("rim\n");}    // enable interrupts
+ #define sim()                 {__asm__("sim\n");}    // disable interrupts
+ #define nop()                 {__asm__("nop\n");}    // No Operation
+ #define trap()                {__asm__("trap\n");}   // Trap (soft IT)
+ #define wfi()                 {__asm__("wfi\n");}    // Wait For Interrupt
+ #define halt()                {__asm__("halt\n");}   // Halt
+#endif
 
 /*
  * Registers map is shown in short datasheet, page 26
@@ -125,8 +160,32 @@ typedef unsigned long U32;
 /* ------------------- interrupts ------------------- */
 #define EXTI_CR1	*(volatile U8*)0x50A0
 #define EXTI_CR2	*(volatile U8*)0x50A1
-#define INTERRUPT_HANDLER(fn, num)		void fn() __interrupt(num)
-#define INTERRUPT_DEFINITION(fn, num)	extern void fn() __interrupt(num)
+
+#ifdef _COSMIC_
+ #define INTERRUPT_HANDLER(a,b) @far @interrupt void a(void)
+ #define INTERRUPT_HANDLER_TRAP(a) void @far @interrupt a(void)
+#endif /* _COSMIC_ */
+
+#ifdef _RAISONANCE_
+ #define INTERRUPT_HANDLER(a,b) void a(void) interrupt b
+ #define INTERRUPT_HANDLER_TRAP(a) void a(void) trap
+#endif /* _RAISONANCE_ */
+
+#ifdef _IAR_
+ #define STRINGVECTOR(x) #x
+ #define VECTOR_ID(x) STRINGVECTOR( vector = (x) )
+ #define INTERRUPT_HANDLER( a, b )  \
+ _Pragma( VECTOR_ID( (b)+2 ) )        \
+ __interrupt void (a)( void )
+ #define INTERRUPT_HANDLER_TRAP(a) \
+ _Pragma( VECTOR_ID( 1 ) ) \
+ __interrupt void (a) (void)
+#endif /* _IAR_ */
+
+#ifdef SDCC
+ #define INTERRUPT_HANDLER(fn, num)		void fn() __interrupt(num)
+ #define INTERRUPT_DEFINITION(fn, num)	extern void fn() __interrupt(num)
+#endif
 
 // Reset status register
 #define RST_SR		*(volatile U8*)0x50B3

@@ -1,12 +1,12 @@
+#include "config.h"
+#include "stm8l.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "stm8l.h"
-#include <spi.h>
-#include <gpio.h>
-#include <config.h>
-#include <util.h>
-#include <uart.h>
+#include "spi.h"
+#include "gpio.h"
+#include "util.h"
+#include "uart.h"
 
 static bool forced_chip_select = false;
 
@@ -24,9 +24,9 @@ void spi_init(void)
     // we don't use the HW NSS, pin for SPI, it is a user switch instead
     gpio_config(SPI_NSS_HW, GPIO_INPUT_PULLUP);
 
-    gpio_config(RADIO_NCS, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
+    gpio_config(RADIO_NCS, (enum gpio_config)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
     gpio_config(RADIO_INT, GPIO_INPUT_FLOAT_IRQ);
-    
+
     // setup mode, clock, master
 #if CLOCK_DIV == CLOCK_DIV_16MHZ
     SPI_CR1 = (0x3<<3) | SPI_CR1_MODE0; // mode0, 1MHz
@@ -36,11 +36,11 @@ void spi_init(void)
 
     // setup for software CS
     SPI_CR2 = 0x03;
-    
+
     SPI_SR = 0; // clear errors
     SPI_CR1 |= 0x04; // master
     SPI_ICR = 0; // no interrupts please
-    
+
     SPI_CR1 |= 0x40; // enable spi peripheral
 
     // clear overruns
@@ -68,7 +68,6 @@ void spi_force_chip_select(bool set)
         spi_radio_cs_high();
     }
 }
-
 
 void spi_write(uint8_t n, const uint8_t *buf)
 {
