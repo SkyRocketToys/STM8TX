@@ -12,10 +12,12 @@
 *.img
 *.bin
 blimage
+combined.h
 doxygen/StreamingTx/html
 doxygen/StreamingTx/latex
 doxygen/*.txt
 iar/BootDebug_Beken
+iar/BootRelease_Beken
 iar/Debug
 iar/Debug_Beken
 iar/Debug_CC2500

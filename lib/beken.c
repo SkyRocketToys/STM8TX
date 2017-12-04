@@ -15,6 +15,7 @@
 
 #if SUPPORT_BEKEN
 
+/** \file */
 /** \addtogroup beken Beken BK2425 radio module
 @{ */
 
@@ -22,54 +23,57 @@
 // Packet format definition
 // ----------------------------------------------------------------------------
 
+/** The type of packets being sent between controller and drone */
 enum BK_PKT_TYPE_E {
-	BK_PKT_TYPE_INVALID      = 0,    // Invalid packet from empty packets or bad CRC
-	BK_PKT_TYPE_CTRL         = 0x10, // (Tx->Drone) [ctrl] Packet type 3 = user control
-	BK_PKT_TYPE_AVAILABLE    = 0x11, // (Tx->Drone) [info] Packet type 5 = tx is available (and was either never paired or has been switched off and on again)
-	BK_PKT_TYPE_DISCONNECTED = 0x12, // (Tx->Drone) [id] Packet type 6 = tx was connected and is now available
-	BK_PKT_TYPE_PAIRING      = 0x13, // (Tx->Drone) [id] Packet type 9 = tx is pairing to this address (normal comms speed - better range)
-	BK_PKT_TYPE_DRONE        = 0x14, // (Drone->Tx) Packet type 4 = drone command to tx (reply to ctrl)
+	BK_PKT_TYPE_INVALID      = 0,    ///< Invalid packet from empty packets or bad CRC
+	BK_PKT_TYPE_CTRL         = 0x10, ///< (Tx->Drone) [ctrl] Packet type 3 = user control
+	BK_PKT_TYPE_AVAILABLE    = 0x11, ///< (Tx->Drone) [info] Packet type 5 = tx is available (and was either never paired or has been switched off and on again)
+	BK_PKT_TYPE_DISCONNECTED = 0x12, ///< (Tx->Drone) [id] Packet type 6 = tx was connected and is now available
+	BK_PKT_TYPE_PAIRING      = 0x13, ///< (Tx->Drone) [id] Packet type 9 = tx is pairing to this address (normal comms speed - better range)
+	BK_PKT_TYPE_DRONE        = 0x14, ///< (Drone->Tx) Packet type 4 = drone command to tx (reply to ctrl)
 };
 typedef uint8_t BK_PKT_TYPE;
 
 
-// Data for packets that are not droneid packets
-// Onair order = little-endian
+/** Data for packets that are not droneid packets
+	Onair order = little-endian */
 typedef struct packetDataDeviceCtrl_s {
-	uint8_t throttle;
-	uint8_t roll;
-	uint8_t pitch;
-	uint8_t yaw;
-	uint8_t lsb;
-	uint8_t buttons;
-	uint8_t data_type;
-	uint8_t data_value;
+	uint8_t throttle; ///< High 8 bits of the throttle joystick
+	uint8_t roll; ///< High 8 bits of the roll joystick
+	uint8_t pitch; ///< High 8 bits of the pitch joystick
+	uint8_t yaw; ///< High 8 bits of the yaw joystick
+	uint8_t lsb; ///< Low 2 bits of throttle, roll, pitch, yaw
+	uint8_t buttons; ///< The buttons
+	uint8_t data_type; ///< Type of extra data being sent
+	uint8_t data_value; ///< Value of extra data being sent
 } packetDataDeviceCtrl;
 
-enum { SZ_DRONEID = 6 }; // Size of UUID for drone (48 bits)
-enum { SZ_CTRLID = 6 }; // Size of UUID for controller (48 bits)
+enum { SZ_DRONEID = 6 }; ///< Size of UUID for drone (48 bits)
+enum { SZ_CTRLID = 6 }; ///< Size of UUID for controller (48 bits)
 
-// Onair order = little-endian
+/** Data for packets that are binding packets
+	Onair order = little-endian */
 typedef struct packetDataDeviceID_s {
-	uint8_t droneId[SZ_DRONEID];
-	uint8_t reconnectAddress[3];
+	uint8_t droneId[SZ_DRONEID]; ///< The UUID of the drone
+	uint8_t reconnectAddress[3]; ///< The Address chosen for this connection
 } packetDataDeviceID;
 
-// Data structure for data packet transmitted from device (controller) to host (drone)
+/** Data structure for data packet transmitted from device (controller) to host (drone) */
 typedef struct packetDataDevice_s {
-	BK_PKT_TYPE packetType;
-	uint8_t channel; // Next channel I will broadcast on
-	union packetDataDevice_u
+	BK_PKT_TYPE packetType; ///< The packet type
+	uint8_t channel; ///< Next channel I will broadcast on
+	union packetDataDevice_u ///< The variant part of the packets
 	{
-		packetDataDeviceCtrl ctrl; // 6..18
-		packetDataDeviceID id; // 6..20
+		packetDataDeviceCtrl ctrl; ///< Control packets
+		packetDataDeviceID id; ///< Binding packets
 	} u;
 } packetFormatTx;
 
+/** Data structure for data packet transmitted from host (drone) to device (controller) */
 typedef struct packetDataDrone_s {
-	BK_PKT_TYPE packetType;
-	uint8_t channel; // Next channel I will broadcast on
-	uint8_t data[10];
+	BK_PKT_TYPE packetType; ///< The packet type
+	uint8_t channel; ///< Next channel I will broadcast on
+	uint8_t data[10]; ///< Telemetry data (unspecified so far)
 } packetFormatRx;
 
 // ----------------------------------------------------------------------------
@@ -86,33 +90,35 @@ typedef uint32_t PAIRADDR; // Pair address (was 8 bit, now 32 bit (low 23 bits u
 #define PACKET_LENGTH_TX 10
 #define PACKET_LENGTH_RX 16
 
-// Comms state
+/** Comms state */
 enum {
-	COMMS_STATE_UNPAIRED,
-	COMMS_STATE_DISCONNECTED, // I have paired but am not connected
-	COMMS_STATE_PAIRING, // Telling the drones I have accepted one of them
-	COMMS_STATE_PAIRED, // Telling the drone I have received its accept
+	COMMS_STATE_UNPAIRED, ///< I have not paired
+	COMMS_STATE_DISCONNECTED, ///< I have paired but am not connected
+	COMMS_STATE_PAIRING, ///< Telling the drones I have accepted one of them
+	COMMS_STATE_PAIRED, ///< Telling the drone I have received its accept
 };
 uint8_t commsState;
 
-// Channel hopping parameters
-enum {
-	CHANNEL_MIN_PHYSICAL = 0, // Minimum physical channel that is possible
-	CHANNEL_MAX_PHYSICAL = 83, // Maximum physical channel that is possible
-	CHANNEL_FCC_LOW = 10, // Minimum physical channel that will pass the FCC tests
-	CHANNEL_FCC_HIGH = 72, // Maximum physical channel that will pass the FCC tests
-	CHANNEL_FCC_MID = 41, // A representative physical channel
-	CHANNEL_TEST_MODE = 41, // Frequency to use for testing
+/** Channel hopping parameters. Values are in MHz from 2400Mhz. */
+enum CHANNEL_MHZ_e {
+	CHANNEL_MIN_PHYSICAL = 0, ///< Minimum physical channel that is possible
+	CHANNEL_MAX_PHYSICAL = 83, ///< Maximum physical channel that is possible
+	CHANNEL_FCC_LOW = 10, ///< Minimum physical channel that will pass the FCC tests
+	CHANNEL_FCC_HIGH = 72, ///< Maximum physical channel that will pass the FCC tests
+	CHANNEL_FCC_MID = 41, ///< A representative physical channel
+	CHANNEL_TEST_MODE = 41, ///< Frequency to use for testing
 };
 
-typedef enum {
-	ITX_250,  // 250kbps
-	ITX_1000, // 1000kbps
-	ITX_2000, // 2000kbps
+/** The baud rate of the GFSK modulation */
+typedef enum ITX_SPEED_e {
+	ITX_250,  ///< 250kbps (slowest but furthest range)
+	ITX_1000, ///< 1000kbps (balanced)
+	ITX_2000, ///< 2000kbps (fastest hence least congested)
 	ITX_MAX
 } ITX_SPEED;
 
-typedef enum {
+/** Flags for the STM8 hardware SPI registers */
+typedef enum SPI_Flag_e {
 	SPI_FLAG_BSY    = (uint8_t)0x80, /*!< Busy flag */
 	SPI_FLAG_OVR    = (uint8_t)0x40, /*!< Overrun flag */
 	SPI_FLAG_MODF   = (uint8_t)0x20, /*!< Mode fault */
@@ -122,112 +128,113 @@ typedef enum {
 	SPI_FLAG_RXNE   = (uint8_t)0x01  /*!< Receive buffer empty */
 } SPI_Flag_TypeDef;
 
-// SPI (BK2425/nrf24L01+) commands
-typedef enum {
+/** SPI register commands for the BK2425 and nrf24L01+ chips */
+typedef enum BK_SPI_CMD_e {
 // General commands
-	BK_REG_MASK        = 0x1F,  // The range of registers that can be read and written
-	BK_READ_REG        = 0x00,  // Define read command to register (0..1F)
-	BK_WRITE_REG       = 0x20,  // Define write command to register (0..1F)
+	BK_REG_MASK        = 0x1F,  ///< The range of registers that can be read and written
+	BK_READ_REG        = 0x00,  ///< Define read command to register (0..1F)
+	BK_WRITE_REG       = 0x20,  ///< Define write command to register (0..1F)
 #if RADIO_BEKEN
-	BK_ACTIVATE_CMD	   = 0x50,
+	BK_ACTIVATE_CMD	   = 0x50,  ///<
 #endif
 	BK_R_RX_PL_WID_CMD = 0x60,
-	BK_RD_RX_PLOAD     = 0x61,  // Define RX payload register address
-	BK_WR_TX_PLOAD     = 0xA0,  // Define TX payload register address
-	BK_W_ACK_PAYLOAD_CMD = 0xA8, // (nrf: +pipe 0..7)
-	BK_W_TX_PAYLOAD_NOACK_CMD = 0xB0,
-	BK_FLUSH_TX        = 0xE1,  // Define flush TX register command
-	BK_FLUSH_RX        = 0xE2,  // Define flush RX register command
-	BK_REUSE_TX_PL     = 0xE3,  // Define reuse TX payload register command
-	BK_NOP             = 0xFF,  // Define No Operation, might be used to read status register
+	BK_RD_RX_PLOAD     = 0x61,  ///< Define RX payload register address
+	BK_WR_TX_PLOAD     = 0xA0,  ///< Define TX payload register address
+	BK_W_ACK_PAYLOAD_CMD = 0xA8, ///< (nrf: +pipe 0..7)
+	BK_W_TX_PAYLOAD_NOACK_CMD = 0xB0, ///<
+	BK_FLUSH_TX        = 0xE1,  ///< Define flush TX register command
+	BK_FLUSH_RX        = 0xE2,  ///< Define flush RX register command
+	BK_REUSE_TX_PL     = 0xE3,  ///< Define reuse TX payload register command
+	BK_NOP             = 0xFF,  ///< Define No Operation, might be used to read status register
 
 // BK2425 bank 0 register addresses
-	BK_CONFIG          = 0x00,  // 'Config' register address
-	BK_EN_AA           = 0x01,  // 'Enable Auto Acknowledgment' register address
-	BK_EN_RXADDR       = 0x02,  // 'Enabled RX addresses' register address
-	BK_SETUP_AW        = 0x03,  // 'Setup address width' register address
-	BK_SETUP_RETR      = 0x04,  // 'Setup Auto. Retrans' register address
-	BK_RF_CH           = 0x05,  // 'RF channel' register address
-	BK_RF_SETUP        = 0x06,  // 'RF setup' register address
-	BK_STATUS          = 0x07,  // 'Status' register address
-	BK_OBSERVE_TX      = 0x08,  // 'Observe TX' register address (lost packets, retransmitted packets on this frequency)
-	BK_CD              = 0x09,  // 'Carrier Detect' register address
-	BK_RX_ADDR_P0      = 0x0A,  // 'RX address pipe0' register address (5 bytes)
-	BK_RX_ADDR_P1      = 0x0B,  // 'RX address pipe1' register address (5 bytes)
-	BK_RX_ADDR_P2      = 0x0C,  // 'RX address pipe2' register address (1 byte)
-	BK_RX_ADDR_P3      = 0x0D,  // 'RX address pipe3' register address (1 byte)
-	BK_RX_ADDR_P4      = 0x0E,  // 'RX address pipe4' register address (1 byte)
-	BK_RX_ADDR_P5      = 0x0F,  // 'RX address pipe5' register address (1 byte)
-	BK_TX_ADDR         = 0x10,  // 'TX address' register address (5 bytes)
-	BK_RX_PW_P0        = 0x11,  // 'RX payload width, pipe0' register address
-	BK_RX_PW_P1        = 0x12,  // 'RX payload width, pipe1' register address
-	BK_RX_PW_P2        = 0x13,  // 'RX payload width, pipe2' register address
-	BK_RX_PW_P3        = 0x14,  // 'RX payload width, pipe3' register address
-	BK_RX_PW_P4        = 0x15,  // 'RX payload width, pipe4' register address
-	BK_RX_PW_P5        = 0x16,  // 'RX payload width, pipe5' register address
-	BK_FIFO_STATUS     = 0x17,  // 'FIFO Status Register' register address
-	BK_DYNPD           = 0x1c,  // 'Enable dynamic payload length' register address
-	BK_FEATURE         = 0x1d,  // 'Feature' register address
+	BK_CONFIG          = 0x00,  ///< 'Config' register address
+	BK_EN_AA           = 0x01,  ///< 'Enable Auto Acknowledgment' register address
+	BK_EN_RXADDR       = 0x02,  ///< 'Enabled RX addresses' register address
+	BK_SETUP_AW        = 0x03,  ///< 'Setup address width' register address
+	BK_SETUP_RETR      = 0x04,  ///< 'Setup Auto. Retrans' register address
+	BK_RF_CH           = 0x05,  ///< 'RF channel' register address
+	BK_RF_SETUP        = 0x06,  ///< 'RF setup' register address
+	BK_STATUS          = 0x07,  ///< 'Status' register address
+	BK_OBSERVE_TX      = 0x08,  ///< 'Observe TX' register address (lost packets, retransmitted packets on this frequency)
+	BK_CD              = 0x09,  ///< 'Carrier Detect' register address
+	BK_RX_ADDR_P0      = 0x0A,  ///< 'RX address pipe0' register address (5 bytes)
+	BK_RX_ADDR_P1      = 0x0B,  ///< 'RX address pipe1' register address (5 bytes)
+	BK_RX_ADDR_P2      = 0x0C,  ///< 'RX address pipe2' register address (1 byte)
+	BK_RX_ADDR_P3      = 0x0D,  ///< 'RX address pipe3' register address (1 byte)
+	BK_RX_ADDR_P4      = 0x0E,  ///< 'RX address pipe4' register address (1 byte)
+	BK_RX_ADDR_P5      = 0x0F,  ///< 'RX address pipe5' register address (1 byte)
+	BK_TX_ADDR         = 0x10,  ///< 'TX address' register address (5 bytes)
+	BK_RX_PW_P0        = 0x11,  ///< 'RX payload width, pipe0' register address
+	BK_RX_PW_P1        = 0x12,  ///< 'RX payload width, pipe1' register address
+	BK_RX_PW_P2        = 0x13,  ///< 'RX payload width, pipe2' register address
+	BK_RX_PW_P3        = 0x14,  ///< 'RX payload width, pipe3' register address
+	BK_RX_PW_P4        = 0x15,  ///< 'RX payload width, pipe4' register address
+	BK_RX_PW_P5        = 0x16,  ///< 'RX payload width, pipe5' register address
+	BK_FIFO_STATUS     = 0x17,  ///< 'FIFO Status Register' register address
+	BK_DYNPD           = 0x1c,  ///< 'Enable dynamic payload length' register address
+	BK_FEATURE         = 0x1d,  ///< 'Feature' register address
 #if RADIO_BEKEN
-	BK_PAYLOAD_WIDTH   = 0x1f,  // 'payload length of 256 bytes modes register address
+	BK_PAYLOAD_WIDTH   = 0x1f,  ///< 'payload length of 256 bytes modes register address
 
 // BK2425 bank 1 register addresses
-	BK2425_R1_4      = 0x04,
-	BK2425_R1_5      = 0x05,
-	BK2425_R1_WHOAMI = 0x08, // Register to read that contains the chip id
-	BK2425_R1_12     = 0x0C, // PLL speed 120 or 130us
-	BK2425_R1_13     = 0x0D,
-	BK2425_R1_14     = 0x0E,
+	BK2425_R1_4      = 0x04, ///<
+	BK2425_R1_5      = 0x05, ///<
+	BK2425_R1_WHOAMI = 0x08, ///< Register to read that contains the chip id
+	BK2425_R1_12     = 0x0C, ///< PLL speed 120 or 130us
+	BK2425_R1_13     = 0x0D, ///<
+	BK2425_R1_14     = 0x0E, ///<
 #endif
 } BK_SPI_CMD;
 
 enum {
-	BK_CHIP_ID_BK2425 = 0x63, // The expected value of reading BK2425_R1_WHOAMI
+	BK_CHIP_ID_BK2425 = 0x63, ///< The expected value of reading BK2425_R1_WHOAMI
 };
 
-// Meanings of the BK_STATUS register
-enum {
+/** Meanings of the BK_STATUS register */
+enum BK_STATUS_e {
 #if RADIO_BEKEN
-	BK_STATUS_RBANK = 0x80, // Register bank 1 is in use
+	BK_STATUS_RBANK = 0x80, ///< Register bank 1 is in use
 #endif
-	BK_STATUS_RX_DR = 0x40, // Data ready
-	BK_STATUS_TX_DS = 0x20, // Data sent
-	BK_STATUS_MAX_RT = 0x10, // Max retries failed
-	BK_STATUS_RX_MASK = 0x0E, // Mask for the receptions bit
+	BK_STATUS_RX_DR = 0x40, ///< Data ready
+	BK_STATUS_TX_DS = 0x20, ///< Data sent
+	BK_STATUS_MAX_RT = 0x10, ///< Max retries failed
+	BK_STATUS_RX_MASK = 0x0E, ///< Mask for the receptions bit
 	BK_STATUS_RX_EMPTY = 0x0E,
-	BK_STATUS_RX_P_5 = 0x0A, // Data pipe 5 has some data ready
-	BK_STATUS_RX_P_4 = 0x08, // Data pipe 4 has some data ready
-	BK_STATUS_RX_P_3 = 0x06, // Data pipe 3 has some data ready
-	BK_STATUS_RX_P_2 = 0x04, // Data pipe 2 has some data ready
-	BK_STATUS_RX_P_1 = 0x02, // Data pipe 1 has some data ready
-	BK_STATUS_RX_P_0 = 0x00, // Data pipe 0 has some data ready
-	BK_STATUS_TX_FULL = 0x01 // Tx buffer full
+	BK_STATUS_RX_P_5 = 0x0A, ///< Data pipe 5 has some data ready
+	BK_STATUS_RX_P_4 = 0x08, ///< Data pipe 4 has some data ready
+	BK_STATUS_RX_P_3 = 0x06, ///< Data pipe 3 has some data ready
+	BK_STATUS_RX_P_2 = 0x04, ///< Data pipe 2 has some data ready
+	BK_STATUS_RX_P_1 = 0x02, ///< Data pipe 1 has some data ready
+	BK_STATUS_RX_P_0 = 0x00, ///< Data pipe 0 has some data ready
+	BK_STATUS_TX_FULL = 0x01 ///< Tx buffer full
 };
 
-// Meanings of the FIFO_STATUS register
-enum {
-	BK_FIFO_STATUS_TX_REUSE = 0x40,
-	BK_FIFO_STATUS_TX_FULL  = 0x20,
-	BK_FIFO_STATUS_TX_EMPTY = 0x10,
-	BK_FIFO_STATUS_RX_FULL  = 0x02,
-	BK_FIFO_STATUS_RX_EMPTY = 0x01
+/** Meanings of the FIFO_STATUS register */
+enum BK_FIFO_STATUS_e {
+	BK_FIFO_STATUS_TX_REUSE = 0x40, ///<
+	BK_FIFO_STATUS_TX_FULL  = 0x20, ///< The tx buffer has more than ? item
+	BK_FIFO_STATUS_TX_EMPTY = 0x10, ///< The tx buffer has less than ? item
+	BK_FIFO_STATUS_RX_FULL  = 0x02, ///< The rx buffer has more than ? items
+	BK_FIFO_STATUS_RX_EMPTY = 0x01  ///< The rx buffer has less than ? items
 };
 
-// Meanings of the BK_CONFIG register
-enum {
-	BK_CONFIG_MASK_RX_DR = 0x40,  // Mask interrupt caused by RX_DR
-	BK_CONFIG_MASK_TX_DS = 0x20,  // Mask interrupt caused by TX_DS
-	BK_CONFIG_MASK_MAX_RT = 0x10, // Mask interrupt caused by MAX_RT
-	BK_CONFIG_EN_CRC = 0x08,      // Enable CRC. Forced high if one of the bits in the EN_AA is high
-	BK_CONFIG_CRCO = 0x04,        // CRC encoding scheme (0=8 bits, 1=16 bits)
-	BK_CONFIG_PWR_UP = 0x02,      // POWER UP
-	BK_CONFIG_PRIM_RX = 0x01,     // Receive/transmit
+/** Meanings of the BK_CONFIG register */
+enum BK_CONFIG_e {
+	BK_CONFIG_MASK_RX_DR = 0x40,  ///< Mask interrupt caused by RX_DR
+	BK_CONFIG_MASK_TX_DS = 0x20,  ///< Mask interrupt caused by TX_DS
+	BK_CONFIG_MASK_MAX_RT = 0x10, ///< Mask interrupt caused by MAX_RT
+	BK_CONFIG_EN_CRC = 0x08,      ///< Enable CRC. Forced high if one of the bits in the EN_AA is high
+	BK_CONFIG_CRCO = 0x04,        ///< CRC encoding scheme (0=8 bits, 1=16 bits)
+	BK_CONFIG_PWR_UP = 0x02,      ///< POWER UP
+	BK_CONFIG_PRIM_RX = 0x01,     ///< Receive/transmit
 };
 
-enum {
-	BK_FEATURE_EN_DPL = 0x04,     //
-	BK_FEATURE_EN_ACK_PAY = 0x02, //
-	BK_FEATURE_EN_DYN_ACK = 0x01, //
+/** Meanings of the BK_FEATURE register */
+enum BK_FEATURE_e {
+	BK_FEATURE_EN_DPL = 0x04,     ///< Dynamic packet length is enabled
+	BK_FEATURE_EN_ACK_PAY = 0x02, ///<
+	BK_FEATURE_EN_DYN_ACK = 0x01, ///<
 };
 
 #define FLAG_WRITE      0x80
@@ -389,8 +396,9 @@ packetFormatRx pktDataRecv; // Packet data in process of being received
 
 
 // -----------------------------------------------------------------------------
-// Write a single byte command to the SPI bus (e.g. Flush)
-void SPI_Write_Cmd(uint8_t reg)
+/** Write a single byte command to the SPI bus (e.g. Flush) */
+void SPI_Write_Cmd(
+	uint8_t reg) ///< The simple command to write #BK_SPI_CMD_e
 {
 	reg |= FLAG_WRITE;
 	spi_force_chip_select(true); // CSN low, init SPI transaction
@@ -399,8 +407,10 @@ void SPI_Write_Cmd(uint8_t reg)
 }
 
 // ----------------------------------------------------------------------------
-// Writes value 'value' to register 'reg'
-void SPI_Write_Reg(uint8_t reg, uint8_t value)
+/** Writes value 'value' to register 'reg' */
+void SPI_Write_Reg(
+	uint8_t reg,  ///< The command to write #BK_SPI_CMD_e
+	uint8_t value) ///< The data value to write
 {
 	uint8_t tx[2];
 	tx[0] = reg | FLAG_WRITE;
@@ -411,7 +421,7 @@ void SPI_Write_Reg(uint8_t reg, uint8_t value)
 }
 
 // ----------------------------------------------------------------------------
-// Read the status from the BK2425
+/** Read the status from the BK2425 */
 uint8_t SPI_Read_Status(void)
 {
 	uint8_t tx = BK_NOP;
@@ -423,8 +433,10 @@ uint8_t SPI_Read_Status(void)
 }
 
 // ----------------------------------------------------------------------------
-// Read one uint8_t from BK2425 register, 'reg'
-uint8_t SPI_Read_Reg(uint8_t reg)
+/** Read one uint8_t from BK2425 register 'reg' via SPI
+\return The register value */
+uint8_t SPI_Read_Reg(
+	uint8_t reg)  ///< The command to write #BK_SPI_CMD_e
 {
 	uint8_t tx[2];
 	uint8_t rx[2];
@@ -437,8 +449,11 @@ uint8_t SPI_Read_Reg(uint8_t reg)
 }
 
 // ----------------------------------------------------------------------------
-// Writes contents of buffer '*pBuf' to BK2425
-void SPI_Write_Buf(uint8_t reg, const uint8_t *pBuf, uint8_t length)
+/** Writes contents of a buffer to BK2425 via SPI */
+void SPI_Write_Buf(
+	uint8_t reg,   ///< The command to write #BK_SPI_CMD_e
+	const uint8_t *pBuf,  ///< The data to write
+	uint8_t length) ///< The length in bytes of the data to write
 {
 	spi_force_chip_select(true);
 	reg |= FLAG_WRITE;
@@ -448,7 +463,7 @@ void SPI_Write_Buf(uint8_t reg, const uint8_t *pBuf, uint8_t length)
 }
 
 // ----------------------------------------------------------------------------
-// Switch to Rx mode
+/** Switch the Beken radio to Rx mode */
 void SwitchToRxMode(void)
 {
 	uint8_t value;
@@ -468,7 +483,7 @@ void SwitchToRxMode(void)
 }
 
 // ----------------------------------------------------------------------------
-// switch to Tx mode
+/** Switch the Beken radio to Tx mode */
 void SwitchToTxMode(void)
 {
 	uint8_t value;
@@ -484,7 +499,7 @@ void SwitchToTxMode(void)
 }
 
 // ----------------------------------------------------------------------------
-// switch to Idle mode
+/** Switch the Beken radio to Idle mode */
 void SwitchToIdleMode(void)
 {
 	uint8_t value;
@@ -496,7 +511,7 @@ void SwitchToIdleMode(void)
 }
 
 // ----------------------------------------------------------------------------
-// Switch to Sleep mode
+/** Switch the Beken radio to Sleep mode */
 void SwitchToSleepMode(void)
 {
 	uint8_t value;
@@ -518,11 +533,9 @@ void SwitchToSleepMode(void)
 }
 
 // ----------------------------------------------------------------------------
-// Set which register bank we are accessing
-// Parameter:
-//	_cfg      1:register bank1
-//	          0:register bank0
-void SetRBank(char _cfg) // 1:Bank1 0:Bank0
+/** Set which register bank we are accessing on the Beken spi chip */
+void SetRBank(
+	char _cfg) ///< 1=Bank1 0=Bank0
 {
 #if RADIO_BEKEN
 	uint8_t bank = SPI_Read_Status() & BK_STATUS_RBANK;
@@ -542,7 +555,7 @@ ITX_SPEED gTxSpeed = ITX_2000;
 #endif
 
 // ----------------------------------------------------------------------------
-// Return the current speed in kbps
+/** Return the current speed in kbps */
 int BK2425_GetSpeed(void)
 {
 	switch (gTxSpeed) {
@@ -554,8 +567,9 @@ int BK2425_GetSpeed(void)
 }
 
 // ----------------------------------------------------------------------------
-// BK2425 initialization of radio registers
-void BK2425_Initialize(ITX_SPEED spd)
+/** BK2425 initialization of radio registers */
+void BK2425_Initialize(
+	ITX_SPEED spd) ///< The baudrate to modulate the transmission and reception at.
 {
 	int8_t i;
 	bkReady = 0;
@@ -621,13 +635,14 @@ void BK2425_Initialize(ITX_SPEED spd)
 }
 
 // ----------------------------------------------------------------------------
-// CPM: Change between 250kbps and 2000kbps on the fly
 bool bRadioFast = false;
-void BK2425_SetSpeed(bool bFast)
+/** Change between 250kbps and 2000kbps on the fly */
+void BK2425_SetSpeed(
+	bool bFast) ///< false=slow speed, true=fast speed
 {
+	ITX_SPEED spd = ITX_250;
 	if (bFast == bRadioFast)
 		return;
-	ITX_SPEED spd = ITX_250;
 	if (bFast)
 		spd = ITX_2000;
 	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP);
@@ -639,8 +654,10 @@ void BK2425_SetSpeed(bool bFast)
 
 #if RADIO_BEKEN
 // ----------------------------------------------------------------------------
-// write a 32-bit Bank1 register
-void SPI_Bank1_Write_Reg(uint8_t reg, const uint8_t *pBuf)
+/** Write a 32-bit Bank1 register */
+void SPI_Bank1_Write_Reg(
+	uint8_t reg, ///< A spi register in bank1 to write to #BK_SPI_CMD_e
+	const uint8_t *pBuf) ///< A pointer to a 32-bit buffer to be written
 {
 	SetRBank(1);
 	SPI_Write_Buf(reg, pBuf, 4);
@@ -648,8 +665,10 @@ void SPI_Bank1_Write_Reg(uint8_t reg, const uint8_t *pBuf)
 }
 
 // ----------------------------------------------------------------------------
-// read a 32-bit Bank1 register
-void SPI_Bank1_Read_Reg(uint8_t reg, uint8_t *pBuf)
+/** Read a 32-bit Bank1 register */
+void SPI_Bank1_Read_Reg(
+	uint8_t reg, ///< A spi register in bank1 to write to #BK_SPI_CMD_e
+	uint8_t *pBuf) ///< A pointer to a 32-bit buffer to be read into
 {
 	SetRBank(1);
 	spi_read_registers(reg, pBuf, 4);
@@ -658,9 +677,9 @@ void SPI_Bank1_Read_Reg(uint8_t reg, uint8_t *pBuf)
 #endif
 
 // ----------------------------------------------------------------------------
-// Change the radio channel
-// Used on NAZE
-void ChangeChannel(uint8_t channelNumber)
+/** Change the radio channel */
+void ChangeChannel(
+	uint8_t channelNumber) ///< A physical radio channel. See #CHANNEL_MHZ_e
 {
 	if (channelNumber > CHANNEL_MAX_PHYSICAL)
 		return;
@@ -668,7 +687,8 @@ void ChangeChannel(uint8_t channelNumber)
 }
 
 // ----------------------------------------------------------------------------
-// Returns true if BK_STATUS_MAX_RT was found in the set state
+/* Clear the radio acknowledge overflow status of the Beken chip.
+	\return true if BK_STATUS_MAX_RT was found in the set state, false otherwise */
 bool ClearAckOverflow(void)
 {
 	uint8_t status = SPI_Read_Status();
@@ -684,6 +704,7 @@ bool ClearAckOverflow(void)
 }
 
 // ----------------------------------------------------------------------------
+/** Initialise the Beken chip ready to be talked to */
 void initBeken(void)
 {
 	/* Set ChipSelect pin in Output push-pull high level in spi_init() */
@@ -692,12 +713,13 @@ void initBeken(void)
 }
 
 // ----------------------------------------------------------------------------
+/** DeInitialise the Beken chip after talking */
 void deinitBeken(void)
 {
 }
 
 // ----------------------------------------------------------------------------
-// Describe our transmission parameters to the serial port for verification by the tester
+/** Describe our transmission parameters to the serial port for verification by the tester */
 void describeBeken(void)
 {
 #if SUPPORT_UART
@@ -713,11 +735,13 @@ void describeBeken(void)
 
 
 // ----------------------------------------------------------------------------
-// Change pipeline address -
 PAIRADDR address; // Workaround for compiler bug whereby it was conflating bits 8..15 and 16..23 if a long is passed in as a parameter
 uint8_t gRxDefault = 1;
 uint8_t gRxCh = 0;
-void ChangeAddress(PAIRADDR tmpaddress, uint8_t rxch)
+/** Change pipeline address */
+void ChangeAddress(
+	PAIRADDR tmpaddress, ///<
+	uint8_t rxch) ///<
 {
 	address = tmpaddress; // Attempt to work around compiler bug in IAR STM8 compiler 2.20.1
 	if (address > PAIRADDR_MASK)
@@ -745,6 +769,7 @@ void ChangeAddress(PAIRADDR tmpaddress, uint8_t rxch)
 	SPI_Write_Reg((BK_WRITE_REG|BK_EN_RXADDR), rxch); // Listen to one or two addresses
 	gRxCh = rxch;
 }
+
 uint8_t isAddrDefault(uint8_t rxch)
 {
 	if (rxch == 1)
@@ -752,7 +777,11 @@ uint8_t isAddrDefault(uint8_t rxch)
 	return gRxDefault;
 }
 
-void ChangeAddressTx(PAIRADDR tmpaddress, uint8_t txch)
+// ----------------------------------------------------------------------------
+/** Change address */
+void ChangeAddressTx(
+	PAIRADDR tmpaddress, ///<
+	uint8_t txch) ///<
 {
 	address = tmpaddress; // Attempt to work around compiler bug in IAR STM8 compiler 2.20.1
 	if (address > PAIRADDR_MASK)
@@ -775,17 +804,21 @@ void ChangeAddressTx(PAIRADDR tmpaddress, uint8_t txch)
 }
 
 // ----------------------------------------------------------------------------
-void ChangeOutputPower(uint8_t power)
+/** Change the radio output power of the Beken radio chip */
+void ChangeOutputPower(
+	uint8_t power) ///< power value
 {
+	uint8_t setup;
 	if (power > 3)
 		return;
-	uint8_t setup = SPI_Read_Reg(BK_RF_SETUP);
+	setup = SPI_Read_Reg(BK_RF_SETUP);
 	setup &= ~(3 << 1);
 	setup |= (power << 1);
 	SPI_Write_Reg((BK_WRITE_REG|BK_RF_SETUP), setup);
 }
 
 // ----------------------------------------------------------------------------
+/** Kick the independant windowed watchdog so that it does not reset the CPU by timing out */
 void IWDG_Kick(void)
 {
 #if SUPPORT_WATCHDOG
@@ -794,13 +827,12 @@ void IWDG_Kick(void)
 }
 
 // ----------------------------------------------------------------------------
-// Fill FIFO to send a packet
-// Parameter:
-//   type: WR_TX_PLOAD or W_TX_PAYLOAD_NOACK_CMD
-//   pbuf: a buffer pointer
-//   len: packet length
-// Return: True if ack overflow was set when send was requested
-bool Send_Packet(uint8_t type, const uint8_t* pbuf, uint8_t len)
+/** Fill the Bekens tx FIFO to send a packet
+	\return True if ack overflow was set when send was requested. */
+bool Send_Packet(
+	uint8_t type, ///< WR_TX_PLOAD or W_TX_PAYLOAD_NOACK_CMD
+	const uint8_t* pbuf, ///< a buffer pointer
+	uint8_t len) ///< packet length in bytes
 {
 	// read register FIFO_STATUS's value
 	uint8_t fifo_sta = SPI_Read_Reg(BK_FIFO_STATUS);	// read register FIFO_STATUS's value
@@ -816,9 +848,10 @@ bool Send_Packet(uint8_t type, const uint8_t* pbuf, uint8_t len)
 }
 
 // ----------------------------------------------------------------------------
-// Read FIFO to read a packet
-// Return: uint8_t - 0 if no packet, 1 if packet read
-uint8_t Receive_Packet(uint8_t rx_buf[])
+/** Read FIFO to read a packet
+	\returns 0 if no packet, 1 if packet read */
+uint8_t Receive_Packet(
+	uint8_t rx_buf[]) ///< The buffer to fill
 {
 	uint8_t len, sta, fifo_sta, returnVal;
 	returnVal = 0;
@@ -850,15 +883,15 @@ uint8_t Receive_Packet(uint8_t rx_buf[])
 }
 
 // ----------------------------------------------------------------------------
-// Flush the TX buffer
+/** Flush the Beken radio TX buffer */
 void FlushTx(void)
 {
 	SPI_Write_Cmd(BK_FLUSH_TX); // flush Tx
 }
 
 // ----------------------------------------------------------------------------
-// Get chip ID
-// Should return BK_CHIP_ID_BK2425
+/** Get the Beken radio chip ID
+	\return BK_CHIP_ID_BK2425 */
 uint8_t Get_Chip_ID(void)
 {
 #if RADIO_BEKEN
@@ -871,7 +904,7 @@ uint8_t Get_Chip_ID(void)
 }
 
 // ----------------------------------------------------------------------------
-// Ensure that the chip id is good
+/** Ensure that the chip id is good */
 void VerifyBekenChipID(void)
 {
 	uint8_t id = Get_Chip_ID();
@@ -913,9 +946,11 @@ const uint8_t channelTable[CHANNEL_COUNT_LOGICAL] = {
 };
 
 // ----------------------------------------------------------------------------
-// Set the range of the channel indexes we are using
-// Return true if we changed something
-bool SetChannelRange(uint8_t min, uint8_t max)
+/** Set the range of the channel indexes we are using
+\return true if we changed something */
+bool SetChannelRange(
+	uint8_t min, ///< The minimum logical channel range
+	uint8_t max) ///< The maximum logical channel range
 {
 	min *= CHANNEL_DWELL_PACKETS;
 	max *= CHANNEL_DWELL_PACKETS;
@@ -929,15 +964,20 @@ bool SetChannelRange(uint8_t min, uint8_t max)
 }
 
 // ----------------------------------------------------------------------------
-uint8_t LookupChannel(uint8_t idx)
+/** Convert a logical channel index into a physical channel
+\return The physical channel, in MHz above 2400Mhz. */
+uint8_t LookupChannel(
+	uint8_t idx) ///< The logical channel, as an index into a frequency hopping table.
 {
 	return channelTable[idx / CHANNEL_DWELL_PACKETS];
 }
 
 // ----------------------------------------------------------------------------
-// Channel hopping algorithm implementation
-// Calculate the next channel to use for transmission and change to it
-uint8_t NextChannelIndex(uint8_t seq)
+/** Channel hopping algorithm implementation.
+	Calculate the next channel to use for transmission and change to it
+	\return The next value of the logical channel index. */
+uint8_t NextChannelIndex(
+	uint8_t seq) ///< The current value of the logical channel index
 {
 	{
 		++seq;
@@ -955,6 +995,7 @@ uint8_t NextChannelIndex(uint8_t seq)
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
+/** Initialise the Beken radio chip */
 void beken_init(void)
 {
 	// Setup the Beken chip
@@ -981,6 +1022,7 @@ void beken_init(void)
 }
 
 // ----------------------------------------------------------------------------
+/** The IRQ routine that needs to be called on radio interrupts for the Beken chip */
 void beken_irq(void)
 {
 	// Determine which state fired the interrupt
@@ -1015,7 +1057,7 @@ void beken_irq(void)
 		ackPacketCount++;
 		bFreshData = 1;
 		Receive_Packet((uint8_t *)&pktDataRecv);
-		pktDataRx = pktDataRecv;
+		memcpy(&pktDataRx, &pktDataRecv, sizeof(pktDataRx));
 //...	recvTimestampMs = GetTime();
 //...	esb_rx_process_packet(&pktDataRx, rxstd);
 	}
@@ -1030,7 +1072,7 @@ uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL
 uint16_t lastTxPacketCount;
 
 // ----------------------------------------------------------------------------
-// This timer interrupt needs to be hooked up
+/** The IRQ routine that needs to be called on timer interrupts for the Beken chip */
 void beken_timer_irq(void)
 {
 	static uint8_t txChannel = 0;
@@ -1066,54 +1108,66 @@ void beken_timer_irq(void)
 }
 
 // ----------------------------------------------------------------------------
+/** Start sending a binding packet */
 void beken_start_bind_send(void)
 {
 	//...
 }
 
 // ----------------------------------------------------------------------------
+/** Start sending a control data packet */
 void beken_start_send(void)
 {
 	//...
 }
 
 // ----------------------------------------------------------------------------
+/** Start sending an FCC test packet */
 void beken_start_FCC_test(void)
 {
 	//...
 }
 
 // ----------------------------------------------------------------------------
-void beken_start_factory_test(uint8_t test_mode)
+/** Start sending an factory test packet */
+void beken_start_factory_test(
+	uint8_t test_mode) ///< The type of test to send.
 {
 	//...
 }
 
 // ----------------------------------------------------------------------------
+/** Set the next FCC power */
 void beken_next_FCC_power(void)
 {
 	//...
 }
 
 // ----------------------------------------------------------------------------
-void beken_set_CW_mode(bool cw)
+/** Go into continuous carrier wave send mode or normal mode */
+void beken_set_CW_mode(
+	bool cw) ///< false=normal, true=carrier wave
 {
 	//...
 }
 
 // ----------------------------------------------------------------------------
-void beken_change_FCC_channel(int8_t change)
+/** Change the FCC channel */
+void beken_change_FCC_channel(
+	int8_t change) ///< ?
 {
 	//...
 }
 
 // ----------------------------------------------------------------------------
+/** Toggle the FCC scan */
 void beken_FCC_toggle_scan(void)
 {
 	//...
 }
 
 // ----------------------------------------------------------------------------
+/** Get the current tx power */
 uint8_t get_tx_power(void)
 {
 	//...
@@ -1121,6 +1175,7 @@ uint8_t get_tx_power(void)
 }
 
 // ----------------------------------------------------------------------------
+/** Get the current FCC channel */
 int8_t get_FCC_chan(void)
 {
 	//...
@@ -1128,6 +1183,7 @@ int8_t get_FCC_chan(void)
 }
 
 // ----------------------------------------------------------------------------
+/** Get the current FCC power */
 uint8_t get_FCC_power(void)
 {
 	//...

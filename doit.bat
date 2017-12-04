@@ -13,5 +13,5 @@ set PATH=%SDCC%;%CYGWIN%;%PYTHONPATH%
 bash.exe -c "echo $PATH"
 bash.exe -c "echo $PYTHONPATH"
 rem bash.exe -c "make clean"
-bash.exe -c "make"
+bash.exe -c "make combined.ihx"
 PATH=%oldpath%
