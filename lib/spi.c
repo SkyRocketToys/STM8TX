@@ -83,6 +83,14 @@ uint8_t spi_read1(void)
     return v;
 }
 
+// read N bytes
+void spi_read(uint8_t n, uint8_t *buf)
+{
+    while (n--) {
+        *buf++ = spi_read1();
+    }
+}
+
 void spi_transfer(uint8_t n, const uint8_t *sendbuf, uint8_t *recvbuf)
 {
     if (!forced_chip_select) {
