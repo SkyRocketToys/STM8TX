@@ -4,7 +4,7 @@
 #include "config.h"
 #include "util.h"
 #include "channels.h"
-#include "cypress.h"
+#include "radio.h"
 
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
 extern uint8_t telem_ack_value;

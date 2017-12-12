@@ -6,7 +6,7 @@
 #include "uart.h"
 #include "adc.h"
 #include "spi.h"
-#include "cypress.h"
+#include "radio.h"
 #include "timer.h"
 #include "eeprom.h"
 #include "buzzer.h"
@@ -24,7 +24,7 @@ INTERRUPT_HANDLER(ADC1_IRQHandler, 22) {
     adc_irq();
 }
 INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5) {
-    cypress_irq();
+    radio_irq();
 }
 INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
     timer_irq();
@@ -173,7 +173,7 @@ static void status_update(bool have_link)
         green_led_pattern = LED_PATTERN_FCC;
         if (buttons == BUTTON_RIGHT) {
             uint8_t i;
-            cypress_next_FCC_power();
+            radio_next_FCC_power();
             FCC_power = get_FCC_power();
             printf("FCC power %u\n", FCC_power);
             for (i=0; i<FCC_power; i++) {
@@ -183,16 +183,16 @@ static void status_update(bool have_link)
         }
         if (buttons == BUTTON_POWER) {
             fcc_CW_mode = !fcc_CW_mode;
-            cypress_set_CW_mode(fcc_CW_mode);
+            radio_set_CW_mode(fcc_CW_mode);
             buzzer_tune(fcc_CW_mode?TONE_LOITER:TONE_ALT_HOLD);
             printf("CW mode %u\n", fcc_CW_mode);
         }
         if (buttons == BUTTON_LEFT_SHOULDER) {
-            cypress_change_FCC_channel(1);
+            radio_change_FCC_channel(1);
             buzzer_tune(TONE_RX_SEARCH);
         }
         if (buttons == BUTTON_RIGHT_SHOULDER) {
-            cypress_FCC_toggle_scan();
+            radio_FCC_toggle_scan();
             buzzer_tune(TONE_RX_SEARCH);
         }
         return;
@@ -362,7 +362,7 @@ void main(void)
 
     delay_ms(1);
     uart2_init();
-    cypress_init();
+    radio_init();
 
     buzzer_init();
     
@@ -378,20 +378,20 @@ void main(void)
     switch (get_buttons_no_power()) {
     case BUTTON_LEFT | BUTTON_RIGHT:
         printf("FCC test start\n");
-        cypress_start_FCC_test();
+        radio_start_FCC_test();
         break;
         
     case BUTTON_LEFT:
         printf("DSM2 bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
-        cypress_start_bind_send(true);
+        radio_start_bind_send(true);
         break;
 
 #if SUPPORT_DSMX
     case BUTTON_RIGHT:
         printf("DSMX bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 0);
-        cypress_start_bind_send(false);
+        radio_start_bind_send(false);
         break;
 #endif
 
@@ -419,13 +419,13 @@ void main(void)
         }
         printf("Factory mode %u adc=[%u %u %u %u]\n", factory_mode,
             adc0, adc1, adc2, adc3);
-        cypress_start_factory_test(factory_mode);
+        radio_start_factory_test(factory_mode);
         break;
     }
         
     default: {
         bool use_dsm2 = eeprom_read(EEPROM_DSMPROT_OFFSET);
-        cypress_start_send(use_dsm2);
+        radio_start_send(use_dsm2);
         break;
     }
     }
@@ -448,7 +448,7 @@ void main(void)
         bool link_ok = false;
         int8_t FCC_chan = get_FCC_chan();
 
-        cypress_set_pps_rssi();
+        radio_set_pps_rssi();
 
         telem_pps = get_telem_pps();
         

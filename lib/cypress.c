@@ -20,6 +20,7 @@
 #include <adc.h>
 #include <telem_structure.h>
 #include <buzzer.h>
+#include <radio.h>
 #include "eeprom.h"
 
 #define DISABLE_CRC 0
@@ -402,7 +403,7 @@ static struct {
     uint8_t autobind_count;
 } dsm;
 
-static void radio_init(void);
+static void radio_init_hw(void);
 static void cypress_transmit16(const uint8_t data[16]);
 static void dsm_set_channel(uint8_t channel, bool is_dsm2, uint8_t sop_col, uint8_t data_col, uint16_t crc_seed);
 static void send_normal_packet(void);
@@ -418,11 +419,11 @@ static void cypress_reset(void)
     delay_ms(500);
 }
 
-void cypress_init(void)
+void radio_init(void)
 {
     uint8_t tx_max;
     
-    printf("cypress_init\n");
+    printf("radio_init\n");
 
     // setup RST pin on PD0
     gpio_config(RADIO_RST, GPIO_OUTPUT_PUSHPULL);
@@ -448,7 +449,7 @@ void cypress_init(void)
     
     cypress_reset();
 
-    radio_init();
+    radio_init_hw();
 }
 
 /*
@@ -740,9 +741,9 @@ static void dsm_setup_transfer(void)
 /*
   initialise the radio
  */
-static void radio_init(void)
+static void radio_init_hw(void)
 {
-    printf("Cypress: radio_init starting\n");
+    printf("Cypress: radio_init_hw starting\n");
 
     // wait for radio to settle
     while (true) {
@@ -772,7 +773,7 @@ static void radio_init(void)
     // start in NONE state
     state = STATE_NONE;
 
-    printf("Cypress: radio_init done\n");
+    printf("Cypress: radio_init_hw done\n");
 }
 
 /*
@@ -911,7 +912,7 @@ static void irq_handler_send(uint8_t tx_status)
 /*
   IRQ handler
  */
-void cypress_irq(void)
+void radio_irq(void)
 {
     // always read both rx and tx status. This ensure IRQ is cleared
     uint8_t rx_status = read_status_debounced(CYRF_RX_IRQ_STATUS);
@@ -1310,7 +1311,7 @@ static void send_bind_packet(void)
 /*
   setup radio for bind on send side
  */
-void cypress_start_bind_send(bool use_dsm2)
+void radio_start_bind_send(bool use_dsm2)
 {
     uint8_t data_code[16];
     uint32_t rr;
@@ -1355,7 +1356,7 @@ void cypress_start_bind_send(bool use_dsm2)
 /*
   setup radio for FCC test
  */
-void cypress_start_FCC_test(void)
+void radio_start_FCC_test(void)
 {
     dsm.FCC_test_chan = DSM_SCAN_MIN_CH;
     dsm.FCC_test_power = CYRF_PA_4;
@@ -1377,7 +1378,7 @@ void cypress_start_FCC_test(void)
 /*
   setup radio for normal sending
  */
-void cypress_start_send(bool use_dsm2)
+void radio_start_send(bool use_dsm2)
 {
 #if !SUPPORT_DSMX
     use_dsm2 = true;
@@ -1405,10 +1406,10 @@ void cypress_start_send(bool use_dsm2)
 /*
   setup for factory mode
  */
-void cypress_start_factory_test(uint8_t test_mode)
+void radio_start_factory_test(uint8_t test_mode)
 {
     dsm.factory_test_mode = test_mode;
-    cypress_start_send(true);
+    radio_start_send(true);
 }
 
 /*
@@ -1482,7 +1483,7 @@ uint8_t get_tx_power(void)
 /*
   called once per main loop to get packets rates and average RSSI values
  */
-void cypress_set_pps_rssi(void)
+void radio_set_pps_rssi(void)
 {
     // get current send pps
     dsm.current_send_pps = dsm.send_count - dsm.last_tx_count;
@@ -1530,7 +1531,7 @@ uint8_t get_telem_pps(void)
 /*
   switch between 3 FCC test modes
  */
-void cypress_next_FCC_power(void)
+void radio_next_FCC_power(void)
 {
     dsm.FCC_test_power = (dsm.FCC_test_power+1) % (CYRF_PA_4+1);
 }
@@ -1554,12 +1555,12 @@ uint8_t get_FCC_power(void)
 /*
   set CW mode for FCC testing
  */
-void cypress_set_CW_mode(bool cw)
+void radio_set_CW_mode(bool cw)
 {
     dsm.fcc_CW_mode = cw;
 }
 
-void cypress_change_FCC_channel(int8_t change)
+void radio_change_FCC_channel(int8_t change)
 {
     switch (dsm.FCC_test_chan) {
     case DSM_SCAN_MIN_CH:
@@ -1575,7 +1576,7 @@ void cypress_change_FCC_channel(int8_t change)
     }
 }
 
-void cypress_FCC_toggle_scan(void)
+void radio_FCC_toggle_scan(void)
 {
     dsm.FCC_scan_mode = !dsm.FCC_scan_mode;
     if (!dsm.FCC_scan_mode) {
