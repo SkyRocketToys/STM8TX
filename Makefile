@@ -14,7 +14,8 @@ CHIP=stm8s105c6
 #STLINK=stlink
 STLINK=stlinkv2
 
-RADIO_MODULE=lib/cypress.c
+#RADIO_MODULE=lib/cypress.c
+RADIO_MODULE=lib/cc2500.c
 
 LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c $(RADIO_MODULE)
 LIBSRC += lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c lib/channels.c
