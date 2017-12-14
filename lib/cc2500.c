@@ -1,7 +1,11 @@
 /*
   driver for cc2500 radio
 
-  Many thanks to the betaflight and cleanflight projects
+  This driver developed with thanks to the following projects:
+
+  https://github.com/betaflight
+  http://cleanflight.com/
+  https://github.com/pascallanger/DIY-Multiprotocol-TX-Module
  */
 
 #include <stdint.h>
@@ -167,6 +171,44 @@ static int8_t  bindOffset;
 static uint8_t bindHopData[NUM_CHANNELS];
 static uint8_t channr;
 static uint8_t chanskip;
+static uint8_t rxnum;
+static uint16_t bindcount;
+
+
+static const uint16_t CRCTable[] = {
+        0x0000,0x1189,0x2312,0x329b,0x4624,0x57ad,0x6536,0x74bf,
+        0x8c48,0x9dc1,0xaf5a,0xbed3,0xca6c,0xdbe5,0xe97e,0xf8f7,
+        0x1081,0x0108,0x3393,0x221a,0x56a5,0x472c,0x75b7,0x643e,
+        0x9cc9,0x8d40,0xbfdb,0xae52,0xdaed,0xcb64,0xf9ff,0xe876,
+        0x2102,0x308b,0x0210,0x1399,0x6726,0x76af,0x4434,0x55bd,
+        0xad4a,0xbcc3,0x8e58,0x9fd1,0xeb6e,0xfae7,0xc87c,0xd9f5,
+        0x3183,0x200a,0x1291,0x0318,0x77a7,0x662e,0x54b5,0x453c,
+        0xbdcb,0xac42,0x9ed9,0x8f50,0xfbef,0xea66,0xd8fd,0xc974,
+        0x4204,0x538d,0x6116,0x709f,0x0420,0x15a9,0x2732,0x36bb,
+        0xce4c,0xdfc5,0xed5e,0xfcd7,0x8868,0x99e1,0xab7a,0xbaf3,
+        0x5285,0x430c,0x7197,0x601e,0x14a1,0x0528,0x37b3,0x263a,
+        0xdecd,0xcf44,0xfddf,0xec56,0x98e9,0x8960,0xbbfb,0xaa72,
+        0x6306,0x728f,0x4014,0x519d,0x2522,0x34ab,0x0630,0x17b9,
+        0xef4e,0xfec7,0xcc5c,0xddd5,0xa96a,0xb8e3,0x8a78,0x9bf1,
+        0x7387,0x620e,0x5095,0x411c,0x35a3,0x242a,0x16b1,0x0738,
+        0xffcf,0xee46,0xdcdd,0xcd54,0xb9eb,0xa862,0x9af9,0x8b70,
+        0x8408,0x9581,0xa71a,0xb693,0xc22c,0xd3a5,0xe13e,0xf0b7,
+        0x0840,0x19c9,0x2b52,0x3adb,0x4e64,0x5fed,0x6d76,0x7cff,
+        0x9489,0x8500,0xb79b,0xa612,0xd2ad,0xc324,0xf1bf,0xe036,
+        0x18c1,0x0948,0x3bd3,0x2a5a,0x5ee5,0x4f6c,0x7df7,0x6c7e,
+        0xa50a,0xb483,0x8618,0x9791,0xe32e,0xf2a7,0xc03c,0xd1b5,
+        0x2942,0x38cb,0x0a50,0x1bd9,0x6f66,0x7eef,0x4c74,0x5dfd,
+        0xb58b,0xa402,0x9699,0x8710,0xf3af,0xe226,0xd0bd,0xc134,
+        0x39c3,0x284a,0x1ad1,0x0b58,0x7fe7,0x6e6e,0x5cf5,0x4d7c,
+        0xc60c,0xd785,0xe51e,0xf497,0x8028,0x91a1,0xa33a,0xb2b3,
+        0x4a44,0x5bcd,0x6956,0x78df,0x0c60,0x1de9,0x2f72,0x3efb,
+        0xd68d,0xc704,0xf59f,0xe416,0x90a9,0x8120,0xb3bb,0xa232,
+        0x5ac5,0x4b4c,0x79d7,0x685e,0x1ce1,0x0d68,0x3ff3,0x2e7a,
+        0xe70e,0xf687,0xc41c,0xd595,0xa12a,0xb0a3,0x8238,0x93b1,
+        0x6b46,0x7acf,0x4854,0x59dd,0x2d62,0x3ceb,0x0e70,0x1ff9,
+        0xf78f,0xe606,0xd49d,0xc514,0xb1ab,0xa022,0x92b9,0x8330,
+        0x7bc7,0x6a4e,0x58d5,0x495c,0x3de3,0x2c6a,0x1ef1,0x0f78
+};
 
 static void radio_init_hw(void);
 
@@ -215,7 +257,9 @@ void cc2500_WriteFifo(const uint8_t *dpbuffer, uint8_t len)
 static void cc2500_WriteReg(uint8_t reg, uint8_t value)
 {
     uint8_t d[2] = { reg | CC2500_WRITE_SINGLE, value };
+    spi_force_chip_select(true);
     spi_write(2, d);
+    spi_force_chip_select(false);
 }
 
 void cc2500_SetPower(uint8_t power)
@@ -304,11 +348,63 @@ static bool cc2500_Reset(void)
     return cc2500_ReadReg(CC2500_0E_FREQ1) == 0xC4; // check if reset
 }
 
+static void initialiseData(uint8_t adr)
+{
+    cc2500_WriteReg(CC2500_0C_FSCTRL0, 0);
+    cc2500_WriteReg(CC2500_18_MCSM0, 0x8);
+    cc2500_WriteReg(CC2500_09_ADDR, adr ? 0x03 : bindTxId[0]);
+    cc2500_WriteReg(CC2500_07_PKTCTRL1, 0x0D); // address check, no broadcast, autoflush, status enable
+    cc2500_WriteReg(CC2500_19_FOCCFG, 0x16);
+}
+
+static void setChannel(uint8_t channel)
+{
+    cc2500_Strobe(CC2500_SIDLE);
+    cc2500_WriteReg(CC2500_23_FSCAL3, calData[channel][0]);
+    cc2500_WriteReg(CC2500_24_FSCAL2, calData[channel][1]);
+    cc2500_WriteReg(CC2500_25_FSCAL1, calData[channel][2]);
+    cc2500_WriteReg(CC2500_0A_CHANNR, bindHopData[channel]);
+}
+
+/*
+  create hopping table - based on DIY-Multiprotocol-TX-Module implementation
+ */
+static void setup_hopping_table(void)
+{
+    uint8_t val;
+    uint8_t channel = bindTxId[0] & 0x07;
+    uint8_t channel_spacing = bindTxId[1];
+    uint8_t i;
+
+    //Filter bad tables
+    if (channel_spacing < 0x02) {
+        channel_spacing += 0x02;
+    }
+    if (channel_spacing>0xE9) {
+        channel_spacing -= 0xE7;
+    }
+    if (channel_spacing % NUM_CHANNELS == 0) {
+        channel_spacing++;
+    }
+    
+    bindHopData[0] = channel;
+    for (i=1; i<NUM_CHANNELS; i++) {
+        channel = (channel+channel_spacing) % 0xEB;
+        val=channel;
+        if ((val==0x00) || (val==0x5A) || (val==0xDC)) {
+            val++;
+        }
+        bindHopData[i] = val;
+    }
+}
+
 /*
   initialise the radio
  */
 static void radio_init_hw(void)
 {
+    uint8_t i;
+
     printf("cc2500: radio_init_hw starting\n");
     while (cc2500_ReadReg(CC2500_30_PARTNUM | CC2500_READ_BURST) != 0x80 ||
            cc2500_ReadReg(CC2500_31_VERSION | CC2500_READ_BURST) != 0x03) {
@@ -320,8 +416,8 @@ static void radio_init_hw(void)
     if (!cc2500_Reset()) {
         printf("cc2500: failed reset\n");        
     }
-    
-    for (uint8_t i=0; i<sizeof(radio_config)/sizeof(radio_config[0]); i++) {
+
+    for (i=0; i<sizeof(radio_config)/sizeof(radio_config[0]); i++) {
         cc2500_WriteReg(radio_config[i].reg, radio_config[i].value);
     }
     cc2500_Strobe(CC2500_SIDLE);	// Go to idle...
@@ -330,35 +426,143 @@ static void radio_init_hw(void)
     bindTxId[0] = 15;
     bindTxId[1] = 20;
 
-    for (uint8_t c=0;c<NUM_CHANNELS;c++) {
-        // trivial channel list for now, this needs to be randomly
-        // generated, seeded from radio ID
-        bindHopData[c] = 1 + c*3;
-    }
-    
-    for (uint8_t c=0;c<NUM_CHANNELS;c++) {
+    chanskip = 1;
+
+    setup_hopping_table();
+
+    for (i=0;i<NUM_CHANNELS;i++) {
         cc2500_Strobe(CC2500_SIDLE);
-        cc2500_WriteReg(CC2500_0A_CHANNR, c);
+        cc2500_WriteReg(CC2500_0A_CHANNR, bindHopData[i]);
         cc2500_Strobe(CC2500_SCAL);
         delay_ms(1);
-        calData[bindHopData[c]][0] = cc2500_ReadReg(CC2500_23_FSCAL3);
-        calData[bindHopData[c]][1] = cc2500_ReadReg(CC2500_24_FSCAL2);
-        calData[bindHopData[c]][2] = cc2500_ReadReg(CC2500_25_FSCAL1);
+        calData[i][0] = cc2500_ReadReg(CC2500_23_FSCAL3);
+        calData[i][1] = cc2500_ReadReg(CC2500_24_FSCAL2);
+        calData[i][2] = cc2500_ReadReg(CC2500_25_FSCAL1);
     }
     delay_ms(10);
+    cc2500_Strobe(CC2500_SIDLE);
+    delay_ms(10);
+
+    // setup for sending bind packets
+    initialiseData(1);
+}
+
+static uint16_t calc_crc(uint8_t *data, uint8_t len)
+{
+    uint16_t crc = 0;
+    uint8_t i;
+    for (i=0; i < len; i++) {
+        crc = (crc<<8) ^ (CRCTable[((uint8_t)(crc>>8) ^ *data++) & 0xFF]);
+    }
+    return crc;
+}
+
+static void send_packet(uint8_t len, const uint8_t *packet)
+{
+    cc2500_Strobe(CC2500_SFTX);
+    cc2500_WriteFifo(packet, len);
+    cc2500_Strobe(CC2500_STX);
+}
+
+static void send_normal_packet(void);
+
+static void start_receive(void)
+{
+    channr = (channr + chanskip) % 47;
+    cc2500_Strobe(CC2500_SIDLE);
+    setChannel(channr);
+    cc2500_Strobe(CC2500_SRX);
+    timer_call_after_ms(3, send_normal_packet);
+}
+
+static void send_normal_packet(void)
+{
+    uint8_t packet[30];
+    uint8_t i, ofs;
+    uint16_t lcrc;
+
+    memset(packet, 0, sizeof(packet));
+
+    packet[0] = sizeof(packet)-1;
+    packet[1] = bindTxId[0];
+    packet[2] = bindTxId[1];
+    packet[3] = 0x02;
+
+    packet[4] = (chanskip<<6)|channr;
+    packet[5] = (chanskip>>2);
+    packet[6] = rxnum;
+    packet[7] = 0; // packet type, 0=normal pkt
+    packet[8] = 0;		
+	
+    for (i = 0, ofs=9; i <8 ; i+=2, ofs += 3) {
+        uint16_t chan_0 = channel_value(i);
+        uint16_t chan_1 = channel_value(i+1);
+        packet[ofs]   = chan_0 & 0xFF;
+        packet[ofs+1] = (((chan_0>>8) & 0x0F)|(chan_1 << 4));
+        packet[ofs+2] = chan_1>>4;
+    }
+
+    lcrc = calc_crc(&packet[3], sizeof(packet)-5);
+    packet[sizeof(packet)-2] = lcrc>>8;
+    packet[sizeof(packet)-1] = lcrc;
+
+    cc2500_Strobe(CC2500_SIDLE);
+    cc2500_Strobe(CC2500_SFRX);
+    send_packet(sizeof(packet), packet);
+
+    timer_call_after_ms(6, start_receive);
 }
 
 /*
-  write multiple bytes
+  send one bind packet
  */
-void write_multiple(uint8_t reg, uint8_t n, const uint8_t *data)
+static void send_bind_packet(void)
 {
-    spi_force_chip_select(true);
-    reg |= CC2500_WRITE_BURST;
-    spi_write(1, &reg);
-    spi_write(n, data);
-    spi_force_chip_select(false);
+    uint8_t packet[30]; // US packet is 0x1D (29) long
+    static uint8_t idx;
+    uint16_t lcrc;
+    uint8_t i;
+
+    memset(packet, 0, sizeof(packet));
+    
+    packet[0] = sizeof(packet)-1; // US (FCC) version
+    packet[1] = 0x03;
+    packet[2] = 0x01;
+    packet[3] = bindTxId[0];
+    packet[4] = bindTxId[1];
+    packet[5] = idx;
+    for (i=0; i<5; i++) {
+        if (idx + i < 47) {
+            packet[6+i] = bindHopData[idx+i];
+        }
+    }
+    packet[11] = 0x02;
+    packet[12] = 0; // rxnum
+
+    lcrc = calc_crc(&packet[3], sizeof(packet)-5);
+
+    packet[sizeof(packet)-2] = lcrc >> 8;
+    packet[sizeof(packet)-1] = lcrc;
+
+    idx += 5;
+    if (idx >= 50) {
+        idx -= 50;
+    }
+
+    cc2500_Strobe(CC2500_SIDLE);
+    cc2500_WriteReg(CC2500_0A_CHANNR, 0);
+    send_packet(sizeof(packet), packet);
+
+    bindcount++;
+    if (bindcount > 500) {
+        // send every 9ms
+        timer_call_after_ms(9, send_normal_packet);
+    } else {
+        // send bind every 9ms
+        timer_call_after_ms(9, send_bind_packet);
+    }
 }
+
 
 /*
   IRQ handler
@@ -388,6 +592,9 @@ void radio_start_FCC_test(void)
  */
 void radio_start_send(bool use_dsm2)
 {
+    printf("radio_start_send\n");
+    setChannel(0);
+    timer_call_after_ms(2, send_bind_packet);    
 }
 
 /*
