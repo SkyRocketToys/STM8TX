@@ -11,7 +11,7 @@
 
 /** Definition of ports; one of these can be ored with one or more pin bits to refer to
 	a collection of pins on a single port. */
-enum gpio_pins {
+enum gpio_pins_e {
 	// These types are mutually exclusive
 	GPIO_PORTA = 0x000, ///< Port A
 	GPIO_PORTB = 0x100, ///< Port B
@@ -22,6 +22,7 @@ enum gpio_pins {
 	GPIO_PORTG = 0x600, ///< Port G
 	GPIO_PORTH = 0x700, ///< Port H
 	GPIO_PORTI = 0x800, ///< Port I
+//	GPIO_NONE  = 0xF00, ///< Invalid port (at the moment causes compile error)
 	// GPIO bits. These can be ored together to refer to a collection of pins.
 	GPIO_PIN0 =	(1 << 0), ///< Pin 0 of a port
 	GPIO_PIN1 =	(1 << 1), ///< Pin 1 of a port
@@ -34,7 +35,7 @@ enum gpio_pins {
 };
 
 /** Configuration values, for gpio_config */
-enum gpio_config {
+enum gpio_config_e {
 	// These types are mutually exclusive
     GPIO_INPUT_FLOAT            =0x0, ///< Input pin with no pullup.
     GPIO_INPUT_PULLUP           =0x2, ///< Input pin with internal pullup resistor active
@@ -49,7 +50,7 @@ enum gpio_config {
     GPIO_CLEAR                  =0x20  ///< Flag to clear a GPIO
 };
 
-void gpio_config(uint16_t pins, enum gpio_config config); // Configure one or more pins on a port
+void gpio_config(uint16_t pins, enum gpio_config_e config); // Configure one or more pins on a port
 void gpio_set(uint16_t pins); // Set one or more pins on a port high
 void gpio_clear(uint16_t pins); // Set one or more pins on a port low
 void gpio_toggle(uint16_t pins); // Toggle one or more pins on a port between high and low

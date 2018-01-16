@@ -1,5 +1,12 @@
 // -----------------------------------------------------------------------------
 // Main entry point for transmitter firmware
+//
+// Memory map:
+// 0x0000..0x07ff = 2Kbytes of RAM
+// 0x6000 = internal rom bootloader
+// 0x8000 = bootloader
+// 0x8700 = firmware (14.24k)
+// 0xc000 = downloaded firmware for replacing the main one
 // -----------------------------------------------------------------------------
 
 #include "config.h"
@@ -105,13 +112,16 @@ static void check_stick_activity(void)
         }
     }
     // any button counts as activity
-    if ((gpio_get(PIN_RIGHT_BUTTON)==0) ||
+#if OLD_SPIDERMAN_TX
+#else
+	if ((gpio_get(PIN_RIGHT_BUTTON)==0) ||
         (gpio_get(PIN_LEFT_BUTTON)==0) ||
         (gpio_get(PIN_SW1)==0) ||
         (gpio_get(PIN_SW2)==0) ||
         (gpio_get(PIN_USER)!=0)) {
         active = true;
     }
+#endif
     if (active) {
         last_stick_activity = timer_get_ms();
     }

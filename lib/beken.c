@@ -237,8 +237,6 @@ enum BK_FEATURE_e {
 	BK_FEATURE_EN_DYN_ACK = 0x01, ///<
 };
 
-#define FLAG_WRITE      0x80
-
 #define BK_MAX_PACKET_LEN 32 // max value is 32 bytes
 #define BK_RCV_TIMEOUT 30
 
@@ -400,7 +398,6 @@ packetFormatRx pktDataRecv; // Packet data in process of being received
 void SPI_Write_Cmd(
 	uint8_t reg) ///< The simple command to write #BK_SPI_CMD_e
 {
-	reg |= FLAG_WRITE;
 	spi_force_chip_select(true); // CSN low, init SPI transaction
 	spi_write(1, &reg);
 	spi_force_chip_select(false); // CSN high again
@@ -413,7 +410,7 @@ void SPI_Write_Reg(
 	uint8_t value) ///< The data value to write
 {
 	uint8_t tx[2];
-	tx[0] = reg | FLAG_WRITE;
+	tx[0] = reg; // For actual registers, the caller must add BK_WRITE_REG flag to reg.
 	tx[1] = value;
 	spi_force_chip_select(true); // CSN low, init SPI transaction
 	spi_write(2, &tx[0]);
@@ -456,7 +453,6 @@ void SPI_Write_Buf(
 	uint8_t length) ///< The length in bytes of the data to write
 {
 	spi_force_chip_select(true);
-	reg |= FLAG_WRITE;
 	spi_write(1, &reg);
 	spi_write(length, pBuf);
 	spi_force_chip_select(false);

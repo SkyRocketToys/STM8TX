@@ -31,7 +31,7 @@ static struct gpio_regs *gpio = (struct gpio_regs *)0x5000;
 /** Configure one or more pins on a port */
 void gpio_config(
 	uint16_t pins, ///< One or more pins to configure on a single specified GPIO port. See #gpio_pins
-	enum gpio_config config) ///< The configuration format wanted for the specified pin(s)
+	enum gpio_config_e config) ///< The configuration format wanted for the specified pin(s)
 {
     uint8_t port = (pins >> 8);
     uint8_t pin = pins & 0xFF;

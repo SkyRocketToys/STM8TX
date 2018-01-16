@@ -810,7 +810,7 @@
         <debug>1</debug>
         <option>
           <name>GenDeviceSelectMenu</name>
-          <state>UnspecifiedSTM8	STM8 - Unspecified</state>
+          <state>STM8S005K6	STM8S005K6</state>
         </option>
         <option>
           <name>GenCodeModel</name>
@@ -982,7 +982,7 @@
         </option>
         <option>
           <name>CCDefines</name>
-          <state>STM8S105</state>
+          <state>STM8S005</state>
           <state>PRODUCT=2</state>
         </option>
         <option>
@@ -1401,7 +1401,7 @@
         </option>
         <option>
           <name>IlinkIcfFile</name>
-          <state>E:\ArduPilot\StreamingGPSTransmitter\iar\lnkstm8.icf</state>
+          <state>$PROJ_DIR$\lnkstm8.icf</state>
         </option>
         <option>
           <name>IlinkIcfFileSlave</name>
@@ -1469,7 +1469,7 @@
         </option>
         <option>
           <name>DoFill</name>
-          <state>0</state>
+          <state>1</state>
         </option>
         <option>
           <name>FillerByte</name>
@@ -1477,11 +1477,11 @@
         </option>
         <option>
           <name>FillerStart</name>
-          <state>0x0</state>
+          <state>0x8700</state>
         </option>
         <option>
           <name>FillerEnd</name>
-          <state>0x0</state>
+          <state>0xbfff</state>
         </option>
         <option>
           <name>CrcSize</name>
@@ -2195,7 +2195,7 @@
         </option>
         <option>
           <name>IlinkIcfFile</name>
-          <state>E:\ArduPilot\StreamingGPSTransmitter\iar\lnkstm8.icf</state>
+          <state>$PROJ_DIR$\lnkstm8.icf</state>
         </option>
         <option>
           <name>IlinkIcfFileSlave</name>
@@ -2989,7 +2989,7 @@
         </option>
         <option>
           <name>IlinkIcfFile</name>
-          <state>E:\ArduPilot\StreamingGPSTransmitter\iar\lnkstm8.icf</state>
+          <state>$PROJ_DIR$\lnkstm8.icf</state>
         </option>
         <option>
           <name>IlinkIcfFileSlave</name>

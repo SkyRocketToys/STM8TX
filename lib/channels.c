@@ -52,6 +52,8 @@ static bool latched_left_button(void)
       does not change
      */
 
+#if OLD_SPIDERMAN_TX
+#else
     if (gpio_get(PIN_LEFT_BUTTON) != 0) {
         if (counter >= 10 && !ignore_left_button) {
             latched = !latched;
@@ -72,6 +74,7 @@ static bool latched_left_button(void)
             counter = 0;
         }
     }
+#endif
     return latched;
 }
 
@@ -189,6 +192,8 @@ uint8_t get_buttons(void)
 {
     uint8_t ret = 0;
 
+#if OLD_SPIDERMAN_TX
+#else
     if (gpio_get(PIN_LEFT_BUTTON) == 0) {
         ret |= BUTTON_LEFT;
     }
@@ -208,6 +213,7 @@ uint8_t get_buttons(void)
     if (gpio_get(PIN_SW5)==0) {
         ret |= BUTTON_MODE;
     }
+#endif
 #endif
     return ret;
 }

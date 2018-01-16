@@ -26,3 +26,6 @@ iar/settings
 iar/*.dep
 iar/*.ewt
 iar/*.ewd
+
+*.bak
+info.tmp

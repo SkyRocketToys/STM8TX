@@ -608,7 +608,7 @@
         </option>
         <option>
           <name>IlinkIcfFile</name>
-          <state>$TOOLKIT_DIR$\config\lnkstm8s105k6.icf</state>
+          <state>$PROJ_DIR$\lnkstm8_boot.icf</state>
         </option>
         <option>
           <name>IlinkIcfFileSlave</name>
@@ -811,7 +811,7 @@
         <debug>0</debug>
         <option>
           <name>GenDeviceSelectMenu</name>
-          <state></state>
+          <state>STM8S005K6	STM8S005K6</state>
         </option>
         <option>
           <name>GenCodeModel</name>
@@ -851,11 +851,11 @@
         </option>
         <option>
           <name>GenRTDescription</name>
-          <state></state>
+          <state>Use the normal configuration of the C/EC++ runtime library. No locale interface, C locale, no file descriptor support, no multibytes in printf and scanf, and no hex floats in strtod.</state>
         </option>
         <option>
           <name>GenRTConfigPath</name>
-          <state></state>
+          <state>$TOOLKIT_DIR$\LIB\dlstm8smn.h</state>
         </option>
         <option>
           <name>GenLibInFormatter</name>
@@ -864,7 +864,7 @@
         </option>
         <option>
           <name>GenLibInFormatterDescription</name>
-          <state></state>
+          <state>Full formatting, without multibytes.</state>
         </option>
         <option>
           <name>GenLibOutFormatter</name>
@@ -873,15 +873,15 @@
         </option>
         <option>
           <name>GenLibOutFormatterDescription</name>
-          <state></state>
+          <state>Full formatting, without multibytes.</state>
         </option>
         <option>
           <name>GenStackSize</name>
-          <state>###Uninitialized###</state>
+          <state>0x100</state>
         </option>
         <option>
           <name>GenHeapSize</name>
-          <state>###Uninitialized###</state>
+          <state>0x100</state>
         </option>
         <option>
           <name>GeneralEnableMisra</name>
@@ -912,7 +912,7 @@
         </option>
         <option>
           <name>GenMathFunctionDescription</name>
-          <state></state>
+          <state>Default variants of cos, sin, tan, log, log10, pow, and exp.</state>
         </option>
       </data>
     </settings>
@@ -950,12 +950,12 @@
         </option>
         <option>
           <name>IccOptLevelSlave</name>
-          <state>1</state>
+          <state>3</state>
         </option>
         <option>
           <name>IccOptAllowList</name>
           <version>0</version>
-          <state>111110</state>
+          <state>111111</state>
         </option>
         <option>
           <name>IccGenerateDebugInfo</name>
@@ -963,7 +963,7 @@
         </option>
         <option>
           <name>IccOutputFile</name>
-          <state></state>
+          <state>$FILE_BNAME$.o</state>
         </option>
         <option>
           <name>IccCodeModel</name>
@@ -983,6 +983,9 @@
         </option>
         <option>
           <name>CCDefines</name>
+          <state>STM8S005</state>
+          <state>BL_VERSION=2</state>
+          <state>PRODUCT=2</state>
           <state>NDEBUG</state>
         </option>
         <option>
@@ -1051,7 +1054,7 @@
         </option>
         <option>
           <name>CCIncludePath2</name>
-          <state></state>
+          <state>..\include</state>
         </option>
         <option>
           <name>CCStdIncCheck</name>
@@ -1337,7 +1340,7 @@
         </option>
         <option>
           <name>IlinkOutputFile</name>
-          <state>###Unitialized###</state>
+          <state>BootLoader.out</state>
         </option>
         <option>
           <name>IlinkDebugInfoEnable</name>
@@ -1397,11 +1400,11 @@
         </option>
         <option>
           <name>IlinkIcfOverride</name>
-          <state>0</state>
+          <state>1</state>
         </option>
         <option>
           <name>IlinkIcfFile</name>
-          <state>lnk0t.icf</state>
+          <state>$PROJ_DIR$\lnkstm8_boot.icf</state>
         </option>
         <option>
           <name>IlinkIcfFileSlave</name>
@@ -1465,11 +1468,11 @@
         </option>
         <option>
           <name>IlinkProgramEntryLabel</name>
-          <state></state>
+          <state>__iar_program_start</state>
         </option>
         <option>
           <name>DoFill</name>
-          <state>0</state>
+          <state>1</state>
         </option>
         <option>
           <name>FillerByte</name>
@@ -1477,11 +1480,11 @@
         </option>
         <option>
           <name>FillerStart</name>
-          <state>0x0</state>
+          <state>0x8000</state>
         </option>
         <option>
           <name>FillerEnd</name>
-          <state>0x0</state>
+          <state>0x86ff</state>
         </option>
         <option>
           <name>CrcSize</name>

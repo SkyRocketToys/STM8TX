@@ -36,9 +36,9 @@ set FW_INFILE=EWSTM8\%FW_BUILDNAME%\Exe\StreamingTransmitter.s19
 rem set FW_OUTFILE=T:\SkyRocketToys\firmware2018\%ProductDir%%FW_NAME%
 
 rem Build the firmware
-%IARBUILD% EWSTM8/Project.ewp -build  %FW_BOOTNAME% -log info
+%IARBUILD% iar/BootLoader.ewp -build  %FW_BOOTNAME% -log info
 IF %ERRORLEVEL% NEQ 0 goto err2
-%IARBUILD% EWSTM8/Project.ewp -build  %FW_BUILDNAME% -log info
+%IARBUILD% iar/StreamingTransmitter.ewp -build  %FW_BUILDNAME% -log info
 IF %ERRORLEVEL% NEQ 0 goto err1
 rem Merge the boot and firmware files
 rem ...

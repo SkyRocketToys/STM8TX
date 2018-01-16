@@ -33,7 +33,7 @@ void spi_init(void)
     // we don't use the HW NSS, pin for SPI, it is a user switch instead
     gpio_config(SPI_NSS_HW, GPIO_INPUT_PULLUP); // This line belongs elsewhere really
 
-    gpio_config(RADIO_NCS, (enum gpio_config)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
+    gpio_config(RADIO_NCS, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
     gpio_config(RADIO_INT, GPIO_INPUT_FLOAT_IRQ);
 
     // setup mode, clock, master

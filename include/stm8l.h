@@ -266,7 +266,7 @@ typedef unsigned long U32;
 #define UART1_GTR	*(volatile U8*)0x5239
 #define UART1_PSCR	*(volatile U8*)0x523A
 #endif // STM8S003
-#ifdef STM8S105
+#if defined(STM8S105) || defined(STM8S005)
 #define UART2_SR	*(volatile U8*)0x5240
 #define UART2_DR	*(volatile U8*)0x5241
 #define UART2_BRR1	*(volatile U8*)0x5242
@@ -457,14 +457,14 @@ typedef unsigned long U32;
 
 /* TIM4 */
 #define TIM4_CR1	*(volatile U8*)0x5340
-#if defined STM8S105 || defined STM8S103
+#if defined STM8S005 || defined STM8S105
 #define TIM4_IER	*(volatile U8*)0x5341
 #define TIM4_SR		*(volatile U8*)0x5342
 #define TIM4_EGR	*(volatile U8*)0x5343
 #define TIM4_CNTR	*(volatile U8*)0x5344
 #define TIM4_PSCR	*(volatile U8*)0x5345
 #define TIM4_ARR	*(volatile U8*)0x5346
-#elif defined STM8S003
+#elif defined STM8S003 || defined STM8S103
 #define TIM4_IER	*(volatile U8*)0x5343
 #define TIM4_SR		*(volatile U8*)0x5344
 #define TIM4_EGR	*(volatile U8*)0x5345
