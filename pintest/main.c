@@ -4,7 +4,7 @@
 #include "uart.h"
 #include "gpio.h"
 
-static uint16_t pins[] = {
+static uint16_t /* gpio_pins_e */ pins[] = {
     LED_GREEN,
     LED_YELLOW,
     RADIO_TXEN,

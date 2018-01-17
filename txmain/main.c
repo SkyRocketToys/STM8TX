@@ -1,12 +1,23 @@
 // -----------------------------------------------------------------------------
 // Main entry point for transmitter firmware
 //
+// -----------------------------------------------------------------------------
 // Memory map:
 // 0x0000..0x07ff = 2Kbytes of RAM
-// 0x6000 = internal rom bootloader
-// 0x8000 = bootloader
-// 0x8700 = firmware (14.24k)
+// 0x4000..0x43ff = 1kbtye of data eeprom
+// 0x4800         = option bytes
+// 0x5000         = hardware registers
+// 0x6000..0x67FF = 2Kbtyes of internal rom bootloader
+// 0x7f00         = internal cpu registers
+// ------------------------------------
+// 0x8000 = bootloader (1.75k)
+// 0x8700 = firmware (14.25k)
 // 0xc000 = downloaded firmware for replacing the main one
+// 0xF900 = free
+// -----------------------------------------------------------------------------
+// Resource usage:
+// Tim2 = reserved by cpm for better beeper
+// Tim4 = 1ms timer
 // -----------------------------------------------------------------------------
 
 #include "config.h"
@@ -47,9 +58,15 @@
 INTERRUPT_HANDLER(ADC1_IRQHandler, 22) {
     adc_irq();
 }
+#if OLD_SPIDERMAN_TX
+INTERRUPT_HANDLER(EXTI_PORTB_IRQHandler, 4) {
+    radio_irq();
+}
+#else
 INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5) {
     radio_irq();
 }
+#endif
 INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
     timer_irq();
 }
@@ -132,9 +149,10 @@ static void check_stick_activity(void)
         // power off
         if (timer_get_ms() - last_link_ms < 1500 &&
             (t_status.flags & TELEM_FLAG_ARMED) == 0) {
-            printf("power off disarmed\n");
+            printf("power off disarmed\r\n");
             gpio_clear(PIN_POWER);
             disableInterrupts();
+			printf("MainPwrOff\r\n");
             buzzer_tune(TONE_ERROR_TUNE);
             // loop forever
             while (true) ;
@@ -200,7 +218,7 @@ static void status_update(bool have_link)
             uint8_t i;
             radio_next_FCC_power();
             FCC_power = get_FCC_power();
-            printf("FCC power %u\n", FCC_power);
+            printf("FCC power %u\r\n", FCC_power);
             for (i=0; i<FCC_power; i++) {
                 buzzer_tune(TONE_RX_SEARCH);
                 delay_ms(100);
@@ -210,7 +228,7 @@ static void status_update(bool have_link)
             fcc_CW_mode = !fcc_CW_mode;
             radio_set_CW_mode(fcc_CW_mode);
             buzzer_tune(fcc_CW_mode?TONE_LOITER:TONE_ALT_HOLD);
-            printf("CW mode %u\n", fcc_CW_mode);
+            printf("CW mode %u\r\n", fcc_CW_mode);
         }
         if (buttons == BUTTON_LEFT_SHOULDER) {
             radio_change_FCC_channel(1);
@@ -246,7 +264,7 @@ static void status_update(bool have_link)
         uint8_t time_since_activity_s = time_since_activity >> 10;
         if (time_since_activity_s > 180) {
             // clear power control
-            printf("powering off\n");
+            printf("powering off\r\n");
             gpio_clear(PIN_POWER);
         }
         if (time_since_activity_s > 170) {
@@ -393,30 +411,34 @@ void main(void)
 
     buzzer_init();
 
+#if SUPPORT_BEKEN
+    EXTI_CR1 = (2<<6) | (2<<4) | (2<<2) | (2<<0); // falling edge interrupts
+#else
     EXTI_CR1 = (1<<6) | (1<<4) | (1<<2) | (1<<0); // rising edge interrupts
+#endif
 
     enableInterrupts();
 
-    printf("BL_VERSION %u\n", get_bl_version());
+    printf("BL_VERSION %u\r\n", get_bl_version());
 
     // wait for initial stick inputs
     delay_ms(200);
-
+#if SUPPORT_CYPRESS
     switch (get_buttons_no_power()) {
     case BUTTON_LEFT | BUTTON_RIGHT:
-        printf("FCC test start\n");
+        printf("FCC test start\r\n");
         radio_start_FCC_test();
         break;
 
     case BUTTON_LEFT:
-        printf("DSM2 bind\n");
+        printf("DSM2 bind\r\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
         radio_start_bind_send(true);
         break;
 
 #if SUPPORT_DSMX
     case BUTTON_RIGHT:
-        printf("DSMX bind\n");
+        printf("DSMX bind\r\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 0);
         radio_start_bind_send(false);
         break;
@@ -444,7 +466,7 @@ void main(void)
         } else if (adc1 < 200 && adc0 > 300 && adc0 < 700) {
             factory_mode = 8;
         }
-        printf("Factory mode %u adc=[%u %u %u %u]\n", factory_mode,
+        printf("Factory mode %u adc=[%u %u %u %u]\r\n", factory_mode,
             adc0, adc1, adc2, adc3);
         radio_start_factory_test(factory_mode);
         break;
@@ -456,6 +478,9 @@ void main(void)
         break;
     }
     }
+#else
+	radio_start_send(false);
+#endif
 
     note_adjust = eeprom_read(EEPROM_NOTE_ADJUST);
     if (note_adjust > 40) {
@@ -483,12 +508,12 @@ void main(void)
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
                (unsigned)get_buttons(), get_tx_power());
         if (FCC_chan != -1) {
-            printf(" FCC %d CW:%u\n", FCC_chan, fcc_CW_mode);
+            printf(" FCC %d CW:%u\r\n", FCC_chan, fcc_CW_mode);
         } else if (telem_pps == 0) {
-            printf(" TX:%u NOSIGNAL\n", get_send_pps());
+            printf(" TX:%u NOSIGNAL\r\n", get_send_pps());
             link_ok = false;
         } else {
-            printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u F:0x%x M:%u\n",
+            printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u F:0x%x M:%u\r\n",
                    get_send_pps(),
                    telem_pps,
                    get_telem_rssi(),

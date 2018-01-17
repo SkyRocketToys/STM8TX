@@ -18,18 +18,29 @@ BUILD_DATE_DAY=$(shell date +%d | sed 's/^0//g')
 BL_VERSION=2
 
 # -----------------------------------------------------------------------------
+PRODUCT=2
 CC=sdcc
 CODELOC=0x8700
 CFLAGS=-mstm8 -Iinclude -DSTM8S105=1 --opt-code-size -DCODELOC=$(CODELOC) -DBLBASE=$(BLBASE) -DBL_VERSION=$(BL_VERSION)
 CFLAGS+= -DBUILD_DATE_YEAR=$(BUILD_DATE_YEAR) -DBUILD_DATE_MONTH=$(BUILD_DATE_MONTH) -DBUILD_DATE_DAY=$(BUILD_DATE_DAY)
-CFLAGS+= -DPRODUCT=2
+CFLAGS+= -DPRODUCT=$(PRODUCT)
 BLBASE=0x8100
 LD=sdld
 CHIP=stm8s105c6
 #STLINK=stlink
 STLINK=stlinkv2
 
-LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c lib/cypress.c lib/beken.c lib/cc2500.c
+ifeq ($(PRODUCT),1)
+RADIO_MODULE=lib/cypress.c
+endif
+ifeq ($(PRODUCT),2)
+RADIO_MODULE=lib/beken.c
+endif
+ifeq ($(PRODUCT),3)
+RADIO_MODULE=lib/cc2500.c
+endif
+
+LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c $(RADIO_MODULE)
 LIBSRC += lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c lib/channels.c
 BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom.c
 

@@ -1,5 +1,8 @@
 // -----------------------------------------------------------------------------
 // Support the sound buzzer
+//
+// We can use the "beep" functionality to choose a limited number of output frequencies
+// Or timer 2 channel 1 PWM to support 16-bit timer accuracy.
 // -----------------------------------------------------------------------------
 
 #include "config.h"
@@ -160,7 +163,7 @@ static void stop_note(void)
 
 // -----------------------------------------------------------------------------
 /* continue playing note until duration is reached */
-static bool play()
+static bool play(void)
 {
     uint16_t cur_time = timer_get_ms();
     if (tune_num != prev_tune_num){
@@ -187,7 +190,7 @@ static bool play()
 
 // -----------------------------------------------------------------------------
 /* setup note and duration */
-static bool set_note()
+static bool set_note(void)
 {
     // first, get note duration, if available
     uint16_t scale,note,num =0;
@@ -284,7 +287,7 @@ static bool set_note()
 
 // -----------------------------------------------------------------------------
 // Initialise a tune, using tune_num as the new song to trigger
-static bool init_tune()
+static bool init_tune(void)
 {
     uint16_t num;
     bool have_name;
@@ -308,7 +311,7 @@ static bool init_tune()
         tune_pos++;
     }
     if (have_name) {
-        printf("'\n");
+        printf("'\r\n");
     }
     tune_pos++;
 
@@ -356,7 +359,7 @@ static bool init_tune()
 
 // -----------------------------------------------------------------------------
 /* Advance state machine by one tick. Assumes this is called every fixed number of milliseconds. */
-static void tune_tick()
+static void tune_tick(void)
 {
     if(state == 0) {
         state = state + init_tune();
@@ -377,17 +380,21 @@ static void tune_tick()
 /** Initialise the sound buzzer module */
 void buzzer_init(void)
 {
-    // enable AFR7 in options byte to enable buzzer
-    FLASH_CR2 |= 0x80;
-    FLASH_NCR2 &= ~0x80;
-    eeprom_unlock();
-    OPTION_BYTE2 |= 0x80;
-    OPTION_NBYTE2 &= ~0x80;
-    eeprom_lock();
+	if (!(OPTION_BYTE2 & 0x80)) // Is this already set? Don't wear out the flash.
+	{
+		// enable AFR7 in options byte to enable buzzer (PortD4 alternative function)
+		FLASH_CR2 |= 0x80;
+		FLASH_NCR2 &= ~0x80;
+		eeprom_unlock();
+		OPTION_BYTE2 |= 0x80;
+		OPTION_NBYTE2 &= ~0x80;
+		eeprom_lock();
+	}
 }
 
 // -----------------------------------------------------------------------------
-/** Start playing the given tune number. Only one tune can be played at a time */
+/** Start playing the given tune number. Only one tune can be played at a time.
+Halts the thread until the tune has completed playing! */
 void buzzer_tune(
 	uint8_t t) ///< The tune number. See #tune_index
 {
@@ -397,7 +404,7 @@ void buzzer_tune(
     } else if (t < TONE_NUMBER_OF_TUNES) {
         tune_ptr = tune[t];
     } else {
-        printf("Bad tune %u\n", t);
+        printf("Bad tune %u\r\n", t);
         return;
     }
     state = 0;
@@ -419,7 +426,7 @@ void buzzer_tune_add(uint16_t offset, const uint8_t *data, uint8_t length)
     if (length < 8 || temp_tune_len == MAX_TUNE_LEN) {
         // must be the end of the tune
         temp_tune[temp_tune_len] = 0;
-        printf("tune of length %u: %s\n", temp_tune_len, (const char *)temp_tune);
+        printf("tune of length %u: %s\r\n", temp_tune_len, (const char *)temp_tune);
         temp_tune_pending = true;
     }
 }

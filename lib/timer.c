@@ -8,6 +8,7 @@
 #include "util.h"
 #include "gpio.h"
 #include "buzzer.h"
+#include "beken.h"
 
 /** \addtogroup timer Timer routines
 @{ */
@@ -31,6 +32,9 @@ void timer_init(void)
 static uint16_t power_pin_count;
 static bool activate_power_pin;
 bool power_off_disarm = false;
+#if SUPPORT_BEKEN
+static uint8_t radio_timer_count;
+#endif
 
 // -----------------------------------------------------------------------------
 /** The interrupt function for the timer IRQ.
@@ -45,6 +49,7 @@ void timer_irq(void)
             g_callback_t_ms = 0;
             g_callback();
         }
+#if 000 // Why poweroff here?
         pin_user = gpio_get(PIN_USER);
         if (!pin_user) {
             // only activate if its been off at least once since boot
@@ -56,15 +61,24 @@ void timer_irq(void)
                 power_off_disarm = true;
             }
             if (power_pin_count > POWER_OFF_MS) {
-                // clear power control
+                // clear power control - this should kill the cpu
                 gpio_clear(PIN_POWER);
-                buzzer_tune(TONE_ERROR_TUNE);
+				printf("PwrOff\r\n");
+                buzzer_tune(TONE_ERROR_TUNE); // Play an error tune since we should be turned off by now
                 // loop forever
                 while (true) ;
             }
         } else {
             power_pin_count = 0;
         }
+#endif
+#if SUPPORT_BEKEN
+		if (++radio_timer_count >= 5) // Every 5ms
+		{
+			radio_timer_count = 0;
+			beken_timer_irq();
+		}
+#endif
     }
     // clear interrupt
     TIM4_SR = 0;

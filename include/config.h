@@ -17,7 +17,7 @@
 #endif
 
 #if PRODUCT==2
-#define OLD_SPIDERMAN_TX 1 // We dont have hardware yet so use an old Tx
+#define OLD_SPIDERMAN_TX 0 // We dont have hardware yet so use an old Tx
 #define SUPPORT_CYPRESS 0
 #define SUPPORT_BEKEN 1
 #define SUPPORT_CC2500 0
@@ -35,35 +35,35 @@
 /** @file */
 
 /** \page schematic PCB layout from schematic.
-The schematic "Streaming and Streaming with GPS Drone button board" v0.1 says
+The schematic PCB1807 "Streaming and Streaming with GPS Drone button board" v0.1 says
 \section pins GPIO pins
-Port | Meaning
------|--------
-A1 | BUTTON_STUNT
-A2 | BUTTON_VIDEO
-B0 | CH4 = ROLL (mode2) RightHorizontal
-B1 | CH3 = PITCH (mode2) RightVertical
-B2 | CH1 = THROTTLE (mode2) LeftVertical
-B3 | CH2 = YAW (mode2) LeftHorizontal
-B4 | PWR
-B5 | RADIO_PACTL
-C1 | BUTTON_GPS
-C2 | USER
-C3 | RADIO_IRQ
-C4 | RADIO_CS
-C5 | RADIO_SCK
-C6 | RADIO_MOSI
-C7 | RADIO_MISO
-D0 | BUTTON_MODE
-D1 | SWIM
-D2 | RADIO_CE
-D3 | LED_GPS
-D4 | BEEP
-D5 | UART_TX
-D6 | UART_RX
-D7 | LED_MODE
-E5 | BUTTON_LL
-F4 | VBAT_SENSE
+Port | Meaning | Position
+-----|---------|---------
+A1 | BUTTON_STUNT | (SW4) offboard
+A2 | BUTTON_VIDEO | (SW5) offboard
+B0 | CH4 = ROLL   | (mode2) RightHorizontal
+B1 | CH3 = PITCH  | (mode2) RightVertical
+B2 | CH1 = THROTTLE | (mode2) LeftVertical
+B3 | CH2 = YAW    | (mode2) LeftHorizontal
+B4 | PWR          |
+B5 | RADIO_PACTL  |
+C1 | BUTTON_GPS   | (SW3)
+C2 | USER         | (SW6)
+C3 | RADIO_IRQ    |
+C4 | RADIO_CS     |
+C5 | RADIO_SCK    |
+C6 | RADIO_MOSI   |
+C7 | RADIO_MISO   |
+D0 | BUTTON_MODE  | (SW1)
+D1 | SWIM         | (SW1?)
+D2 | RADIO_CE     |
+D3 | LED_GPS      |
+D4 | BEEP         |
+D5 | UART_TX      |
+D6 | UART_RX      |
+D7 | LED_MODE     |
+E5 | BUTTON_LL    | (SW2)
+F4 | VBAT_SENSE   |
 */
 
 /** \section PCB layout from 2016 Spiderman Tx.
@@ -180,7 +180,7 @@ RADIO_PACTL | B5
 #define RADIO_RST   (GPIO_NONE) //
 #define SPI_NSS_HW  (GPIO_PORTE|GPIO_PIN5) //
 
-#else
+#else // Proper hardware
 
 #define PIN_POWER  (GPIO_PORTB|GPIO_PIN4) // PWR
 #define LED_GREEN  (GPIO_PORTD|GPIO_PIN3) // LED_GPS
@@ -249,7 +249,19 @@ RADIO_PACTL | B5
 #define POWER_OFF_MS 2000
 #define POWER_OFF_DISARMED_MS 500
 
+// battery sense analog
+#define PIN_VBAT (GPIOF|GPIO_PIN4)
+
 // location in flash of new firmware
 #define NEW_FIRMWARE_BASE 0xC000
+
+// stick inputs on PB2, PB3, PB1 and PB0
+
+// SWIM on PD1
+
+#define UART_TX (GPIO_PORTD|GPIO_PIN5)
+#define UART_RX (GPIO_PORTD|GPIO_PIN6)
+
+#define PIN_BEEP (GPIO_PORTD|GPIO_PIN4)
 
 /** @}*/

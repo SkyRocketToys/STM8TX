@@ -20,13 +20,13 @@ Support radio protocol logical channels
 // -----------------------------------------------------------------------------
 // Bodge
 #ifndef BUILD_DATE_YEAR
-#define BUILD_DATE_YEAR 2017
+#define BUILD_DATE_YEAR 2018
 #endif
 #ifndef BUILD_DATE_MONTH
-#define BUILD_DATE_MONTH 11
+#define BUILD_DATE_MONTH 01
 #endif
 #ifndef BUILD_DATE_DAY
-#define BUILD_DATE_DAY 22
+#define BUILD_DATE_DAY 17
 #endif
 
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
@@ -41,19 +41,19 @@ extern uint8_t get_bl_version(void);
 /** latch left button with debouncing */
 static bool latched_left_button(void)
 {
-    static uint8_t counter;
-    static bool latched;
-    static bool ignore_left_button;
-
     /*
       the left button is latching to make flight mode changes more
       reliable on lossy links. If any other button is pressed when
       left button is held, then it is a button combination and mode
       does not change
      */
-
 #if OLD_SPIDERMAN_TX
+	return false;
 #else
+    static uint8_t counter;
+    static bool latched;
+    static bool ignore_left_button;
+
     if (gpio_get(PIN_LEFT_BUTTON) != 0) {
         if (counter >= 10 && !ignore_left_button) {
             latched = !latched;
@@ -74,8 +74,8 @@ static bool latched_left_button(void)
             counter = 0;
         }
     }
-#endif
     return latched;
+#endif
 }
 
 // -----------------------------------------------------------------------------

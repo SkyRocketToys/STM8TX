@@ -3,6 +3,7 @@
 
 void beken_init(void);
 void beken_irq();
+void beken_timer_irq();
 void beken_start_bind_send(void);
 void beken_start_send(void);
 void beken_start_FCC_test(void);
@@ -25,5 +26,8 @@ uint8_t get_FCC_power(void);
 #define radio_set_CW_mode beken_set_CW_mode
 #define radio_change_FCC_channel beken_change_FCC_channel
 #define radio_FCC_toggle_scan beken_FCC_toggle_scan
+
+uint8_t LookupChannel(uint8_t idx);
+void ChangeChannel(uint8_t channelNumber);
 
 #endif

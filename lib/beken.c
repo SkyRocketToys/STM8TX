@@ -12,8 +12,14 @@
 #include "gpio.h"
 #include "telem_structure.h"
 #include "beken.h"
+#include "adc.h"
+#include "channels.h"
 
 #if SUPPORT_BEKEN
+
+#define SUPPORT_UART 1 // Output some info
+#define CHANNEL_DWELL_PACKETS 1 // 5ms frequency changes
+#define CHANNEL_COUNT_LOGICAL 60
 
 /** \file */
 /** \addtogroup beken Beken BK2425 radio module
@@ -240,9 +246,13 @@ enum BK_FEATURE_e {
 #define BK_MAX_PACKET_LEN 32 // max value is 32 bytes
 #define BK_RCV_TIMEOUT 30
 
-#define BEKEN_DESELECT()     gpio_set(RADIO_CE)
-#define BEKEN_CE_HIGH()      gpio_set(RADIO_NCS)
-#define BEKEN_CE_LOW()       gpio_clear(RADIO_NCS)
+#define BEKEN_SELECT()       gpio_clear(RADIO_NCS)
+#define BEKEN_DESELECT()     gpio_set(RADIO_NCS)
+#define BEKEN_CE_HIGH()      gpio_set(RADIO_CE)
+#define BEKEN_CE_LOW()       gpio_clear(RADIO_CE)
+#define BEKEN_PA_HIGH()      gpio_set(RADIO_TXEN)
+#define BEKEN_PA_LOW()       gpio_clear(RADIO_TXEN)
+
 
 
 // ----------------------------------------------------------------------------
@@ -388,7 +398,7 @@ uint32_t lastReceivedTime = 0;
 uint32_t ackPacketCount = 0;
 uint32_t sentPacketCount = 0;
 uint8_t bFreshData = 0; // Have we received a packet since we last processed one
-packetFormatTx pktDataTx;
+packetFormatTx pktDataTx; // Packet data to send
 packetFormatRx pktDataRx;
 packetFormatRx pktDataRecv; // Packet data in process of being received
 
@@ -476,6 +486,7 @@ void SwitchToRxMode(void)
 	SPI_Write_Reg(BK_WRITE_REG | BK_CONFIG, value); // Set PWR_UP bit, enable CRC(2 length) & Prim:RX. RX_DR enabled..
 
 	BEKEN_CE_HIGH();
+	BEKEN_PA_LOW();
 }
 
 // ----------------------------------------------------------------------------
@@ -485,6 +496,7 @@ void SwitchToTxMode(void)
 	uint8_t value;
 	SPI_Write_Cmd(BK_FLUSH_TX); // flush Tx
 
+	BEKEN_PA_HIGH();
 	BEKEN_CE_LOW();
 	for (value = 0; value < 40; ++value)
 		nop();
@@ -501,6 +513,7 @@ void SwitchToIdleMode(void)
 	uint8_t value;
 	SPI_Write_Cmd(BK_FLUSH_TX); // flush Tx
 
+	BEKEN_PA_LOW();
 	BEKEN_CE_LOW();
 	for (value = 0; value < 40; ++value)
 		nop();
@@ -517,6 +530,7 @@ void SwitchToSleepMode(void)
  	value = SPI_Read_Status(); // read register STATUS's value
 	SPI_Write_Reg(BK_WRITE_REG|BK_STATUS, value); // clear RX_DR or TX_DS or MAX_RT interrupt flag
 
+	BEKEN_PA_LOW();
 	BEKEN_CE_LOW();
 	for (value = 0; value < 40; ++value)
 		nop();
@@ -704,6 +718,8 @@ bool ClearAckOverflow(void)
 void initBeken(void)
 {
 	/* Set ChipSelect pin in Output push-pull high level in spi_init() */
+    gpio_config(RADIO_TXEN, GPIO_OUTPUT_PUSHPULL);
+    gpio_clear(RADIO_TXEN);
 	BEKEN_DESELECT();
 	BEKEN_CE_LOW();
 }
@@ -719,9 +735,10 @@ void deinitBeken(void)
 void describeBeken(void)
 {
 #if SUPPORT_UART
+	uint8_t i;
 	printf("# TxSpeed %dkbps\r\n", (int) BK2425_GetSpeed() );
 	printf("# Channels[%d]=", (int) CHANNEL_COUNT_LOGICAL );
-	for (uint8_t i = 0; i < CHANNEL_COUNT_LOGICAL; ++i)
+	for (i = 0; i < CHANNEL_COUNT_LOGICAL; ++i)
 	{
 		printf("%d ", (int) LookupChannel(i));
 	}
@@ -905,12 +922,12 @@ void VerifyBekenChipID(void)
 {
 	uint8_t id = Get_Chip_ID();
 #if SUPPORT_UART
-	printf("# Chip ID: 0x%02x\r\n", id);
+	printf("\r\n# Chip ID: %u\r\n", id);
 #endif
 	while (id != BK_CHIP_ID_BK2425)
 	{
 #if SUPPORT_UART
-		printf("Chip ID Failed: 0x%02x\r\n", id);
+		printf("Chip ID Failed: %u\r\n", id);
 #endif
 		IWDG_Kick();
 		initBeken();
@@ -923,21 +940,26 @@ void VerifyBekenChipID(void)
 // Frequency hopping
 // ----------------------------------------------------------------------------
 
-#define CHANNEL_DWELL_PACKETS 1 // 5ms frequency changes
-#define CHANNEL_COUNT_LOGICAL 60
 uint8_t gChannelIdxMin = 0;
 uint8_t gChannelIdxMax = CHANNEL_COUNT_LOGICAL * CHANNEL_DWELL_PACKETS;
 
 const uint8_t channelTable[CHANNEL_COUNT_LOGICAL] = {
 #if (CHANNEL_COUNT_LOGICAL==60) // Use 15 channels 4 times
-	46,41,31,52,36,13,72,69,21,56,
-	16,26,61,66,10,
-	46,41,31,52,36,13,72,69,21,56,
-	16,26,61,66,10,
-	46,41,31,52,36,13,72,69,21,56,
-	16,26,61,66,10,
-	46,41,31,52,36,13,72,69,21,56,
-	16,26,61,66,10,
+#if 1
+	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
+	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
+	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
+	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
+//	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+//	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+//	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+//	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+#else
+	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
+	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
+	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
+	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
+#endif
 #endif
 };
 
@@ -1061,11 +1083,44 @@ void beken_irq(void)
 	// Clear the bits
 	SPI_Write_Reg((BK_WRITE_REG|BK_STATUS), (BK_STATUS_MAX_RT | BK_STATUS_TX_DS | BK_STATUS_RX_DR));
 	// What is this code for? Did it used to be an attempt to mask radio interrupts?
-	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
+//	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
 }
 
 uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL
 uint16_t lastTxPacketCount;
+
+// ----------------------------------------------------------------------------
+// Update a radio control packet
+// Called from IRQ context
+void UpdateTxData(void)
+{
+	uint16_t val;
+
+	// Base values for this packet type
+	pktDataTx.packetType = BK_PKT_TYPE_CTRL; ///< The packet type
+//	pktDataTx.channel;
+	pktDataTx.u.ctrl.lsb = 0;
+	pktDataTx.u.ctrl.buttons = get_buttons();
+	pktDataTx.u.ctrl.data_type = 0;
+	pktDataTx.u.ctrl.data_value = 0;
+
+	// Put in the stick values
+	val = channel_value(STICK_THROTTLE);
+	pktDataTx.u.ctrl.throttle = val >> 2;
+	pktDataTx.u.ctrl.lsb |= (val & 3) << 0;
+	val = channel_value(STICK_ROLL);
+	pktDataTx.u.ctrl.roll = val >> 2;
+	pktDataTx.u.ctrl.lsb |= (val & 3) << 2;
+	val = channel_value(STICK_PITCH);
+	pktDataTx.u.ctrl.pitch = val >> 2;
+	pktDataTx.u.ctrl.lsb |= (val & 3) << 4;
+	val = channel_value(STICK_YAW);
+	pktDataTx.u.ctrl.yaw = val >> 2;
+	pktDataTx.u.ctrl.lsb |= (val & 3) << 6;
+
+	// Put in the extra data fields
+	//...
+}
 
 // ----------------------------------------------------------------------------
 /** The IRQ routine that needs to be called on timer interrupts for the Beken chip */
@@ -1083,6 +1138,7 @@ void beken_timer_irq(void)
 	ClearAckOverflow();
 
 	// Support sending reconnect packets
+#if 0
 	if (commsState == COMMS_STATE_DISCONNECTED)
 	{
 		switch (lastTxPacketCount & 255) {
@@ -1096,7 +1152,9 @@ void beken_timer_irq(void)
 			break;
 		};
 	}
+#endif
 	SwitchToTxMode();
+	UpdateTxData();
 	pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
 	lastTxChannel = txChannel;
 	lastTxPacketCount++;

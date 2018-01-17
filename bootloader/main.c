@@ -4,10 +4,10 @@
   written for SDCC compiler and IAR compiler
  */
 
-#include "config.h"
-#include "stm8l.h"
 #include <stdint.h>
 #include <string.h>
+#include "config.h"
+#include "stm8l.h"
 #include "gpio.h"
 #include "crc.h"
 #include "eeprom.h"
