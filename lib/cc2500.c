@@ -216,13 +216,14 @@ void radio_init(void)
 {
     printf("radio_init\n");
 
-    // setup RST pin on PD0
-    gpio_config(RADIO_RST, GPIO_OUTPUT_PUSHPULL);
+    // setup PACTL
+    gpio_config(RADIO_PACTL, GPIO_OUTPUT_PUSHPULL);
+    gpio_clear(RADIO_PACTL);
 
-    // setup TXEN
-    gpio_config(RADIO_TXEN, GPIO_OUTPUT_PUSHPULL);
-    gpio_set(RADIO_TXEN);
-
+    // setup PACTL
+    gpio_config(RADIO_PACTL, GPIO_OUTPUT_PUSHPULL);
+    gpio_clear(RADIO_PACTL);
+    
     // setup radio CE
     gpio_config(RADIO_CE, GPIO_OUTPUT_PUSHPULL);
     gpio_set(RADIO_CE);
@@ -459,6 +460,7 @@ static uint16_t calc_crc(uint8_t *data, uint8_t len)
 
 static void send_packet(uint8_t len, const uint8_t *packet)
 {
+    gpio_set(RADIO_PACTL);
     cc2500_Strobe(CC2500_SFTX);
     cc2500_WriteFifo(packet, len);
     cc2500_Strobe(CC2500_STX);
@@ -468,6 +470,7 @@ static void send_normal_packet(void);
 
 static void start_receive(void)
 {
+    gpio_clear(RADIO_PACTL);
     channr = (channr + chanskip) % 47;
     cc2500_Strobe(CC2500_SIDLE);
     setChannel(channr);

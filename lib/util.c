@@ -19,6 +19,7 @@ void chip_init(void)
     gpio_config(PIN_SW3, GPIO_INPUT_PULLUP);
     gpio_config(PIN_SW4, GPIO_INPUT_PULLUP);
     gpio_config(PIN_USER, GPIO_INPUT_FLOAT);
+    gpio_config(PIN_MODE, GPIO_INPUT_PULLUP);
 }
 
 void led_init(void)
