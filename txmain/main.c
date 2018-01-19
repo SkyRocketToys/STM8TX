@@ -507,11 +507,11 @@ void main(void)
     next_ms = timer_get_ms() + 1000;
 
     while (true) {
-        uint8_t telem_pps;
         bool link_ok = false;
         int8_t FCC_chan = get_FCC_chan();
-
 #if SUPPORT_CYPRESS
+        uint8_t telem_pps;
+
         radio_set_pps_rssi();
         telem_pps = get_telem_pps();
 
@@ -534,6 +534,8 @@ void main(void)
                    t_status.flight_mode);
             link_ok = true;
         }
+#else
+		display_sticks();
 #endif
 
         status_update(link_ok);
@@ -542,7 +544,6 @@ void main(void)
             update_leds();
             check_stick_activity();
         }
-		display_sticks();
         if (FCC_chan != -1) {
             next_ms += 400;
         } else {

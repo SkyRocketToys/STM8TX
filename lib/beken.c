@@ -107,13 +107,11 @@ typedef struct packetDataDfu_s {
 #define RADIO_BEKEN 1 // We are using the Beken BK2425 chip
 #define TX_SPEED 250u // Default transmit speed in kilobits per second.
 
-typedef uint32_t PAIRADDR; // Pair address (was 8 bit, now 32 bit (low 24 bits used))
-#define PAIRADDR_MASK 0xfffffful // Amount of pair address used
-#define PAIRADDR_DEFAULT 0x00c62bul // Default address for pairing to unpaired tx (note this needs to match the address in TX_Address)
-#define PACKET_LENGTH_TX 12
+#define PACKET_LENGTH_TX_CTRL 12
 #define PACKET_LENGTH_TX_BIND 10
 #define PACKET_LENGTH_RX_TELEMETRY 9
 #define PACKET_LENGTH_RX_DFU 20
+#define PACKET_LENGTH_RX_MAX 20
 
 /** Channel hopping parameters. Values are in MHz from 2400Mhz. */
 enum CHANNEL_MHZ_e {
@@ -373,14 +371,14 @@ static const uint8_t Bank0_Reg[][2]={
 
 // -----------------------------------------------------------------------------
 // Variables
-uint8_t TX_Address[]={0x32,0x99,0x59,0xC6,0x2D}; // Base address of binding tx
-uint8_t RX0_Address[]={0x33,0x99,0x59,0xC6,0x2B}; // Base address of telemetry/dfu rx
-uint8_t RX1_Address[]={0x33,0x99,0x59,0xC6,0x2B}; // ditto
+uint8_t TX0_Address[5]; // Base address of ctrl tx
+uint8_t TX1_Address[5]; // Base address of binding tx
+uint8_t RX0_Address[5]; // Base address of telemetry/dfu rx
+uint8_t RX1_Address[5]; // ditto
 
 struct telem_status t_status;
 uint8_t op_status; // Last status byte read in transaction
 volatile uint8_t bkReady = 0u; // Is the beken chip ready enough for its status to be handled?
-PAIRADDR pairAddress = PAIRADDR_DEFAULT; // This needs to be set to the CRC32 of my GUID on startup
 uint8_t gLastRxLen = 0;
 uint32_t gTxPackets = 0;
 uint32_t gRxPackets = 0;
@@ -594,7 +592,7 @@ void BK2425_Initialize(
 	// Set the various 5 byte addresses
 	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P0),RX0_Address,5); // reg 10 - Rx0 addr
 	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P1),RX1_Address,5); // REG 11 - Rx1 addr
-	SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR),TX_Address,5); // REG 16 - TX addr
+	SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR),TX1_Address,5); // REG 16 - TX addr
 
 #if RADIO_BEKEN
 	i = SPI_Read_Reg(BK_FEATURE);
@@ -708,11 +706,36 @@ bool ClearAckOverflow(void)
 }
 
 // ----------------------------------------------------------------------------
+// Set up the addresses
+void beken_set_address(void)
+{
+	const uint8_t* uuid = (const uint8_t*) U_ID00;
+	uint32_t address = crc_crc32(uuid, 12); // Unique chip ID (x:16, y:16, wafer:8, lot:56)
+
+	TX0_Address[0] = 0x32;
+	TX0_Address[1] = 0x99;
+	TX0_Address[2] = 0x59;
+	TX0_Address[3] = 0xC6;
+	TX0_Address[4] = 0x2D;
+
+	TX1_Address[0] = 0x31;
+	TX1_Address[1] = (address >> 16) & 0xff;
+	TX1_Address[2] = 0x59;
+	TX1_Address[3] = (address >> 8) & 0xff;
+	TX1_Address[4] = (address) & 0xff;
+
+	RX1_Address[0] = RX0_Address[0] = 0x33;
+	RX1_Address[1] = RX0_Address[1] = (address >> 16) & 0xff;
+	RX1_Address[2] = RX0_Address[2] = 0x59;
+	RX1_Address[3] = RX0_Address[3] = (address >> 8) & 0xff;
+	RX1_Address[4] = RX0_Address[4] = (address) & 0xff;
+}
+
+// ----------------------------------------------------------------------------
 /** Initialise the Beken chip ready to be talked to */
 void initBeken(void)
 {
-	const uint8_t* uuid = (const uint8_t*) U_ID00;
-	pairAddress = crc_crc32(uuid, 12); // Unique chip ID (x:16, y:16, wafer:8, lot:56)
+	beken_set_address();
 
 	/* Set ChipSelect pin in Output push-pull high level in spi_init() */
     gpio_config(RADIO_TXEN, GPIO_OUTPUT_PUSHPULL);
@@ -744,34 +767,19 @@ void describeBeken(void)
 #endif
 }
 
-PAIRADDR address;
-
 // ----------------------------------------------------------------------------
 /** Change address */
 void ChangeAddressTx(
-	PAIRADDR tmpaddress, ///<
-	uint8_t txch) ///<
+	uint8_t txch) ///< 0 for data, 1 for binding
 {
-	address = tmpaddress; // Attempt to work around compiler bug in IAR STM8 compiler 2.20.1
-	if (address > PAIRADDR_MASK)
-		return;
 	if (txch)
 	{
-		TX_Address[0] = 0x32;
-		TX_Address[1] = 0x99;
-		TX_Address[2] = 0x59;
-		TX_Address[3] = 0xC6;
-		TX_Address[4] = 0x2D;
+		SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR), TX1_Address, 5); // REG 16 - TX addr
 	}
 	else
 	{
-		TX_Address[0] = 0x31;
-		TX_Address[1] = (address >> 16) & 0xff;
-		TX_Address[2] = 0x59;
-		TX_Address[3] = (address >> 8) & 0xff;
-		TX_Address[4] = (address) & 0xff;
+		SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR), TX0_Address, 5); // REG 16 - TX addr
 	}
-	SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR), TX_Address, 5); // REG 16 - TX addr
 }
 
 // ----------------------------------------------------------------------------
@@ -835,7 +843,7 @@ uint8_t Receive_Packet(
 			len = SPI_Read_Reg(BK_R_RX_PL_WID_CMD);	// read received packet length in bytes
 			gLastRxLen = len;
 
-			if (len <= PACKET_LENGTH_RX_DFU)
+			if (len <= PACKET_LENGTH_RX_MAX)
 			{
 				// This includes short packets (e.g. where no telemetry was sent)
 				spi_read_registers(BK_RD_RX_PLOAD, rx_buf, len); // read receive payload from RX_FIFO buffer
@@ -971,18 +979,6 @@ uint8_t NextChannelIndex(
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
-// Set up the addresses
-void beken_set_address(void)
-{
-	TX_Address[0] = 0x31;
-	RX1_Address[0] = RX0_Address[0] = 0x33;
-	TX_Address[1] = RX1_Address[1] = RX0_Address[1] = (address >> 16) & 0xff;
-	TX_Address[2] = RX1_Address[2] = RX0_Address[2] = 0x59;
-	TX_Address[3] = RX1_Address[3] = RX0_Address[3] = (address >> 8) & 0xff;
-	TX_Address[4] = RX1_Address[4] = RX0_Address[4] = (address) & 0xff;
-}
-
-// ----------------------------------------------------------------------------
 /** Initialise the Beken radio chip */
 void beken_init(void)
 {
@@ -1006,7 +1002,6 @@ void beken_init(void)
 
 	VerifyBekenChipID();
 	IWDG_Kick();
-	beken_set_address();
 	switch (BK2425_GetSpeed()) { // Use the default speed
 	case 250: BK2425_Initialize(ITX_250); break;
 	case 1000: BK2425_Initialize(ITX_1000); break;
@@ -1123,11 +1118,11 @@ void UpdateTxBindData(void)
 {
 	pktDataTx.packetType = BK_PKT_TYPE_BIND;
 //	pktDataTx.channel;
-	pktDataTx.u.bind.bind_address[0] = 0x31;
-	pktDataTx.u.bind.bind_address[1] = (pairAddress >> 16) & 0xff;
-	pktDataTx.u.bind.bind_address[2] = 0x59;
-	pktDataTx.u.bind.bind_address[3] = (pairAddress >> 8) & 0xff;
-	pktDataTx.u.bind.bind_address[4] = (pairAddress >> 0) & 0xff;
+	pktDataTx.u.bind.bind_address[0] = RX0_Address[0];
+	pktDataTx.u.bind.bind_address[1] = RX0_Address[1];
+	pktDataTx.u.bind.bind_address[2] = RX0_Address[2];
+	pktDataTx.u.bind.bind_address[3] = RX0_Address[3];
+	pktDataTx.u.bind.bind_address[4] = RX0_Address[4];
 	pktDataTx.u.bind.hopping = 0;
 }
 
@@ -1137,7 +1132,8 @@ void beken_timer_irq(void)
 {
 	static uint8_t txChannel = 0;
 	static uint8_t bindTimer = 0;
-//...	TIM3->SR1 = (uint8_t)(~TIM3_IT_UPDATE);
+	// No need for this as caller takes care of it:
+	// TIM4->SR1 = (uint8_t)(~TIM4_IT_UPDATE);
 	if (!bkReady) // We are reinitialising the chip in the main thread
 		return;
 
@@ -1154,7 +1150,7 @@ void beken_timer_irq(void)
 		{
 			bindTimer = 0;
 			SwitchToIdleMode();
-			ChangeAddressTx(pairAddress, 0); // Binding address
+			ChangeAddressTx(1); // Binding address
 			SwitchToTxMode();
 			UpdateTxBindData();
 			pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
@@ -1165,15 +1161,21 @@ void beken_timer_irq(void)
 		else if (bindTimer == 0)
 		{
 			SwitchToIdleMode();
-			ChangeAddressTx(pairAddress, 1); // Unique address
+			ChangeAddressTx(0); // Unique address for this controls
 		}
+	}
+	else if (bindTimer != 99)
+	{
+		bindTimer = 99;
+		SwitchToIdleMode();
+		ChangeAddressTx(0); // Unique address for this controls
 	}
 	SwitchToTxMode();
 	UpdateTxData();
 	pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
 	lastTxChannel = txChannel;
 	lastTxPacketCount++;
-	Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&pktDataTx, PACKET_LENGTH_TX);
+	Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&pktDataTx, PACKET_LENGTH_TX_CTRL);
 }
 
 // ----------------------------------------------------------------------------
@@ -1258,6 +1260,18 @@ uint8_t get_FCC_power(void)
 	//...
 	return 0;
 }
+
+#if 0
+uint8_t get_telem_pps(void)
+{
+    return 0;
+}
+
+void radio_set_pps_rssi(void)
+{
+}
+
+#endif
 
 /** @}*/
 
