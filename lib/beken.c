@@ -13,6 +13,8 @@
 #include "telem_structure.h"
 #include "beken.h"
 #include "adc.h"
+#include "crc.h"
+#include "timer.h"
 #include "channels.h"
 
 #if SUPPORT_BEKEN
@@ -32,11 +34,11 @@
 /** The type of packets being sent between controller and drone */
 enum BK_PKT_TYPE_E {
 	BK_PKT_TYPE_INVALID      = 0,    ///< Invalid packet from empty packets or bad CRC
-	BK_PKT_TYPE_CTRL         = 0x10, ///< (Tx->Drone) [ctrl] Packet type 3 = user control
-	BK_PKT_TYPE_AVAILABLE    = 0x11, ///< (Tx->Drone) [info] Packet type 5 = tx is available (and was either never paired or has been switched off and on again)
-	BK_PKT_TYPE_DISCONNECTED = 0x12, ///< (Tx->Drone) [id] Packet type 6 = tx was connected and is now available
-	BK_PKT_TYPE_PAIRING      = 0x13, ///< (Tx->Drone) [id] Packet type 9 = tx is pairing to this address (normal comms speed - better range)
-	BK_PKT_TYPE_DRONE        = 0x14, ///< (Drone->Tx) Packet type 4 = drone command to tx (reply to ctrl)
+	BK_PKT_TYPE_CTRL_FOUND   = 0x10, ///< (Tx->Drone) User control - known receiver
+	BK_PKT_TYPE_CTRL_LOST    = 0x11, ///< (Tx->Drone) User control - unknown receiver
+	BK_PKT_TYPE_BIND         = 0x12, ///< (Tx->Drone) Tell drones this tx is broadcasting
+	BK_PKT_TYPE_TELEMETRY    = 0x13, ///< (Drone->Tx) Send telemetry to tx
+	BK_PKT_TYPE_DFU          = 0x14, ///< (Drone->Tx) Send new firmware to tx
 };
 typedef uint8_t BK_PKT_TYPE;
 
@@ -49,20 +51,23 @@ typedef struct packetDataDeviceCtrl_s {
 	uint8_t pitch; ///< High 8 bits of the pitch joystick
 	uint8_t yaw; ///< High 8 bits of the yaw joystick
 	uint8_t lsb; ///< Low 2 bits of throttle, roll, pitch, yaw
-	uint8_t buttons; ///< The buttons
+	uint8_t buttons_held; ///< The buttons
+	uint8_t buttons_toggled; ///< The buttons
 	uint8_t data_type; ///< Type of extra data being sent
-	uint8_t data_value; ///< Value of extra data being sent
+	uint8_t data_value_lo; ///< Value of extra data being sent
+	uint8_t data_value_hi; ///< Value of extra data being sent
 } packetDataDeviceCtrl;
 
-enum { SZ_DRONEID = 6 }; ///< Size of UUID for drone (48 bits)
-enum { SZ_CTRLID = 6 }; ///< Size of UUID for controller (48 bits)
+enum { SZ_ADDRESS = 5 }; ///< Size of address for transmission packets (40 bits)
+enum { SZ_CRC_GUID = 4 }; ///< Size of UUID for drone (32 bits)
+enum { SZ_DFU = 16 }; ///< Size of DFU packets
 
 /** Data for packets that are binding packets
 	Onair order = little-endian */
-typedef struct packetDataDeviceID_s {
-	uint8_t droneId[SZ_DRONEID]; ///< The UUID of the drone
-	uint8_t reconnectAddress[3]; ///< The Address chosen for this connection
-} packetDataDeviceID;
+typedef struct packetDataDeviceBind_s {
+	uint8_t bind_address[SZ_ADDRESS]; ///< The address being used by control packets
+	uint8_t hopping; ///< The hopping table in use for this connection
+} packetDataDeviceBind;
 
 /** Data structure for data packet transmitted from device (controller) to host (drone) */
 typedef struct packetDataDevice_s {
@@ -71,16 +76,28 @@ typedef struct packetDataDevice_s {
 	union packetDataDevice_u ///< The variant part of the packets
 	{
 		packetDataDeviceCtrl ctrl; ///< Control packets
-		packetDataDeviceID id; ///< Binding packets
+		packetDataDeviceBind bind; ///< Binding packets
 	} u;
 } packetFormatTx;
 
 /** Data structure for data packet transmitted from host (drone) to device (controller) */
 typedef struct packetDataDrone_s {
-	BK_PKT_TYPE packetType; ///< The packet type
-	uint8_t channel; ///< Next channel I will broadcast on
-	uint8_t data[10]; ///< Telemetry data (unspecified so far)
+	BK_PKT_TYPE packetType; ///< 0: The packet type
+	uint8_t channel; ///< 1: Next channel I will broadcast on
+	uint8_t wifi; ///< 2:
+	uint8_t rssi; ///< 3:
+	uint8_t droneid[SZ_CRC_GUID]; ///< 4...7:
+	uint8_t mode; ///< 8:
+	// Telemetry data (unspecified so far)
 } packetFormatRx;
+
+typedef struct packetDataDfu_s {
+	BK_PKT_TYPE packetType; ///< 0: The packet type
+	uint8_t channel; ///< 1: Next channel I will broadcast on
+	uint8_t address_lo; ///< 2:
+	uint8_t address_hi; ///< 3:
+	uint8_t data[SZ_DFU]; ///< 4...19:
+} packetFormatDfu;
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -90,20 +107,13 @@ typedef struct packetDataDrone_s {
 #define RADIO_BEKEN 1 // We are using the Beken BK2425 chip
 #define TX_SPEED 250u // Default transmit speed in kilobits per second.
 
-typedef uint32_t PAIRADDR; // Pair address (was 8 bit, now 32 bit (low 23 bits used))
-#define PAIRADDR_MASK 0x7ffffful // Amount of pair address used
+typedef uint32_t PAIRADDR; // Pair address (was 8 bit, now 32 bit (low 24 bits used))
+#define PAIRADDR_MASK 0xfffffful // Amount of pair address used
 #define PAIRADDR_DEFAULT 0x00c62bul // Default address for pairing to unpaired tx (note this needs to match the address in TX_Address)
-#define PACKET_LENGTH_TX 10
-#define PACKET_LENGTH_RX 16
-
-/** Comms state */
-enum {
-	COMMS_STATE_UNPAIRED, ///< I have not paired
-	COMMS_STATE_DISCONNECTED, ///< I have paired but am not connected
-	COMMS_STATE_PAIRING, ///< Telling the drones I have accepted one of them
-	COMMS_STATE_PAIRED, ///< Telling the drone I have received its accept
-};
-uint8_t commsState;
+#define PACKET_LENGTH_TX 12
+#define PACKET_LENGTH_TX_BIND 10
+#define PACKET_LENGTH_RX_TELEMETRY 9
+#define PACKET_LENGTH_RX_DFU 20
 
 /** Channel hopping parameters. Values are in MHz from 2400Mhz. */
 enum CHANNEL_MHZ_e {
@@ -253,6 +263,19 @@ enum BK_FEATURE_e {
 #define BEKEN_PA_HIGH()      gpio_set(RADIO_TXEN)
 #define BEKEN_PA_LOW()       gpio_clear(RADIO_TXEN)
 
+enum {
+	INFO_FW_VER = 1,
+	INFO_DFU_RX,
+	INFO_FW_CRC_LO,
+	INFO_FW_CRC_HI,
+	INFO_FW_YM,
+	INFO_FW_DAY,
+	INFO_MODEL,
+	INFO_RSSI,
+	INFO_BATTERY,
+	INFO_MAX,
+};
+uint16_t gFwInfo[INFO_MAX];
 
 
 // ----------------------------------------------------------------------------
@@ -348,59 +371,30 @@ static const uint8_t Bank0_Reg[][2]={
 {BK_FEATURE,    BK_FEATURE_EN_DPL | BK_FEATURE_EN_ACK_PAY | BK_FEATURE_EN_DYN_ACK }  // (29) 7=enable ack, no ack, dynamic payload length
 };
 
-// Allocation of second address byte between users - never use 0x55 or 0xAA
-#if defined(USER_CARLM)
-	#define USER_ADDRESS_COMPONENT 0xCE
-#elif defined(USER_SIMON)
-	#define USER_ADDRESS_COMPONENT 0xCC
-#elif defined(USER_PAULS)
-	#define USER_ADDRESS_COMPONENT 0x5B
-#elif defined(USER_MSTROHACKER)
-	#define USER_ADDRESS_COMPONENT 0x5C
-#else // Default user
-	#define USER_ADDRESS_COMPONENT 0x59
-#endif
-
-// Allocation of third address byte between models
-#if defined(SRT_NANO)
-	#define MODEL_ADDRESS_COMPONENT 0x23
-#elif defined(SRT_STUNT)
-	#define MODEL_ADDRESS_COMPONENT 0x24
-#elif defined(SRT_STREAM)
-	#define MODEL_ADDRESS_COMPONENT 0x25
-#elif defined(SRT_PRO)
-	#define MODEL_ADDRESS_COMPONENT 0x26
-#elif defined(SRT_HOVER)
-	#define MODEL_ADDRESS_COMPONENT 0x27
-#elif defined(SRT_MINIVIDEO)
-	#define MODEL_ADDRESS_COMPONENT 0x28
-#else // Undefined model
-	#define MODEL_ADDRESS_COMPONENT 0x29
-#endif
-
 // -----------------------------------------------------------------------------
 // Variables
-uint8_t TX_Address[]={0x00,USER_ADDRESS_COMPONENT,MODEL_ADDRESS_COMPONENT,0xC6,0x2B}; // Base address of StuntFc
-uint8_t RX0_Address[]={0x80,USER_ADDRESS_COMPONENT,MODEL_ADDRESS_COMPONENT,0xC6,0x2B}; // Base address of StuntTx - (Unbound tx)
-const uint8_t RX1_Address[]={0x80,USER_ADDRESS_COMPONENT,MODEL_ADDRESS_COMPONENT,0xC6,0x2B}; // Spare (unbound tx)
+uint8_t TX_Address[]={0x32,0x99,0x59,0xC6,0x2D}; // Base address of binding tx
+uint8_t RX0_Address[]={0x33,0x99,0x59,0xC6,0x2B}; // Base address of telemetry/dfu rx
+uint8_t RX1_Address[]={0x33,0x99,0x59,0xC6,0x2B}; // ditto
 
 struct telem_status t_status;
 uint8_t op_status; // Last status byte read in transaction
 volatile uint8_t bkReady = 0u; // Is the beken chip ready enough for its status to be handled?
-volatile PAIRADDR pairAddress = PAIRADDR_DEFAULT;
-PAIRADDR reconnectAddress = PAIRADDR_DEFAULT;
+PAIRADDR pairAddress = PAIRADDR_DEFAULT; // This needs to be set to the CRC32 of my GUID on startup
 uint8_t gLastRxLen = 0;
 uint32_t gTxPackets = 0;
 uint32_t gRxPackets = 0;
 uint8_t badRxAddress = 0;
 uint32_t recvTimestampMs = 0;
-uint32_t lastReceivedTime = 0;
 uint32_t ackPacketCount = 0;
 uint32_t sentPacketCount = 0;
 uint8_t bFreshData = 0; // Have we received a packet since we last processed one
 packetFormatTx pktDataTx; // Packet data to send
 packetFormatRx pktDataRx;
 packetFormatRx pktDataRecv; // Packet data in process of being received
+uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL
+uint16_t lastTxPacketCount;
+uint32_t lastTelemetryPktTime = 0;
 
 
 // -----------------------------------------------------------------------------
@@ -717,9 +711,13 @@ bool ClearAckOverflow(void)
 /** Initialise the Beken chip ready to be talked to */
 void initBeken(void)
 {
+	const uint8_t* uuid = (const uint8_t*) U_ID00;
+	pairAddress = crc_crc32(uuid, 12); // Unique chip ID (x:16, y:16, wafer:8, lot:56)
+
 	/* Set ChipSelect pin in Output push-pull high level in spi_init() */
     gpio_config(RADIO_TXEN, GPIO_OUTPUT_PUSHPULL);
-    gpio_clear(RADIO_TXEN);
+    gpio_config(RADIO_CE, GPIO_OUTPUT_PUSHPULL);
+
 	BEKEN_DESELECT();
 	BEKEN_CE_LOW();
 }
@@ -746,49 +744,7 @@ void describeBeken(void)
 #endif
 }
 
-
-// ----------------------------------------------------------------------------
-PAIRADDR address; // Workaround for compiler bug whereby it was conflating bits 8..15 and 16..23 if a long is passed in as a parameter
-uint8_t gRxDefault = 1;
-uint8_t gRxCh = 0;
-/** Change pipeline address */
-void ChangeAddress(
-	PAIRADDR tmpaddress, ///<
-	uint8_t rxch) ///<
-{
-	address = tmpaddress; // Attempt to work around compiler bug in IAR STM8 compiler 2.20.1
-	if (address > PAIRADDR_MASK)
-		return;
-	if (address == PAIRADDR_DEFAULT)
-		gRxDefault = 1;
-	else
-		gRxDefault = 0;
-
-//	if (address != PAIRADDR_DEFAULT && address != pairAddress)
-//		printf("Compiler bug!\r\n");
-	TX_Address[0] = (address >> 16) & 0xff;
-	TX_Address[3] = (address >> 8) & 0xff;
-	TX_Address[4] = (address) & 0xff;
-	RX0_Address[0] = ((address >> 16) & 0xff) | 0x80;
-	RX0_Address[3] = (address >> 8) & 0xff;
-	RX0_Address[4] = (address) & 0xff;
-
-	printf("Txaddr %08lx == %08lx -> %02x %02x %02x %02x %02x\r\n",
-		address, pairAddress, TX_Address[0], TX_Address[1],
-		TX_Address[2], TX_Address[3], TX_Address[4]);
-	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P0), RX0_Address, 5); // reg 10 - Rx0 addr is of drone
-	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P1), RX1_Address, 5);
-	SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR), TX_Address, 5); // REG 16 - TX addr
-	SPI_Write_Reg((BK_WRITE_REG|BK_EN_RXADDR), rxch); // Listen to one or two addresses
-	gRxCh = rxch;
-}
-
-uint8_t isAddrDefault(uint8_t rxch)
-{
-	if (rxch == 1)
-		return 1;
-	return gRxDefault;
-}
+PAIRADDR address;
 
 // ----------------------------------------------------------------------------
 /** Change address */
@@ -799,17 +755,19 @@ void ChangeAddressTx(
 	address = tmpaddress; // Attempt to work around compiler bug in IAR STM8 compiler 2.20.1
 	if (address > PAIRADDR_MASK)
 		return;
-	if (gRxCh != 3) // Avoid race condition
-		txch = 0;
 	if (txch)
 	{
-		TX_Address[0] = ((PAIRADDR_DEFAULT >> 16) & 0xff);
-		TX_Address[3] = (PAIRADDR_DEFAULT >> 8) & 0xff;
-		TX_Address[4] = (PAIRADDR_DEFAULT) & 0xff;
+		TX_Address[0] = 0x32;
+		TX_Address[1] = 0x99;
+		TX_Address[2] = 0x59;
+		TX_Address[3] = 0xC6;
+		TX_Address[4] = 0x2D;
 	}
 	else
 	{
-		TX_Address[0] = (address >> 16) & 0xff;
+		TX_Address[0] = 0x31;
+		TX_Address[1] = (address >> 16) & 0xff;
+		TX_Address[2] = 0x59;
 		TX_Address[3] = (address >> 8) & 0xff;
 		TX_Address[4] = (address) & 0xff;
 	}
@@ -877,7 +835,7 @@ uint8_t Receive_Packet(
 			len = SPI_Read_Reg(BK_R_RX_PL_WID_CMD);	// read received packet length in bytes
 			gLastRxLen = len;
 
-			if (len <= PACKET_LENGTH_RX)
+			if (len <= PACKET_LENGTH_RX_DFU)
 			{
 				// This includes short packets (e.g. where no telemetry was sent)
 				spi_read_registers(BK_RD_RX_PLOAD, rx_buf, len); // read receive payload from RX_FIFO buffer
@@ -946,14 +904,14 @@ uint8_t gChannelIdxMax = CHANNEL_COUNT_LOGICAL * CHANNEL_DWELL_PACKETS;
 const uint8_t channelTable[CHANNEL_COUNT_LOGICAL] = {
 #if (CHANNEL_COUNT_LOGICAL==60) // Use 15 channels 4 times
 #if 1
-	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
-	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
-	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
-	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
-//	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-//	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-//	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-//	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+//	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
+//	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
+//	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
+//	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
 #else
 	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
 	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
@@ -1013,11 +971,34 @@ uint8_t NextChannelIndex(
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
+// Set up the addresses
+void beken_set_address(void)
+{
+	TX_Address[0] = 0x31;
+	RX1_Address[0] = RX0_Address[0] = 0x33;
+	TX_Address[1] = RX1_Address[1] = RX0_Address[1] = (address >> 16) & 0xff;
+	TX_Address[2] = RX1_Address[2] = RX0_Address[2] = 0x59;
+	TX_Address[3] = RX1_Address[3] = RX0_Address[3] = (address >> 8) & 0xff;
+	TX_Address[4] = RX1_Address[4] = RX0_Address[4] = (address) & 0xff;
+}
+
+// ----------------------------------------------------------------------------
 /** Initialise the Beken radio chip */
 void beken_init(void)
 {
-	// Setup the Beken chip
-	// Assumes that SPI is initialised by now
+	// Initialise the firmware data
+	uint32_t crc = crc_crc32((const uint8_t *)0x8700, (0xc000-0x8700));
+	gFwInfo[INFO_FW_CRC_LO] = crc & 0xffff;
+	gFwInfo[INFO_FW_CRC_HI] = (crc >> 16) & 0xffff;
+	gFwInfo[INFO_FW_VER] = 0;
+	gFwInfo[INFO_DFU_RX] = 0;
+	gFwInfo[INFO_FW_YM] = 0;
+	gFwInfo[INFO_FW_DAY] = 0;
+	gFwInfo[INFO_MODEL] = 1;
+	gFwInfo[INFO_RSSI] = 0; // ... needs to be updated over time
+	gFwInfo[INFO_BATTERY] = 0; // ... needs to be updated over time
+
+	// Setup the Beken chip. Assumes that SPI is initialised by now
 	delay_ms(10);
 	initBeken();
 	IWDG_Kick();
@@ -1025,6 +1006,7 @@ void beken_init(void)
 
 	VerifyBekenChipID();
 	IWDG_Kick();
+	beken_set_address();
 	switch (BK2425_GetSpeed()) { // Use the default speed
 	case 250: BK2425_Initialize(ITX_250); break;
 	case 1000: BK2425_Initialize(ITX_1000); break;
@@ -1033,10 +1015,20 @@ void beken_init(void)
 	// Should now be in Rx mode
 	// Configure radio interrupt
 	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
-	// Initialize the Interrupt sensitivity
-//...	EXTI_SetExtIntSensitivity(EXTI_PORT_GPIOB, EXTI_SENSITIVITY_FALL_ONLY);
-//...	EXTI_SetTLISensitivity(EXTI_TLISENSITIVITY_FALL_ONLY);
 	SwitchToRxMode();
+}
+
+// ----------------------------------------------------------------------------
+void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
+{
+	if (rx->packetType == BK_PKT_TYPE_TELEMETRY)
+	{
+		lastTelemetryPktTime = timer_get_ms();
+	}
+	else if (rx->packetType == BK_PKT_TYPE_DFU)
+	{
+		//...
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -1060,13 +1052,9 @@ void beken_irq(void)
 		// We have received a packet
 		uint8_t rxstd = 0;
 		// Which pipe (address) have we received this packet on?
-		if ((bk_sta & BK_STATUS_RX_MASK) == BK_STATUS_RX_P_1)
+		if ((bk_sta & BK_STATUS_RX_MASK) == BK_STATUS_RX_P_0)
 		{
-			rxstd = 1;
-		}
-		else if ((bk_sta & BK_STATUS_RX_MASK) == BK_STATUS_RX_P_0)
-		{
-			rxstd = isAddrDefault(0);
+			rxstd = 0;
 		}
 		else
 		{
@@ -1076,50 +1064,71 @@ void beken_irq(void)
 		bFreshData = 1;
 		Receive_Packet((uint8_t *)&pktDataRecv);
 		memcpy(&pktDataRx, &pktDataRecv, sizeof(pktDataRx));
-//...	recvTimestampMs = GetTime();
-//...	esb_rx_process_packet(&pktDataRx, rxstd);
+		ProcessPacket(&pktDataRx, rxstd);
 	}
 
 	// Clear the bits
 	SPI_Write_Reg((BK_WRITE_REG|BK_STATUS), (BK_STATUS_MAX_RT | BK_STATUS_TX_DS | BK_STATUS_RX_DR));
-	// What is this code for? Did it used to be an attempt to mask radio interrupts?
-//	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
 }
 
-uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL
-uint16_t lastTxPacketCount;
+// ----------------------------------------------------------------------------
+static bool isDisconnected(void)
+{
+	return (lastTelemetryPktTime == 0) || (timer_get_ms() > lastTelemetryPktTime + 1000);
+}
 
 // ----------------------------------------------------------------------------
 // Update a radio control packet
 // Called from IRQ context
 void UpdateTxData(void)
 {
+	static uint8_t txInfo = 0;
 	uint16_t val;
 
 	// Base values for this packet type
-	pktDataTx.packetType = BK_PKT_TYPE_CTRL; ///< The packet type
+	pktDataTx.packetType = isDisconnected() ? BK_PKT_TYPE_CTRL_LOST : BK_PKT_TYPE_CTRL_FOUND; ///< The packet type
 //	pktDataTx.channel;
 	pktDataTx.u.ctrl.lsb = 0;
-	pktDataTx.u.ctrl.buttons = get_buttons();
+	pktDataTx.u.ctrl.buttons_held = get_buttons_held();
+	pktDataTx.u.ctrl.buttons_toggled = get_buttons_toggled();
 	pktDataTx.u.ctrl.data_type = 0;
-	pktDataTx.u.ctrl.data_value = 0;
+	pktDataTx.u.ctrl.data_value_lo = 0;
+	pktDataTx.u.ctrl.data_value_hi = 0;
 
 	// Put in the stick values
-	val = channel_value(STICK_THROTTLE);
+	val = channel_value(0);
 	pktDataTx.u.ctrl.throttle = val >> 2;
 	pktDataTx.u.ctrl.lsb |= (val & 3) << 0;
-	val = channel_value(STICK_ROLL);
+	val = channel_value(1);
 	pktDataTx.u.ctrl.roll = val >> 2;
 	pktDataTx.u.ctrl.lsb |= (val & 3) << 2;
-	val = channel_value(STICK_PITCH);
+	val = channel_value(2);
 	pktDataTx.u.ctrl.pitch = val >> 2;
 	pktDataTx.u.ctrl.lsb |= (val & 3) << 4;
-	val = channel_value(STICK_YAW);
+	val = channel_value(3);
 	pktDataTx.u.ctrl.yaw = val >> 2;
 	pktDataTx.u.ctrl.lsb |= (val & 3) << 6;
 
 	// Put in the extra data fields
-	//...
+	if (++txInfo >= INFO_MAX)
+		txInfo = 1;
+	val = gFwInfo[txInfo];
+	pktDataTx.u.ctrl.data_type = txInfo;
+	pktDataTx.u.ctrl.data_value_lo = val & 0xff;
+	pktDataTx.u.ctrl.data_value_hi = (val >> 8) & 0xff;
+}
+
+// ----------------------------------------------------------------------------
+void UpdateTxBindData(void)
+{
+	pktDataTx.packetType = BK_PKT_TYPE_BIND;
+//	pktDataTx.channel;
+	pktDataTx.u.bind.bind_address[0] = 0x31;
+	pktDataTx.u.bind.bind_address[1] = (pairAddress >> 16) & 0xff;
+	pktDataTx.u.bind.bind_address[2] = 0x59;
+	pktDataTx.u.bind.bind_address[3] = (pairAddress >> 8) & 0xff;
+	pktDataTx.u.bind.bind_address[4] = (pairAddress >> 0) & 0xff;
+	pktDataTx.u.bind.hopping = 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -1127,6 +1136,7 @@ void UpdateTxData(void)
 void beken_timer_irq(void)
 {
 	static uint8_t txChannel = 0;
+	static uint8_t bindTimer = 0;
 //...	TIM3->SR1 = (uint8_t)(~TIM3_IT_UPDATE);
 	if (!bkReady) // We are reinitialising the chip in the main thread
 		return;
@@ -1137,22 +1147,27 @@ void beken_timer_irq(void)
 	FlushTx(); // Discard any buffered tx bytes
 	ClearAckOverflow();
 
-	// Support sending reconnect packets
-#if 0
-	if (commsState == COMMS_STATE_DISCONNECTED)
+	// Support sending binding packets
+	if (isDisconnected())
 	{
-		switch (lastTxPacketCount & 255) {
-		case 0+8: // Switch here quickly
+		if (++bindTimer >= 7)
+		{
+			bindTimer = 0;
 			SwitchToIdleMode();
-			ChangeAddressTx(reconnectAddress, 0); // Paired address (try this first on bootup)
-			break;
-		case 128+8:
+			ChangeAddressTx(pairAddress, 0); // Binding address
+			SwitchToTxMode();
+			UpdateTxBindData();
+			pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
+			lastTxChannel = txChannel;
+			Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&pktDataTx, PACKET_LENGTH_TX_BIND);
+			return;
+		}
+		else if (bindTimer == 0)
+		{
 			SwitchToIdleMode();
-			ChangeAddressTx(reconnectAddress, 1); // Default address
-			break;
-		};
+			ChangeAddressTx(pairAddress, 1); // Unique address
+		}
 	}
-#endif
 	SwitchToTxMode();
 	UpdateTxData();
 	pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
@@ -1233,7 +1248,7 @@ uint8_t get_tx_power(void)
 int8_t get_FCC_chan(void)
 {
 	//...
-	return 0;
+	return -1; // We are not in fcc mode
 }
 
 // ----------------------------------------------------------------------------

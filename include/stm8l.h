@@ -527,7 +527,7 @@ typedef unsigned long U32;
 
 
 /* -------------------- UNIQUE ID -------------------- */
-#if defined STM8S105 || defined STM8S103 // maybe some other MCU have this too???
+#if defined STM8S105 || defined STM8S103 || defined STM8S005 // maybe some other MCU have this too???
 #define U_ID00		(volatile U8*)0x48CD
 #define U_ID01		(volatile U8*)0x48CE
 #define U_ID02		(volatile U8*)0x48CF

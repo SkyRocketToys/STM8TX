@@ -26,17 +26,12 @@ void chip_init(void)
     gpio_config(PIN_POWER, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
 
     // switches.
-    gpio_config(PIN_USER, GPIO_INPUT_FLOAT);
-#if OLD_SPIDERMAN_TX
-#else
     gpio_config(PIN_SW1, GPIO_INPUT_PULLUP);
     gpio_config(PIN_SW2, GPIO_INPUT_PULLUP);
     gpio_config(PIN_SW3, GPIO_INPUT_PULLUP);
     gpio_config(PIN_SW4, GPIO_INPUT_PULLUP);
-#if PRODUCT==2
     gpio_config(PIN_SW5, GPIO_INPUT_PULLUP);
-#endif
-#endif
+    gpio_config(PIN_SW6, GPIO_INPUT_FLOAT);
 }
 
 // -----------------------------------------------------------------------------

@@ -8,7 +8,6 @@
 
 
 #if PRODUCT==1
-#define OLD_SPIDERMAN_TX 0
 #define SUPPORT_CYPRESS 1
 #define SUPPORT_BEKEN 0
 #define SUPPORT_CC2500 0
@@ -17,7 +16,6 @@
 #endif
 
 #if PRODUCT==2
-#define OLD_SPIDERMAN_TX 0 // We dont have hardware yet so use an old Tx
 #define SUPPORT_CYPRESS 0
 #define SUPPORT_BEKEN 1
 #define SUPPORT_CC2500 0
@@ -25,7 +23,6 @@
 #endif
 
 #if PRODUCT==3
-#define OLD_SPIDERMAN_TX 0 // We dont have hardware yet
 #define SUPPORT_CYPRESS 0
 #define SUPPORT_BEKEN 0
 #define SUPPORT_CC2500 1
@@ -55,7 +52,7 @@ C5 | RADIO_SCK    |
 C6 | RADIO_MOSI   |
 C7 | RADIO_MISO   |
 D0 | BUTTON_MODE  | (SW1)
-D1 | SWIM         | (SW1?)
+D1 | SWIM         |
 D2 | RADIO_CE     |
 D3 | LED_GPS      |
 D4 | BEEP         |
@@ -148,48 +145,15 @@ RADIO_PACTL | B5
 // -----------------------------------------------------------------------------
 // hardware specific pin mapping and chip setup
 // -----------------------------------------------------------------------------
-#if OLD_SPIDERMAN_TX
+#define PIN_POWER   (GPIO_PORTB|GPIO_PIN4) // PWR
+#define LED_GREEN   (GPIO_PORTD|GPIO_PIN3) // LED_GPS
+#define LED_YELLOW  (GPIO_PORTD|GPIO_PIN7) // LED_MODE
 
-#define PIN_POWER  (GPIO_PORTD|GPIO_PIN6) // PWR
-#define LED_GREEN  (GPIO_PORTD|GPIO_PIN7) // LED_GPS
-#define LED_YELLOW (GPIO_PORTD|GPIO_PIN7) // LED_MODE
-
-// beken radio
-#define RADIO_CE    (GPIO_PORTA|GPIO_PIN2) // RADIO_CE
-#define RADIO_NCS   (GPIO_PORTE|GPIO_PIN5) // RADIO_CS
-#define RADIO_INT   (GPIO_PORTB|GPIO_PIN5) // RADIO_IRQ
-
-// SPI setup
-#define SPI_NCS_PIN RADIO_NCS
-#define SPI_SCK     (GPIO_PORTC|GPIO_PIN5) // RADIO_SCK
-#define SPI_MOSI    (GPIO_PORTC|GPIO_PIN6) // RADIO_MOSI
-#define SPI_MISO    (GPIO_PORTC|GPIO_PIN7) // RADIO_MISO
-
-// buttons
-#define PIN_SW1  (GPIO_NONE) // BUTTON_LL (launch/land)
-#define PIN_SW2  (GPIO_NONE) // BUTTON_GPS
-#define PIN_SW3  (GPIO_NONE) // BUTTON_VIDEO
-#define PIN_SW4  (GPIO_NONE) // BUTTON_STUNT
-
-#define PIN_LEFT_BUTTON  PIN_SW3
-#define PIN_RIGHT_BUTTON PIN_SW4
-#define PIN_POWER_BUTTON PIN_USER
-
-#define PIN_USER (GPIO_PORTD|GPIO_PIN1)    // PD1 = SWIM = user
-#define RADIO_TXEN  (GPIO_PORTA|GPIO_PIN1) //
-#define RADIO_RST   (GPIO_NONE) //
-#define SPI_NSS_HW  (GPIO_PORTE|GPIO_PIN5) //
-
-#else // Proper hardware
-
-#define PIN_POWER  (GPIO_PORTB|GPIO_PIN4) // PWR
-#define LED_GREEN  (GPIO_PORTD|GPIO_PIN3) // LED_GPS
-#define LED_YELLOW (GPIO_PORTD|GPIO_PIN7) // LED_MODE
-
-// cypress radio
+// radio module
 #define RADIO_CE    (GPIO_PORTD|GPIO_PIN2) // RADIO_CE
 #define RADIO_NCS   (GPIO_PORTC|GPIO_PIN4) // RADIO_CS
 #define RADIO_INT   (GPIO_PORTC|GPIO_PIN3) // RADIO_IRQ
+#define RADIO_TXEN  (GPIO_PORTB|GPIO_PIN5) // RADIO_PACTL
 
 // SPI setup
 #define SPI_NCS_PIN RADIO_NCS
@@ -198,29 +162,13 @@ RADIO_PACTL | B5
 #define SPI_MISO    (GPIO_PORTC|GPIO_PIN7) // RADIO_MISO
 
 // buttons
-#define PIN_SW1  (GPIO_PORTE|GPIO_PIN5) // BUTTON_LL (launch/land)
-#define PIN_SW2  (GPIO_PORTC|GPIO_PIN1) // BUTTON_GPS
-#define PIN_SW3  (GPIO_PORTA|GPIO_PIN2) // BUTTON_VIDEO
-#define PIN_SW4  (GPIO_PORTA|GPIO_PIN1) // BUTTON_STUNT
+#define PIN_SW1     (GPIO_PORTD|GPIO_PIN0) // BUTTON_MODE
+#define PIN_SW2     (GPIO_PORTE|GPIO_PIN5) // BUTTON_LL (launch/land)
+#define PIN_SW3     (GPIO_PORTC|GPIO_PIN1) // BUTTON_GPS
+#define PIN_SW4     (GPIO_PORTA|GPIO_PIN1) // BUTTON_STUNT
+#define PIN_SW5     (GPIO_PORTA|GPIO_PIN2) // BUTTON_VIDEO
+#define PIN_SW6     (GPIO_PORTC|GPIO_PIN2) // BUTTON_USER
 
-#define PIN_LEFT_BUTTON  PIN_SW3
-#define PIN_RIGHT_BUTTON PIN_SW4
-#define PIN_POWER_BUTTON PIN_USER
-
-#if PRODUCT==1 // 2017 cypress radio tx
-#define PIN_USER (GPIO_PORTB|GPIO_PIN5)    //
-#define RADIO_TXEN  (GPIO_PORTC|GPIO_PIN2) //
-#define RADIO_RST   (GPIO_PORTD|GPIO_PIN0) //
-#define SPI_NSS_HW  (GPIO_PORTE|GPIO_PIN5) //
-#endif
-#if PRODUCT==2 // 2018 beken radio tx (pins B5 and C2 swapped)
-#define RADIO_TXEN (GPIO_PORTB|GPIO_PIN5) // RADIO_PACTL
-#define PIN_USER   (GPIO_PORTC|GPIO_PIN2) // USER
-//#define RADIO_RST   (GPIO_PORTD|GPIO_PIN0) // ### BUTTON_MODE
-#define PIN_SW5  (GPIO_PORTD|GPIO_PIN0) // BUTTON_MODE
-#define SPI_NSS_HW  (GPIO_PORTE|GPIO_PIN5) // ### BUTTON_LL
-#endif
-#endif
 
 // -----------------------------------------------------------------------------
 
@@ -246,8 +194,8 @@ RADIO_PACTL | B5
 
 
 // time to power off, ms
-#define POWER_OFF_MS 2000
-#define POWER_OFF_DISARMED_MS 500
+#define POWER_OFF_DISARMED_MS 500 // Quick power off (if we are connected to a drone and it is disarmed)
+#define POWER_OFF_MS 2000 // Slow power off (all situations)
 
 // battery sense analog
 #define PIN_VBAT (GPIOF|GPIO_PIN4)

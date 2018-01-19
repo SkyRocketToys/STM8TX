@@ -14,8 +14,8 @@ void adc_irq(void);
 enum adc_channel {
 	STICK_ROLL     = 1, ///< Right joystick horizontal axis
 	STICK_PITCH    = 0, ///< Right joystick vertical axis
-	STICK_THROTTLE = 3, ///< Left joystick vertical axis
-	STICK_YAW      = 2, ///< Left joystick horizontal axis
+	STICK_THROTTLE = 2, ///< Left joystick vertical axis
+	STICK_YAW      = 3, ///< Left joystick horizontal axis
 };
 
 /** @}*/

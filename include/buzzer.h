@@ -20,6 +20,7 @@ void buzzer_tone(enum beep_tone tone, uint16_t width_ms, uint8_t repeats);
 void buzzer_tune(uint8_t t);
 void buzzer_tune_add(uint16_t offset, const uint8_t *data, uint8_t length);
 void buzzer_play_pending(void);
+void buzzer_silent(void);
 
 /** The index into the tune table. */
 enum tune_index {

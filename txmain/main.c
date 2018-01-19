@@ -58,15 +58,9 @@
 INTERRUPT_HANDLER(ADC1_IRQHandler, 22) {
     adc_irq();
 }
-#if OLD_SPIDERMAN_TX
-INTERRUPT_HANDLER(EXTI_PORTB_IRQHandler, 4) {
-    radio_irq();
-}
-#else
 INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5) {
     radio_irq();
 }
-#endif
 INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
     timer_irq();
 }
@@ -75,7 +69,7 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
 // get buttons without power button
 static uint8_t get_buttons_no_power(void)
 {
-    return get_buttons() & ~BUTTON_POWER;
+    return get_buttons_held() & ~BUTTON_POWER;
 }
 
 // -----------------------------------------------------------------------------
@@ -129,33 +123,30 @@ static void check_stick_activity(void)
         }
     }
     // any button counts as activity
-#if OLD_SPIDERMAN_TX
-#else
-	if ((gpio_get(PIN_RIGHT_BUTTON)==0) ||
-        (gpio_get(PIN_LEFT_BUTTON)==0) ||
-        (gpio_get(PIN_SW1)==0) ||
+	if ((gpio_get(PIN_SW1)==0) ||
         (gpio_get(PIN_SW2)==0) ||
-        (gpio_get(PIN_USER)!=0)) {
+        (gpio_get(PIN_SW3)==0) ||
+        (gpio_get(PIN_SW4)==0) ||
+        (gpio_get(PIN_SW5)==0) ||
+        (gpio_get(PIN_SW6)!=0)) {
         active = true;
     }
-#endif
     if (active) {
         last_stick_activity = timer_get_ms();
     }
 
+	// Detect the power going off in the interrupt
     if (power_off_disarm) {
         // if the user holds down power button for
         // POWER_OFF_DISARMED_MS and the vehicle is disarmed then
         // power off
         if (timer_get_ms() - last_link_ms < 1500 &&
             (t_status.flags & TELEM_FLAG_ARMED) == 0) {
-            printf("power off disarmed\r\n");
-            gpio_clear(PIN_POWER);
+			printf("DisarmedPwrOff\r\n");
             disableInterrupts();
-			printf("MainPwrOff\r\n");
-            buzzer_tune(TONE_ERROR_TUNE);
-            // loop forever
-            while (true) ;
+			buzzer_silent();
+            gpio_clear(PIN_POWER);
+			for (;;) {} // loop forever
         }
     }
 
@@ -208,7 +199,7 @@ static void status_update(bool have_link)
 
     int8_t FCC_chan = get_FCC_chan();
     uint8_t FCC_power = get_FCC_power();
-    uint8_t buttons = get_buttons();
+    uint8_t buttons = get_buttons_held();
     uint8_t desired_mode;
 
     if (FCC_chan != -1) {
@@ -264,8 +255,11 @@ static void status_update(bool have_link)
         uint8_t time_since_activity_s = time_since_activity >> 10;
         if (time_since_activity_s > 180) {
             // clear power control
-            printf("powering off\r\n");
+            printf("BoredPowerOff\r\n");
+            disableInterrupts();
+			buzzer_silent();
             gpio_clear(PIN_POWER);
+			for (;;) {} // loop forever
         }
         if (time_since_activity_s > 170) {
             buzzer_tune(TONE_INACTIVITY);
@@ -388,6 +382,23 @@ static void status_update(bool have_link)
 }
 
 // -----------------------------------------------------------------------------
+// For debugging the hardware, display the values
+void display_sticks(void)
+{
+	uint16_t val;
+	val = channel_value(0);
+	printf("Throttle: %d ", val+1000);
+	val = channel_value(1);
+	printf("Roll: %d ", val+1000);
+	val = channel_value(2);
+	printf("Pitch: %d ", val+1000);
+	val = channel_value(3);
+	printf("Yaw: %d ", val+1000);
+	val = get_buttons_held();
+	printf("Buttons: %d%d%d%d%d%d\r\n", (val&1)!=0, (val&2)!=0, (val&4)!=0, (val&8)!=0, (val&16)!=0, (val&32)!=0);
+}
+
+// -----------------------------------------------------------------------------
 /** Main entry point for the program */
 void main(void)
 {
@@ -506,7 +517,7 @@ void main(void)
 
 		printf("%u: ADC=[%u %u %u %u] B:0x%x PWR:%u",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
-               (unsigned)get_buttons(), get_tx_power());
+               (unsigned)get_buttons_held(), get_tx_power());
         if (FCC_chan != -1) {
             printf(" FCC %d CW:%u\r\n", FCC_chan, fcc_CW_mode);
         } else if (telem_pps == 0) {
@@ -531,6 +542,7 @@ void main(void)
             update_leds();
             check_stick_activity();
         }
+		display_sticks();
         if (FCC_chan != -1) {
             next_ms += 400;
         } else {

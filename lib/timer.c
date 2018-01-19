@@ -49,8 +49,8 @@ void timer_irq(void)
             g_callback_t_ms = 0;
             g_callback();
         }
-#if 000 // Why poweroff here?
-        pin_user = gpio_get(PIN_USER);
+
+		pin_user = gpio_get(PIN_SW6); // Active high
         if (!pin_user) {
             // only activate if its been off at least once since boot
             activate_power_pin = true;
@@ -58,20 +58,26 @@ void timer_irq(void)
         if (pin_user && activate_power_pin) {
             power_pin_count++;
             if (power_pin_count > POWER_OFF_DISARMED_MS) {
-                power_off_disarm = true;
+                power_off_disarm = true; // Quick poweroff - if disarmed
             }
-            if (power_pin_count > POWER_OFF_MS) {
-                // clear power control - this should kill the cpu
+            if (power_pin_count > POWER_OFF_MS) { // Force power off
+                // clear power control - this should kill the cpu (once the user releases the button)
+				printf("ForcePwrOff\r\n");
+				buzzer_silent();
                 gpio_clear(PIN_POWER);
-				printf("PwrOff\r\n");
-                buzzer_tune(TONE_ERROR_TUNE); // Play an error tune since we should be turned off by now
-                // loop forever
-                while (true) ;
+				// We are now waiting for the user to release the power button
+				for (;;)
+				{
+			        gpio_set(LED_GREEN);
+			        gpio_clear(LED_GREEN);
+			        gpio_set(LED_YELLOW);
+			        gpio_clear(LED_YELLOW);
+				}
             }
         } else {
             power_pin_count = 0;
         }
-#endif
+
 #if SUPPORT_BEKEN
 		if (++radio_timer_count >= 5) // Every 5ms
 		{

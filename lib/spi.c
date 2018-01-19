@@ -29,11 +29,8 @@ void spi_init(void)
     gpio_config(SPI_SCK, GPIO_OUTPUT_PUSHPULL);
     gpio_config(SPI_MOSI, GPIO_OUTPUT_PUSHPULL);
     gpio_config(SPI_MISO, GPIO_INPUT_PULLUP);
-
     // we don't use the HW NSS, pin for SPI, it is a user switch instead
-#if SUPPORT_BEKEN
-    gpio_config(SPI_NSS_HW, GPIO_INPUT_PULLUP); // This line belongs elsewhere really since it is PIN_SW1
-#endif
+
     gpio_config(RADIO_NCS, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
 #if SUPPORT_BEKEN
     gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);

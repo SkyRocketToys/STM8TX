@@ -441,4 +441,11 @@ void buzzer_play_pending(void)
     buzzer_tune(TONE_PENDING);
 }
 
+// -----------------------------------------------------------------------------
+void buzzer_silent(void)
+{
+    temp_tune_pending = false;
+	stop_note();
+}
+
 /** @}*/
