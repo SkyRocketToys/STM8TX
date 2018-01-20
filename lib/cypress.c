@@ -820,6 +820,8 @@ static void write_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len)
     progmem_lock();
 }
 
+static uint8_t last_mode;
+
 static void process_telem_packet(const struct telem_packet *pkt)
 {
     switch (pkt->type) {
@@ -830,14 +832,27 @@ static void process_telem_packet(const struct telem_packet *pkt)
             // adjust power level on the fly
             dsm.tx_max_power = t_status.tx_max-1;
         }
+        if (t_status.flight_mode != last_mode) {
+            uint8_t i;
+            printf("mode: %u ", t_status.flight_mode);
+            for (i=0; i<14; i++) {
+                printf("%x ", pkt->payload.pkt[i]);
+            }
+            printf("\n");
+            last_mode = t_status.flight_mode;
+        }
+        dsm.telem_recv_count++;
         break;
     case TELEM_FW:
     case TELEM_PLAY: {
         struct telem_firmware fw;
         memcpy(&fw, &pkt->payload.fw, sizeof(fw));
+        printf("FW type=%u ofs=%u len=%u\n", pkt->type, fw.offset, fw.len);
         fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
         if (pkt->type == TELEM_FW) {
-            write_flash_copy(fw.offset, &fw.data[0], fw.len);
+            if (fw.offset < 16*1024 && fw.len <= 8) {
+                write_flash_copy(fw.offset, &fw.data[0], fw.len);
+            }
         } else {
             buzzer_tune_add(fw.offset, &fw.data[0], fw.len);
         }
@@ -862,18 +877,16 @@ static void irq_handler_recv(uint8_t rx_status)
     }
 
     rlen = read_register(CYRF_RX_COUNT);
-    if (rlen > 16) {
-        rlen = 16;
+    if (rlen != 16) {
+        printf("rlen=%u\n", rlen);
+        spi_read_registers(CYRF_RX_BUFFER, (uint8_t *)&pkt, 16);
+        return;
     }
-    if (rlen > 0) {
-        spi_read_registers(CYRF_RX_BUFFER, (uint8_t *)&pkt, rlen);
-    }
-
+    spi_read_registers(CYRF_RX_BUFFER, (uint8_t *)&pkt, rlen);
     crc = crc_crc8((uint8_t*)&pkt.type, 15);
     if (crc == pkt.crc) {
         dsm.rssi_sum += read_register(CYRF_RSSI) & 0x1F;
         dsm.rssi_count++;
-        dsm.telem_recv_count++;
         process_telem_packet(&pkt);
     }
 }
