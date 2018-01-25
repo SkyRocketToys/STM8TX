@@ -31,20 +31,29 @@ if %month%==12 set month=dec
 set FW_BOOTNAME=BootRelease_%PRODUCT%
 set FW_BUILDNAME=Debug_%PRODUCT%
 
-set FW_NAME=FW_TX_%PRODUCT%_%BUILDTYPE%_%REVISION%_%day%%month%%year%.s19
-set FW_INFILE=EWSTM8\%FW_BUILDNAME%\Exe\StreamingTransmitter.s19
-rem set FW_OUTFILE=T:\SkyRocketToys\firmware2018\%ProductDir%%FW_NAME%
+set FW_NAME=FW_TX_%PRODUCT%_%BUILDTYPE%_%REVISION%_%day%%month%%year%.hex
+set FW_INFILE=iar_combined.ihx
+set FW_OUTFILE=T:\SkyRocketToys\firmware2018\%ProductDir%%FW_NAME%
 
 rem Build the firmware
 %IARBUILD% iar/BootLoader.ewp -build  %FW_BOOTNAME% -log info
 IF %ERRORLEVEL% NEQ 0 goto err2
 %IARBUILD% iar/StreamingTransmitter.ewp -build  %FW_BUILDNAME% -log info
 IF %ERRORLEVEL% NEQ 0 goto err1
+
 rem Merge the boot and firmware files
-rem ...
+WinTools\cheese.exe dat2dat iar\BootRelease_Beken\Exe\BootLoader.hex iar_boot.bin
+del iar_boot.h
+WinTools\cheese.exe dat2dat iar\Debug_Beken\Exe\StreamingTransmitter.hex iar_txmain.bin
+del iar_txmain.h
+WinTools\cheese.exe extract iar_combined.bin -pad 255 -i iar_boot.bin 0 $8700 -i iar_txmain.bin $8700 $3900 -i iar_txmain.bin $86fa $3900
+del iar_combined.h
+WinTools\cheese.exe dat2dat iar_combined.bin iar_combined.ihx -outrange $8000 $4000
+del iar_combined.h
+
 rem Move it to the right location
-rem copy /b %FW_INFILE% %FW_OUTFILE%
-rem echo "Firmware copied from " %FW_INFILE% " to " %FW_OUTFILE%
+copy /b %FW_INFILE% %FW_OUTFILE%
+echo "Firmware copied from " %FW_INFILE% " to " %FW_OUTFILE%
 goto end
 
 :err2
