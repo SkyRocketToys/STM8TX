@@ -60,7 +60,6 @@ struct telem_packet {
     } payload;
 };
 
-
 /** Type of telemetry data */
 enum tx_telem_type {
     TXTELEM_RSSI = 0, ///< The data word is the RSSI

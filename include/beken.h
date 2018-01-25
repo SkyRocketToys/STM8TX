@@ -26,8 +26,6 @@ uint8_t get_FCC_power(void);
 #define radio_set_CW_mode beken_set_CW_mode
 #define radio_change_FCC_channel beken_change_FCC_channel
 #define radio_FCC_toggle_scan beken_FCC_toggle_scan
-
-uint8_t LookupChannel(uint8_t idx);
-void ChangeChannel(uint8_t channelNumber);
+bool CheckUpdateFccParams(void); // Returns true if something happened
 
 #endif

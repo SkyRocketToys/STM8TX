@@ -28,6 +28,11 @@
 @{ */
 
 // ----------------------------------------------------------------------------
+// Prototypes
+void BK2425_ChangeChannel(uint8_t channelNumber);
+uint8_t LookupChannel(uint8_t idx);
+
+// ----------------------------------------------------------------------------
 // Packet format definition
 // ----------------------------------------------------------------------------
 
@@ -103,8 +108,6 @@ typedef struct packetDataDfu_s {
 // ----------------------------------------------------------------------------
 
 
-#define RADIO_NRF24 0
-#define RADIO_BEKEN 1 // We are using the Beken BK2425 chip
 #define TX_SPEED 250u // Default transmit speed in kilobits per second.
 
 #define PACKET_LENGTH_TX_CTRL 12
@@ -120,7 +123,6 @@ enum CHANNEL_MHZ_e {
 	CHANNEL_FCC_LOW = 10, ///< Minimum physical channel that will pass the FCC tests
 	CHANNEL_FCC_HIGH = 72, ///< Maximum physical channel that will pass the FCC tests
 	CHANNEL_FCC_MID = 41, ///< A representative physical channel
-	CHANNEL_TEST_MODE = 41, ///< Frequency to use for testing
 };
 
 /** The baud rate of the GFSK modulation */
@@ -128,6 +130,7 @@ typedef enum ITX_SPEED_e {
 	ITX_250,  ///< 250kbps (slowest but furthest range)
 	ITX_1000, ///< 1000kbps (balanced)
 	ITX_2000, ///< 2000kbps (fastest hence least congested)
+	ITX_CARRIER, ///< 0kbps carrier test
 	ITX_MAX
 } ITX_SPEED;
 
@@ -148,9 +151,7 @@ typedef enum BK_SPI_CMD_e {
 	BK_REG_MASK        = 0x1F,  ///< The range of registers that can be read and written
 	BK_READ_REG        = 0x00,  ///< Define read command to register (0..1F)
 	BK_WRITE_REG       = 0x20,  ///< Define write command to register (0..1F)
-#if RADIO_BEKEN
 	BK_ACTIVATE_CMD	   = 0x50,  ///<
-#endif
 	BK_R_RX_PL_WID_CMD = 0x60,
 	BK_RD_RX_PLOAD     = 0x61,  ///< Define RX payload register address
 	BK_WR_TX_PLOAD     = 0xA0,  ///< Define TX payload register address
@@ -188,7 +189,6 @@ typedef enum BK_SPI_CMD_e {
 	BK_FIFO_STATUS     = 0x17,  ///< 'FIFO Status Register' register address
 	BK_DYNPD           = 0x1c,  ///< 'Enable dynamic payload length' register address
 	BK_FEATURE         = 0x1d,  ///< 'Feature' register address
-#if RADIO_BEKEN
 	BK_PAYLOAD_WIDTH   = 0x1f,  ///< 'payload length of 256 bytes modes register address
 
 // BK2425 bank 1 register addresses
@@ -198,7 +198,6 @@ typedef enum BK_SPI_CMD_e {
 	BK2425_R1_12     = 0x0C, ///< PLL speed 120 or 130us
 	BK2425_R1_13     = 0x0D, ///<
 	BK2425_R1_14     = 0x0E, ///<
-#endif
 } BK_SPI_CMD;
 
 enum {
@@ -207,9 +206,7 @@ enum {
 
 /** Meanings of the BK_STATUS register */
 enum BK_STATUS_e {
-#if RADIO_BEKEN
 	BK_STATUS_RBANK = 0x80, ///< Register bank 1 is in use
-#endif
 	BK_STATUS_RX_DR = 0x40, ///< Data ready
 	BK_STATUS_TX_DS = 0x20, ///< Data sent
 	BK_STATUS_MAX_RT = 0x10, ///< Max retries failed
@@ -288,7 +285,6 @@ enum {
 };
 
 // (Lets make it one radio interface for both projects)
-#if RADIO_BEKEN
 #define PLL_SPEED { BK2425_R1_12, 0x00,0x12,0x73,0x05 } // 0x00127305ul, // PLL locking time 130us compatible with nRF24L01;
 
 const uint8_t Bank1_RegTable[ITX_MAX][IREG_MAX][5]={
@@ -315,14 +311,22 @@ const uint8_t Bank1_RegTable[ITX_MAX][IREG_MAX][5]={
 		PLL_SPEED,                                              // REG12
 		{ BK2425_R1_13, 0x36,0xb4,0x80,0x00 }, // 0x36B48000ul, // REG13
 		{ BK2425_R1_4,  0xff,0x96,0x82,0xdb }, // 0xdb8296f9ul, // REG4 2Mbps
+	},
+	// (TX_SPEED == 0u)
+	{
+		{ BK2425_R1_4,  0xf9,0x96,0x82,0x21 }, // 0xF9968221ul, // REG4 carrier
+		{ BK2425_R1_5,  0x24,0x06,0x0f,0xb6 }, // 0xB60F0624ul, // REG5 250kbps
+		PLL_SPEED,                                              // REG12
+		{ BK2425_R1_13, 0x36,0xb4,0x80,0x00 }, // 0x36B48000ul, // REG13
+		{ BK2425_R1_4,  0xff,0x96,0x82,0x21 }, // 0xDB8A96f9ul, // REG4 250kbps
 	}
 };
-#endif
 
 static const uint8_t Bank0_Reg6[ITX_MAX][2] = {
 	{BK_RF_SETUP,   0x27}, //  250kbps (6) 0x27=250kbps
 	{BK_RF_SETUP,   0x07}, // 1000kbps (6) 0x07=1Mbps, high gain, high txpower
 	{BK_RF_SETUP,   0x2F}, // 2000kbps (6) 0x2F=2Mbps, high gain, high txpower
+	{BK_RF_SETUP,   0x37}, //  250kbps (6) 0x10=carrier
 };
 
 static const uint8_t Bank1_Reg14[]=
@@ -371,28 +375,59 @@ static const uint8_t Bank0_Reg[][2]={
 
 // -----------------------------------------------------------------------------
 // Variables
-uint8_t TX0_Address[5]; // Base address of ctrl tx
-uint8_t TX1_Address[5]; // Base address of binding tx
-uint8_t RX0_Address[5]; // Base address of telemetry/dfu rx
-uint8_t RX1_Address[5]; // ditto
-
-struct telem_status t_status;
 uint8_t op_status; // Last status byte read in transaction
 volatile uint8_t bkReady = 0u; // Is the beken chip ready enough for its status to be handled?
-uint8_t gLastRxLen = 0;
-uint32_t gTxPackets = 0;
-uint32_t gRxPackets = 0;
-uint8_t badRxAddress = 0;
-uint32_t recvTimestampMs = 0;
-uint32_t ackPacketCount = 0;
-uint32_t sentPacketCount = 0;
-uint8_t bFreshData = 0; // Have we received a packet since we last processed one
-packetFormatTx pktDataTx; // Packet data to send
-packetFormatRx pktDataRx;
-packetFormatRx pktDataRecv; // Packet data in process of being received
-uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL
-uint16_t lastTxPacketCount;
-uint32_t lastTelemetryPktTime = 0;
+
+/* Statistics about the radio */
+typedef struct RadioStats_s {
+	uint8_t lastRxLen;
+	uint32_t numTxPackets;
+	uint32_t numRxPackets;
+	uint8_t badRxAddress;
+	uint32_t recvTimestampMs;
+	uint32_t numAckPackets;
+	uint32_t numSentPackets;
+	uint16_t lastTxPacketCount;
+	uint32_t lastTelemetryPktTime;
+} RadioStats;
+
+/** Parameters used by the fcc pretests */
+typedef struct FccParams_s {
+    bool test_mode; ///< true iff we are sending test signals
+    bool scan_mode; ///< true for scanning, false for fixed frequencies
+	bool CW_mode; ///< true for carrier wave, false for packets
+    uint8_t scan_count; ///< In scan mode, packet count before incrementing scan
+    uint8_t channel; ///< Current frequency 8..70
+    uint8_t power; ///< Current power 0..7
+} FccParams;
+
+typedef struct RadioInfo_s {
+	RadioStats stats;
+	FccParams fcc;
+	uint8_t bFreshData; // Have we received a packet since we last processed one
+	packetFormatTx pktDataTx; // Packet data to send
+	packetFormatRx pktDataRx; // Last valid packet that has been received
+	packetFormatRx pktDataRecv; // Packet data in process of being received
+	uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL
+	uint8_t lastTxPower; // 0..7
+	bool lastTxCwMode; // 0=packet, 1=carrier wave
+	uint8_t TX0_Address[5]; // Base address of ctrl tx
+	uint8_t TX1_Address[5]; // Base address of binding tx
+	uint8_t RX0_Address[5]; // Base address of telemetry/dfu rx
+	uint8_t RX1_Address[5]; // ditto
+} RadioInfo;
+
+RadioInfo beken;
+struct telem_status t_status;
+
+// ----------------------------------------------------------------------------
+/** Kick the independant windowed watchdog so that it does not reset the CPU by timing out */
+void IWDG_Kick(void)
+{
+#if SUPPORT_WATCHDOG
+	IWDG->KR = IWDG_KEY_REFRESH; // Kick the watchdog so we don't reset
+#endif
+}
 
 
 // -----------------------------------------------------------------------------
@@ -462,7 +497,7 @@ void SPI_Write_Buf(
 
 // ----------------------------------------------------------------------------
 /** Switch the Beken radio to Rx mode */
-void SwitchToRxMode(void)
+void BK2425_SwitchToRxMode(void)
 {
 	uint8_t value;
 
@@ -475,6 +510,7 @@ void SwitchToRxMode(void)
 		nop();
 	value = SPI_Read_Reg(BK_CONFIG);	// read register CONFIG's value
 	value |= BK_CONFIG_PRIM_RX; // set bit 0
+	value |= BK_CONFIG_PWR_UP;
 	SPI_Write_Reg(BK_WRITE_REG | BK_CONFIG, value); // Set PWR_UP bit, enable CRC(2 length) & Prim:RX. RX_DR enabled..
 
 	BEKEN_CE_HIGH();
@@ -483,7 +519,7 @@ void SwitchToRxMode(void)
 
 // ----------------------------------------------------------------------------
 /** Switch the Beken radio to Tx mode */
-void SwitchToTxMode(void)
+void BK2425_SwitchToTxMode(void)
 {
 	uint8_t value;
 	SPI_Write_Cmd(BK_FLUSH_TX); // flush Tx
@@ -494,13 +530,15 @@ void SwitchToTxMode(void)
 		nop();
 	value = SPI_Read_Reg(BK_CONFIG); // read register CONFIG's value
 	value &= ~BK_CONFIG_PRIM_RX; // Clear bit 0 (PTX)
+	value |= BK_CONFIG_PWR_UP;
+
 	SPI_Write_Reg(BK_WRITE_REG | BK_CONFIG, value); // Set PWR_UP bit, enable CRC(2 length) & Prim:RX. RX_DR enabled.
 	BEKEN_CE_HIGH();
 }
 
 // ----------------------------------------------------------------------------
 /** Switch the Beken radio to Idle mode */
-void SwitchToIdleMode(void)
+void BK2425_SwitchToIdleMode(void)
 {
 	uint8_t value;
 	SPI_Write_Cmd(BK_FLUSH_TX); // flush Tx
@@ -513,7 +551,7 @@ void SwitchToIdleMode(void)
 
 // ----------------------------------------------------------------------------
 /** Switch the Beken radio to Sleep mode */
-void SwitchToSleepMode(void)
+void BK2425_SwitchToSleepMode(void)
 {
 	uint8_t value;
 
@@ -536,16 +574,14 @@ void SwitchToSleepMode(void)
 
 // ----------------------------------------------------------------------------
 /** Set which register bank we are accessing on the Beken spi chip */
-void SetRBank(
+void BK2425_SetRBank(
 	char _cfg) ///< 1=Bank1 0=Bank0
 {
-#if RADIO_BEKEN
 	uint8_t bank = SPI_Read_Status() & BK_STATUS_RBANK;
 	if (!bank != !_cfg)
 	{
 		SPI_Write_Reg(BK_ACTIVATE_CMD, 0x53);
 	}
-#endif
 }
 
 #if (TX_SPEED==250)
@@ -577,7 +613,7 @@ void BK2425_Initialize(
 	bkReady = 0;
 	gTxSpeed = spd;
 	delay_ms(100);//delay more than 50ms.
-	SetRBank(0);
+	BK2425_SetRBank(0);
 
 	//********************Write Bank0 register******************
 	for (i=20; i >= 0; i--) // From BK_FIFO_STATUS back to beginning of table
@@ -590,21 +626,18 @@ void BK2425_Initialize(
 	}
 
 	// Set the various 5 byte addresses
-	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P0),RX0_Address,5); // reg 10 - Rx0 addr
-	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P1),RX1_Address,5); // REG 11 - Rx1 addr
-	SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR),TX1_Address,5); // REG 16 - TX addr
+	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P0),beken.RX0_Address,5); // reg 10 - Rx0 addr
+	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P1),beken.RX1_Address,5); // REG 11 - Rx1 addr
+	SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR),beken.TX1_Address,5); // REG 16 - TX addr
 
-#if RADIO_BEKEN
 	i = SPI_Read_Reg(BK_FEATURE);
 	if (i == 0) // i!=0 showed that chip has been actived.so do not active again.
 		SPI_Write_Reg(BK_ACTIVATE_CMD,0x73);// Active
-#endif
 	for (i = 22; i >= 21; i--)
 		SPI_Write_Reg((BK_WRITE_REG|Bank0_Reg[i][0]),Bank0_Reg[i][1]);
 
-#if RADIO_BEKEN
 	//********************Write Bank1 register******************
-	SetRBank(1);
+	BK2425_SetRBank(1);
 	for (i = IREG1_4; i <= IREG1_13; i++)
 	{
 		const uint8_t* p = &Bank1_RegTable[spd][i][0];
@@ -628,11 +661,8 @@ void BK2425_Initialize(
 	delay_ms(100);//delay more than 50ms.
 
 	/********************switch back to Bank0 register access******************/
-	SetRBank(0);
-#else
-	delay_ms(100);
-#endif
-	SwitchToRxMode(); // switch to RX mode
+	BK2425_SetRBank(0);
+	BK2425_SwitchToRxMode(); // switch to RX mode
 	bkReady = 1;
 }
 
@@ -648,22 +678,21 @@ void BK2425_SetSpeed(
 	if (bFast)
 		spd = ITX_2000;
 	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP);
-	SwitchToSleepMode();
+	BK2425_SwitchToSleepMode();
 	BK2425_Initialize(spd);
 	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
 	bRadioFast = bFast;
 }
 
-#if RADIO_BEKEN
 // ----------------------------------------------------------------------------
 /** Write a 32-bit Bank1 register */
 void SPI_Bank1_Write_Reg(
 	uint8_t reg, ///< A spi register in bank1 to write to #BK_SPI_CMD_e
 	const uint8_t *pBuf) ///< A pointer to a 32-bit buffer to be written
 {
-	SetRBank(1);
+	BK2425_SetRBank(1);
 	SPI_Write_Buf(reg, pBuf, 4);
-	SetRBank(0);
+	BK2425_SetRBank(0);
 }
 
 // ----------------------------------------------------------------------------
@@ -672,15 +701,14 @@ void SPI_Bank1_Read_Reg(
 	uint8_t reg, ///< A spi register in bank1 to write to #BK_SPI_CMD_e
 	uint8_t *pBuf) ///< A pointer to a 32-bit buffer to be read into
 {
-	SetRBank(1);
+	BK2425_SetRBank(1);
 	spi_read_registers(reg, pBuf, 4);
-	SetRBank(0);
+	BK2425_SetRBank(0);
 }
-#endif
 
 // ----------------------------------------------------------------------------
 /** Change the radio channel */
-void ChangeChannel(
+void BK2425_ChangeChannel(
 	uint8_t channelNumber) ///< A physical radio channel. See #CHANNEL_MHZ_e
 {
 	if (channelNumber > CHANNEL_MAX_PHYSICAL)
@@ -691,7 +719,7 @@ void ChangeChannel(
 // ----------------------------------------------------------------------------
 /* Clear the radio acknowledge overflow status of the Beken chip.
 	\return true if BK_STATUS_MAX_RT was found in the set state, false otherwise */
-bool ClearAckOverflow(void)
+bool BK2425_ClearAckOverflow(void)
 {
 	uint8_t status = SPI_Read_Status();
 	if ((BK_STATUS_MAX_RT & status) == 0)
@@ -712,23 +740,23 @@ void beken_set_address(void)
 	const uint8_t* uuid = (const uint8_t*) U_ID00;
 	uint32_t address = crc_crc32(uuid, 12); // Unique chip ID (x:16, y:16, wafer:8, lot:56)
 
-	TX0_Address[0] = 0x32;
-	TX0_Address[1] = 0x99;
-	TX0_Address[2] = 0x59;
-	TX0_Address[3] = 0xC6;
-	TX0_Address[4] = 0x2D;
+	beken.TX0_Address[0] = 0x32;
+	beken.TX0_Address[1] = 0x99;
+	beken.TX0_Address[2] = 0x59;
+	beken.TX0_Address[3] = 0xC6;
+	beken.TX0_Address[4] = 0x2D;
 
-	TX1_Address[0] = 0x31;
-	TX1_Address[1] = (address >> 16) & 0xff;
-	TX1_Address[2] = 0x59;
-	TX1_Address[3] = (address >> 8) & 0xff;
-	TX1_Address[4] = (address) & 0xff;
+	beken.TX1_Address[0] = 0x31;
+	beken.TX1_Address[1] = (address >> 16) & 0xff;
+	beken.TX1_Address[2] = 0x59;
+	beken.TX1_Address[3] = (address >> 8) & 0xff;
+	beken.TX1_Address[4] = (address) & 0xff;
 
-	RX1_Address[0] = RX0_Address[0] = 0x33;
-	RX1_Address[1] = RX0_Address[1] = (address >> 16) & 0xff;
-	RX1_Address[2] = RX0_Address[2] = 0x59;
-	RX1_Address[3] = RX0_Address[3] = (address >> 8) & 0xff;
-	RX1_Address[4] = RX0_Address[4] = (address) & 0xff;
+	beken.RX1_Address[0] = beken.RX0_Address[0] = 0x33;
+	beken.RX1_Address[1] = beken.RX0_Address[1] = (address >> 16) & 0xff;
+	beken.RX1_Address[2] = beken.RX0_Address[2] = 0x59;
+	beken.RX1_Address[3] = beken.RX0_Address[3] = (address >> 8) & 0xff;
+	beken.RX1_Address[4] = beken.RX0_Address[4] = (address) & 0xff;
 }
 
 // ----------------------------------------------------------------------------
@@ -774,35 +802,130 @@ void ChangeAddressTx(
 {
 	if (txch)
 	{
-		SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR), TX1_Address, 5); // REG 16 - TX addr
+		SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR), beken.TX1_Address, 5); // REG 16 - TX addr
 	}
 	else
 	{
-		SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR), TX0_Address, 5); // REG 16 - TX addr
+		SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR), beken.TX0_Address, 5); // REG 16 - TX addr
 	}
 }
 
+#define OUTPUT_POWER_REG6_0 0 // -25dB
+#define OUTPUT_POWER_REG6_1 0 // -18dB
+#define OUTPUT_POWER_REG6_2 1 // -18dB
+#define OUTPUT_POWER_REG6_3 1 // -12dB
+#define OUTPUT_POWER_REG6_4 1 // -12dB
+#define OUTPUT_POWER_REG6_5 2 //  -7dB
+#define OUTPUT_POWER_REG6_6 3 //  -1dB
+#define OUTPUT_POWER_REG6_7 3 //  +4dB
+
+// Register 4 in bank 1 only applies to Beken chip
+#define OUTPUT_POWER_REG4_0 0 // -25dB
+#define OUTPUT_POWER_REG4_1 3 // -18dB
+#define OUTPUT_POWER_REG4_2 0 // -18dB
+#define OUTPUT_POWER_REG4_3 3 // -12dB
+#define OUTPUT_POWER_REG4_4 2 // -12dB
+#define OUTPUT_POWER_REG4_5 0 //  -7dB
+#define OUTPUT_POWER_REG4_6 0 //  -1dB
+#define OUTPUT_POWER_REG4_7 7 //  +4dB
+
+// ----------------------------------------------------------------------------
+const uint8_t RegPower[8][2] = {
+	{ OUTPUT_POWER_REG4_0, OUTPUT_POWER_REG6_0 },
+	{ OUTPUT_POWER_REG4_1, OUTPUT_POWER_REG6_1 },
+	{ OUTPUT_POWER_REG4_2, OUTPUT_POWER_REG6_2 },
+	{ OUTPUT_POWER_REG4_3, OUTPUT_POWER_REG6_3 },
+	{ OUTPUT_POWER_REG4_4, OUTPUT_POWER_REG6_4 },
+	{ OUTPUT_POWER_REG4_5, OUTPUT_POWER_REG6_5 },
+	{ OUTPUT_POWER_REG4_6, OUTPUT_POWER_REG6_6 },
+	{ OUTPUT_POWER_REG4_7, OUTPUT_POWER_REG6_7 },
+};
+
 // ----------------------------------------------------------------------------
 /** Change the radio output power of the Beken radio chip */
-void ChangeOutputPower(
+/** Must be done on main thread since it is slow */
+void BK2425_SetTxPower(
 	uint8_t power) ///< power value
 {
-	uint8_t setup;
-	if (power > 3)
+	uint8_t oldready = bkReady;
+	if (power > 7)
 		return;
-	setup = SPI_Read_Reg(BK_RF_SETUP);
-	setup &= ~(3 << 1);
-	setup |= (power << 1);
-	SPI_Write_Reg((BK_WRITE_REG|BK_RF_SETUP), setup);
+
+	bkReady = 0;
+	IWDG_Kick();
+	delay_ms(100); // delay more than 50ms.
+	BK2425_SetRBank(1);
+	{
+		const uint8_t* p = &Bank1_RegTable[beken.lastTxCwMode ? ITX_CARRIER : gTxSpeed][IREG1_4][0];
+		uint8_t idx = *p++;
+		uint8_t buf[4];
+		buf[0] = *p++;
+		buf[1] = *p++;
+		buf[2] = *p++;
+		buf[3] = *p++;
+		buf[0] &= ~0x38;
+		buf[0] |= (RegPower[power][0] << 3); // Bits 27..29
+		SPI_Write_Buf((BK_WRITE_REG|idx), buf, 4);
+	}
+	IWDG_Kick();
+	delay_ms(100); // delay more than 50ms.
+	IWDG_Kick();
+	BK2425_SetRBank(0);
+	delay_ms(100);
+	IWDG_Kick();
+
+	{
+		uint8_t setup = SPI_Read_Reg(BK_RF_SETUP);
+		setup &= ~(3 << 1);
+		setup |= (RegPower[power][1] << 1); // Bits 1..2
+		if (beken.lastTxCwMode)
+			setup |= 0x10;
+		SPI_Write_Reg((BK_WRITE_REG|BK_RF_SETUP), setup);
+	}
+	beken.lastTxPower = power;
+	bkReady = oldready;
 }
 
 // ----------------------------------------------------------------------------
-/** Kick the independant windowed watchdog so that it does not reset the CPU by timing out */
-void IWDG_Kick(void)
+/** Enable/disable the carrier sending mode */
+/** Must be done on main thread since it is slow */
+void BK2425_SetCarrierMode(
+	uint8_t cw) ///< carrier mode
 {
-#if SUPPORT_WATCHDOG
-	IWDG->KR = IWDG_KEY_REFRESH; // Kick the watchdog so we don't reset
-#endif
+	uint8_t oldready = bkReady;
+	bkReady = 0;
+	IWDG_Kick();
+	delay_ms(100); // delay more than 50ms.
+	BK2425_SetRBank(1);
+	{
+		const uint8_t* p = &Bank1_RegTable[cw ? ITX_CARRIER : gTxSpeed][IREG1_4][0];
+		uint8_t idx = *p++;
+		uint8_t buf[4];
+		buf[0] = *p++;
+		buf[1] = *p++;
+		buf[2] = *p++;
+		buf[3] = *p++;
+		buf[0] &= ~0x38;
+		buf[0] |= (RegPower[beken.lastTxPower][0] << 3); // Bits 27..29
+		SPI_Write_Buf((BK_WRITE_REG|idx), buf, 4);
+	}
+	IWDG_Kick();
+	delay_ms(100); // delay more than 50ms.
+	IWDG_Kick();
+	BK2425_SetRBank(0);
+	delay_ms(100);
+	IWDG_Kick();
+
+	{
+		uint8_t setup = SPI_Read_Reg(BK_RF_SETUP);
+		setup &= ~(3 << 1);
+		setup |= (RegPower[beken.lastTxPower][1] << 1); // Bits 1..2
+		if (cw)
+			setup |= 0x10;
+		SPI_Write_Reg((BK_WRITE_REG|BK_RF_SETUP), setup);
+	}
+	beken.lastTxCwMode = cw;
+	bkReady = oldready;
 }
 
 // ----------------------------------------------------------------------------
@@ -815,11 +938,11 @@ bool Send_Packet(
 {
 	// read register FIFO_STATUS's value
 	uint8_t fifo_sta = SPI_Read_Reg(BK_FIFO_STATUS);	// read register FIFO_STATUS's value
-	bool returnValue = ClearAckOverflow();
+	bool returnValue = BK2425_ClearAckOverflow();
 
 	if (!(fifo_sta & BK_FIFO_STATUS_TX_FULL)) // if not full, send data
 	{
-		gTxPackets++;
+		beken.stats.numTxPackets++;
 		SPI_Write_Buf(type, pbuf, len); // Writes data to buffer A0,B0,A8
 	}
 
@@ -839,9 +962,9 @@ uint8_t Receive_Packet(
 	{
 		do
 		{
-			gRxPackets++;
+			beken.stats.numRxPackets++;
 			len = SPI_Read_Reg(BK_R_RX_PL_WID_CMD);	// read received packet length in bytes
-			gLastRxLen = len;
+			beken.stats.lastRxLen = len;
 
 			if (len <= PACKET_LENGTH_RX_MAX)
 			{
@@ -873,13 +996,9 @@ void FlushTx(void)
 	\return BK_CHIP_ID_BK2425 */
 uint8_t Get_Chip_ID(void)
 {
-#if RADIO_BEKEN
 	uint8_t ReadArr[4];
 	SPI_Bank1_Read_Reg(BK2425_R1_WHOAMI, ReadArr);
 	return ReadArr[0];
-#else
-	return 99; // Correct value
-#endif
 }
 
 // ----------------------------------------------------------------------------
@@ -1010,7 +1129,7 @@ void beken_init(void)
 	// Should now be in Rx mode
 	// Configure radio interrupt
 	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
-	SwitchToRxMode();
+	BK2425_SwitchToRxMode();
 }
 
 // ----------------------------------------------------------------------------
@@ -1018,7 +1137,7 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 {
 	if (rx->packetType == BK_PKT_TYPE_TELEMETRY)
 	{
-		lastTelemetryPktTime = timer_get_ms();
+		beken.stats.lastTelemetryPktTime = timer_get_ms();
 	}
 	else if (rx->packetType == BK_PKT_TYPE_DFU)
 	{
@@ -1035,8 +1154,8 @@ void beken_irq(void)
 	if (bk_sta & BK_STATUS_TX_DS)
 	{
 		// Packet was sent successfully (not yet acknowledged)
-		sentPacketCount++;
-		SwitchToRxMode(); // Prepare to receive reply
+		beken.stats.numSentPackets++;
+		BK2425_SwitchToRxMode(); // Prepare to receive reply
 	}
 	if (bk_sta & BK_STATUS_MAX_RT)
 	{
@@ -1053,13 +1172,13 @@ void beken_irq(void)
 		}
 		else
 		{
-			badRxAddress++;
+			beken.stats.badRxAddress++;
 		}
-		ackPacketCount++;
-		bFreshData = 1;
-		Receive_Packet((uint8_t *)&pktDataRecv);
-		memcpy(&pktDataRx, &pktDataRecv, sizeof(pktDataRx));
-		ProcessPacket(&pktDataRx, rxstd);
+		beken.stats.numAckPackets++;
+		beken.bFreshData = 1;
+		Receive_Packet((uint8_t *)&beken.pktDataRecv);
+		memcpy(&beken.pktDataRx, &beken.pktDataRecv, sizeof(beken.pktDataRx));
+		ProcessPacket(&beken.pktDataRx, rxstd);
 	}
 
 	// Clear the bits
@@ -1069,7 +1188,9 @@ void beken_irq(void)
 // ----------------------------------------------------------------------------
 static bool isDisconnected(void)
 {
-	return (lastTelemetryPktTime == 0) || (timer_get_ms() > lastTelemetryPktTime + 1000);
+	if (beken.fcc.test_mode)
+		return false;
+	return (beken.stats.lastTelemetryPktTime == 0) || (timer_get_ms() > beken.stats.lastTelemetryPktTime + 1000);
 }
 
 // ----------------------------------------------------------------------------
@@ -1079,51 +1200,93 @@ void UpdateTxData(void)
 {
 	static uint8_t txInfo = 0;
 	uint16_t val;
+	packetFormatTx* tx = &beken.pktDataTx;
 
 	// Base values for this packet type
-	pktDataTx.packetType = isDisconnected() ? BK_PKT_TYPE_CTRL_LOST : BK_PKT_TYPE_CTRL_FOUND; ///< The packet type
-//	pktDataTx.channel;
-	pktDataTx.u.ctrl.lsb = 0;
-	pktDataTx.u.ctrl.buttons_held = get_buttons_held();
-	pktDataTx.u.ctrl.buttons_toggled = get_buttons_toggled();
-	pktDataTx.u.ctrl.data_type = 0;
-	pktDataTx.u.ctrl.data_value_lo = 0;
-	pktDataTx.u.ctrl.data_value_hi = 0;
+	tx->packetType = isDisconnected() ? BK_PKT_TYPE_CTRL_LOST : BK_PKT_TYPE_CTRL_FOUND; ///< The packet type
+//	tx->channel;
+	tx->u.ctrl.lsb = 0;
+	tx->u.ctrl.buttons_held = get_buttons_held();
+	tx->u.ctrl.buttons_toggled = get_buttons_toggled();
+	tx->u.ctrl.data_type = 0;
+	tx->u.ctrl.data_value_lo = 0;
+	tx->u.ctrl.data_value_hi = 0;
 
 	// Put in the stick values
 	val = channel_value(0);
-	pktDataTx.u.ctrl.throttle = val >> 2;
-	pktDataTx.u.ctrl.lsb |= (val & 3) << 0;
+	tx->u.ctrl.throttle = val >> 2;
+	tx->u.ctrl.lsb |= (val & 3) << 0;
 	val = channel_value(1);
-	pktDataTx.u.ctrl.roll = val >> 2;
-	pktDataTx.u.ctrl.lsb |= (val & 3) << 2;
+	tx->u.ctrl.roll = val >> 2;
+	tx->u.ctrl.lsb |= (val & 3) << 2;
 	val = channel_value(2);
-	pktDataTx.u.ctrl.pitch = val >> 2;
-	pktDataTx.u.ctrl.lsb |= (val & 3) << 4;
+	tx->u.ctrl.pitch = val >> 2;
+	tx->u.ctrl.lsb |= (val & 3) << 4;
 	val = channel_value(3);
-	pktDataTx.u.ctrl.yaw = val >> 2;
-	pktDataTx.u.ctrl.lsb |= (val & 3) << 6;
+	tx->u.ctrl.yaw = val >> 2;
+	tx->u.ctrl.lsb |= (val & 3) << 6;
 
 	// Put in the extra data fields
 	if (++txInfo >= INFO_MAX)
 		txInfo = 1;
 	val = gFwInfo[txInfo];
-	pktDataTx.u.ctrl.data_type = txInfo;
-	pktDataTx.u.ctrl.data_value_lo = val & 0xff;
-	pktDataTx.u.ctrl.data_value_hi = (val >> 8) & 0xff;
+	tx->u.ctrl.data_type = txInfo;
+	tx->u.ctrl.data_value_lo = val & 0xff;
+	tx->u.ctrl.data_value_hi = (val >> 8) & 0xff;
 }
 
 // ----------------------------------------------------------------------------
 void UpdateTxBindData(void)
 {
-	pktDataTx.packetType = BK_PKT_TYPE_BIND;
-//	pktDataTx.channel;
-	pktDataTx.u.bind.bind_address[0] = RX0_Address[0];
-	pktDataTx.u.bind.bind_address[1] = RX0_Address[1];
-	pktDataTx.u.bind.bind_address[2] = RX0_Address[2];
-	pktDataTx.u.bind.bind_address[3] = RX0_Address[3];
-	pktDataTx.u.bind.bind_address[4] = RX0_Address[4];
-	pktDataTx.u.bind.hopping = 0;
+	packetFormatTx* tx = &beken.pktDataTx;
+
+	tx->packetType = BK_PKT_TYPE_BIND;
+//	tx->channel;
+	tx->u.bind.bind_address[0] = beken.RX0_Address[0];
+	tx->u.bind.bind_address[1] = beken.RX0_Address[1];
+	tx->u.bind.bind_address[2] = beken.RX0_Address[2];
+	tx->u.bind.bind_address[3] = beken.RX0_Address[3];
+	tx->u.bind.bind_address[4] = beken.RX0_Address[4];
+	tx->u.bind.hopping = 0;
+}
+
+// ----------------------------------------------------------------------------
+// Prepare to send a FCC packet
+static void UpdateFccScan(void)
+{
+	// Support scan mode
+    if (beken.fcc.scan_mode) {
+        beken.fcc.scan_count++;
+        if (beken.fcc.scan_count >= 200) {
+            beken.fcc.scan_count = 0;
+            beken.fcc.channel += 2; // Go up by 2Mhz
+            if (beken.fcc.channel >= CHANNEL_FCC_HIGH) {
+                beken.fcc.channel = CHANNEL_FCC_LOW;
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+/** From the main thread, we must check to see if (slow) parameter changes are needed */
+bool CheckUpdateFccParams(void)
+{
+	bool result = false;
+	if (beken.fcc.test_mode)
+	{
+		// Set the power
+		if (beken.lastTxPower != beken.fcc.power) {
+			BK2425_SetTxPower(beken.fcc.power);
+			result = true;
+		}
+
+		// Set CW mode
+		if (beken.fcc.CW_mode != beken.lastTxCwMode) {
+			BK2425_SetCarrierMode(beken.fcc.CW_mode);
+			result = true;
+		}
+	}
+	return result;
 }
 
 // ----------------------------------------------------------------------------
@@ -1138,10 +1301,19 @@ void beken_timer_irq(void)
 		return;
 
 	// Change to the next (non-ignored) channel
-	txChannel = NextChannelIndex(txChannel);
-	ChangeChannel(LookupChannel(txChannel));
+	if (beken.fcc.test_mode)
+	{
+		UpdateFccScan();
+		BK2425_ChangeChannel(beken.fcc.channel);
+		txChannel = 0;
+	}
+	else
+	{
+		txChannel = NextChannelIndex(txChannel);
+		BK2425_ChangeChannel(LookupChannel(txChannel));
+	}
 	FlushTx(); // Discard any buffered tx bytes
-	ClearAckOverflow();
+	BK2425_ClearAckOverflow();
 
 	// Support sending binding packets
 	if (isDisconnected())
@@ -1149,33 +1321,34 @@ void beken_timer_irq(void)
 		if (++bindTimer >= 7)
 		{
 			bindTimer = 0;
-			SwitchToIdleMode();
+			BK2425_SwitchToIdleMode();
 			ChangeAddressTx(1); // Binding address
-			SwitchToTxMode();
+			BK2425_SwitchToTxMode();
 			UpdateTxBindData();
-			pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
-			lastTxChannel = txChannel;
-			Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&pktDataTx, PACKET_LENGTH_TX_BIND);
+			beken.pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
+			beken.lastTxChannel = txChannel;
+			Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_BIND);
 			return;
 		}
 		else if (bindTimer == 0)
 		{
-			SwitchToIdleMode();
+			BK2425_SwitchToIdleMode();
 			ChangeAddressTx(0); // Unique address for this controls
 		}
 	}
 	else if (bindTimer != 99)
 	{
 		bindTimer = 99;
-		SwitchToIdleMode();
+		BK2425_SwitchToIdleMode();
 		ChangeAddressTx(0); // Unique address for this controls
 	}
-	SwitchToTxMode();
+	BK2425_SwitchToTxMode();
 	UpdateTxData();
-	pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
-	lastTxChannel = txChannel;
-	lastTxPacketCount++;
-	Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&pktDataTx, PACKET_LENGTH_TX_CTRL);
+	beken.pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
+	beken.lastTxChannel = txChannel;
+	beken.stats.lastTxPacketCount++;
+	if (!beken.lastTxCwMode)
+		Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_CTRL);
 }
 
 // ----------------------------------------------------------------------------
@@ -1196,7 +1369,9 @@ void beken_start_send(void)
 /** Start sending an FCC test packet */
 void beken_start_FCC_test(void)
 {
-	//...
+    beken.fcc.channel = CHANNEL_FCC_LOW;
+    beken.fcc.power = 7;
+    beken.fcc.test_mode = true;
 }
 
 // ----------------------------------------------------------------------------
@@ -1211,7 +1386,7 @@ void beken_start_factory_test(
 /** Set the next FCC power */
 void beken_next_FCC_power(void)
 {
-	//...
+    beken.fcc.power = (beken.fcc.power+1) & 7;
 }
 
 // ----------------------------------------------------------------------------
@@ -1219,7 +1394,7 @@ void beken_next_FCC_power(void)
 void beken_set_CW_mode(
 	bool cw) ///< false=normal, true=carrier wave
 {
-	//...
+    beken.fcc.CW_mode = cw;
 }
 
 // ----------------------------------------------------------------------------
@@ -1227,29 +1402,43 @@ void beken_set_CW_mode(
 void beken_change_FCC_channel(
 	int8_t change) ///< ?
 {
-	//...
+    switch (beken.fcc.channel) {
+    case CHANNEL_FCC_LOW:
+        beken.fcc.channel = change==1?CHANNEL_FCC_MID:CHANNEL_FCC_HIGH;
+        break;
+    case CHANNEL_FCC_MID:
+        beken.fcc.channel = change==1?CHANNEL_FCC_HIGH:CHANNEL_FCC_LOW;
+        break;
+    default:
+    case CHANNEL_FCC_HIGH:
+        beken.fcc.channel = change==1?CHANNEL_FCC_LOW:CHANNEL_FCC_MID;
+        break;
+    }
 }
 
 // ----------------------------------------------------------------------------
 /** Toggle the FCC scan */
 void beken_FCC_toggle_scan(void)
 {
-	//...
+	beken.fcc.scan_mode = !beken.fcc.scan_mode;
+    if (!beken.fcc.scan_mode) {
+        beken.fcc.channel = CHANNEL_FCC_LOW;
+    }
 }
 
 // ----------------------------------------------------------------------------
-/** Get the current tx power */
+/** Get the current tx power (for debug output) */
 uint8_t get_tx_power(void)
 {
-	//...
-	return 0;
+	return beken.lastTxPower;
 }
 
 // ----------------------------------------------------------------------------
 /** Get the current FCC channel */
 int8_t get_FCC_chan(void)
 {
-	//...
+	if (beken.fcc.test_mode)
+		return beken.fcc.channel;
 	return -1; // We are not in fcc mode
 }
 
@@ -1257,7 +1446,8 @@ int8_t get_FCC_chan(void)
 /** Get the current FCC power */
 uint8_t get_FCC_power(void)
 {
-	//...
+	if (beken.fcc.test_mode)
+		return beken.fcc.power;
 	return 0;
 }
 

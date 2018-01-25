@@ -7,7 +7,7 @@
 #endif
 
 
-#if PRODUCT==1
+#if PRODUCT==1 // Cypress
 #define SUPPORT_CYPRESS 1
 #define SUPPORT_BEKEN 0
 #define SUPPORT_CC2500 0
@@ -15,14 +15,14 @@
 #define SUPPORT_PROTOCOL 1 // Protocol 1 = cypress channels
 #endif
 
-#if PRODUCT==2
+#if PRODUCT==2 // Beken
 #define SUPPORT_CYPRESS 0
 #define SUPPORT_BEKEN 1
 #define SUPPORT_CC2500 0
 #define SUPPORT_PROTOCOL 2 // Protocol 2 = raw channels
 #endif
 
-#if PRODUCT==3
+#if PRODUCT==3 // TI
 #define SUPPORT_CYPRESS 0
 #define SUPPORT_BEKEN 0
 #define SUPPORT_CC2500 1

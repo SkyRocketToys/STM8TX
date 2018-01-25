@@ -385,6 +385,7 @@ static void status_update(bool have_link)
 // For debugging the hardware, display the values
 void display_sticks(void)
 {
+	int8_t FCC_chan = get_FCC_chan();
 	uint16_t val;
 	val = channel_value(0);
 	printf("Throttle: %d ", val+1000);
@@ -396,13 +397,19 @@ void display_sticks(void)
 	printf("Yaw: %d ", val+1000);
 	val = get_buttons_held();
 	printf("Buttons: %d%d%d%d%d%d\r\n", (val&1)!=0, (val&2)!=0, (val&4)!=0, (val&8)!=0, (val&16)!=0, (val&32)!=0);
+
+    if (FCC_chan != -1) {
+        printf(" FCC %d CW:%u\r\n", FCC_chan, fcc_CW_mode);
+    }
 }
 
 // -----------------------------------------------------------------------------
 /** Main entry point for the program */
 void main(void)
 {
+#if SUPPORT_CYPRESS
     uint16_t counter=0;
+#endif
     uint32_t next_ms;
     uint8_t factory_mode = 0;
 
@@ -434,26 +441,11 @@ void main(void)
 
     // wait for initial stick inputs
     delay_ms(200);
-#if SUPPORT_CYPRESS
     switch (get_buttons_no_power()) {
     case BUTTON_LEFT | BUTTON_RIGHT:
         printf("FCC test start\r\n");
         radio_start_FCC_test();
         break;
-
-    case BUTTON_LEFT:
-        printf("DSM2 bind\r\n");
-        eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
-        radio_start_bind_send(true);
-        break;
-
-#if SUPPORT_DSMX
-    case BUTTON_RIGHT:
-        printf("DSMX bind\r\n");
-        eeprom_write(EEPROM_DSMPROT_OFFSET, 0);
-        radio_start_bind_send(false);
-        break;
-#endif
 
     case BUTTON_LEFT_SHOULDER: {
         uint16_t adc0 = adc_value(0);
@@ -483,15 +475,33 @@ void main(void)
         break;
     }
 
+#if SUPPORT_CYPRESS
+    case BUTTON_LEFT:
+        printf("DSM2 bind\r\n");
+        eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
+        radio_start_bind_send(true);
+        break;
+
+#if SUPPORT_DSMX
+    case BUTTON_RIGHT:
+        printf("DSMX bind\r\n");
+        eeprom_write(EEPROM_DSMPROT_OFFSET, 0);
+        radio_start_bind_send(false);
+        break;
+#endif
+
     default: {
         bool use_dsm2 = eeprom_read(EEPROM_DSMPROT_OFFSET);
         radio_start_send(use_dsm2);
         break;
     }
-    }
 #else
-	radio_start_send(false);
+	default: {
+		radio_start_send(false);
+		break;
+	}
 #endif
+    }
 
     note_adjust = eeprom_read(EEPROM_NOTE_ADJUST);
     if (note_adjust > 40) {
@@ -541,6 +551,7 @@ void main(void)
         status_update(link_ok);
 
         while (timer_get_ms() < next_ms) {
+			CheckUpdateFccParams();
             update_leds();
             check_stick_activity();
         }
