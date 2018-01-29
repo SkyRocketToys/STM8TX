@@ -148,6 +148,7 @@ enum control_mode_t {
     AVOID_ADSB =   19,  // automatic avoidance of obstacles in the macro scale - e.g. full-sized aircraft
     GUIDED_NOGPS = 20,  // guided mode but only accepts attitude and altitude
     FLOWHOLD     = 21,  // hold with flow sensor
+    FLOWHOLD2    = 22,  // hold with flow sensor
 };
 
 static bool fcc_CW_mode;
@@ -270,7 +271,7 @@ static void status_update(bool have_link)
 
     if (desired_mode == THROW && (t_status.flags & TELEM_FLAG_ARMED)) {
         green_led_pattern = LED_PATTERN_RAPID;
-    } else if (desired_mode == ALT_HOLD || desired_mode == FLOWHOLD) {
+    } else if (desired_mode == ALT_HOLD || desired_mode == FLOWHOLD || desired_mode == FLOWHOLD2) {
         // GPS LED always off in "indoor" mode
         green_led_pattern = LED_PATTERN_OFF;
     } else {
@@ -292,7 +293,7 @@ static void status_update(bool have_link)
             last_batt_warn_ms = now;
             buzzer_tune(TONE_BATT_WARNING);
         }
-    } else if (desired_mode == FLOWHOLD) {
+    } else if (desired_mode == FLOWHOLD || desired_mode == FLOWHOLD2) {
         // indoor mode LED short blink
         yellow_led_pattern = LED_PATTERN_HIGH;
     } else if (desired_mode == ALT_HOLD ||
