@@ -643,6 +643,9 @@ static void scan_channels(void)
             // avoid low and high channels
             rssi[i/2] = 0xff;
             i += 2;
+            if (i >= DSM_MAX_CHANNEL) {
+                break;
+            }
             continue;
         }
 
