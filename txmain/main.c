@@ -33,7 +33,7 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
 // get buttons without power button
 static uint8_t get_buttons_no_power(void)
 {
-    return get_buttons() & ~BUTTON_POWER;
+    return get_buttons() & ~BUTTON_USER;
 }
 
 /*
@@ -72,8 +72,8 @@ extern uint8_t note_adjust;
 static void update_leds(void)
 {
     uint8_t tick = (timer_get_ms() >> 6) & 0xF;
-    led_yellow_set(yellow_led_pattern & (1U<<tick));
-    led_green_set(green_led_pattern & (1U<<tick));
+    led_mode_set(yellow_led_pattern & (1U<<tick));
+    led_gps_set(green_led_pattern & (1U<<tick));
 }
 
 /*
@@ -90,11 +90,7 @@ static void check_stick_activity(void)
         }
     }
     // any button counts as activity
-    if ((gpio_get(PIN_RIGHT_BUTTON)==0) ||
-        (gpio_get(PIN_LEFT_BUTTON)==0) ||
-        (gpio_get(PIN_SW1)==0) ||
-        (gpio_get(PIN_SW2)==0) ||
-        (gpio_get(PIN_USER)!=0)) {
+    if (get_buttons_no_power() != 0) {
         active = true;
     }
     if (active) {
@@ -171,7 +167,7 @@ static void status_update(bool have_link)
     if (FCC_chan != -1) {
         yellow_led_pattern = LED_PATTERN_FCC;
         green_led_pattern = LED_PATTERN_FCC;
-        if (buttons == BUTTON_RIGHT) {
+        if (buttons == BUTTON_MODE) {
             uint8_t i;
             radio_next_FCC_power();
             FCC_power = get_FCC_power();
@@ -181,17 +177,17 @@ static void status_update(bool have_link)
                 delay_ms(100);
             }
         }
-        if (buttons == BUTTON_POWER) {
+        if (buttons == BUTTON_GPS) {
             fcc_CW_mode = !fcc_CW_mode;
             radio_set_CW_mode(fcc_CW_mode);
             buzzer_tune(fcc_CW_mode?TONE_LOITER:TONE_ALT_HOLD);
             printf("CW mode %u\n", fcc_CW_mode);
         }
-        if (buttons == BUTTON_LEFT_SHOULDER) {
+        if (buttons == BUTTON_LL) {
             radio_change_FCC_channel(1);
             buzzer_tune(TONE_RX_SEARCH);
         }
-        if (buttons == BUTTON_RIGHT_SHOULDER) {
+        if (buttons == BUTTON_STUNT) {
             radio_FCC_toggle_scan();
             buzzer_tune(TONE_RX_SEARCH);
         }
@@ -354,7 +350,7 @@ void main(void)
     led_init();
 
     // give indication of power on quickly for user
-    led_yellow_set(true);
+    led_mode_set(true);
     
     adc_init();
     spi_init();
@@ -376,26 +372,18 @@ void main(void)
     delay_ms(200);
 
     switch (get_buttons_no_power()) {
-    case BUTTON_LEFT | BUTTON_RIGHT:
+    case BUTTON_LL | BUTTON_MODE:
         printf("FCC test start\n");
         radio_start_FCC_test();
         break;
         
-    case BUTTON_LEFT:
-        printf("DSM2 bind\n");
+    case BUTTON_LL:
+        printf("Start bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
         radio_start_bind_send(true);
         break;
 
-#if SUPPORT_DSMX
-    case BUTTON_RIGHT:
-        printf("DSMX bind\n");
-        eeprom_write(EEPROM_DSMPROT_OFFSET, 0);
-        radio_start_bind_send(false);
-        break;
-#endif
-
-    case BUTTON_LEFT_SHOULDER: {
+    case BUTTON_STUNT: {
         uint16_t adc0 = adc_value(0);
         uint16_t adc1 = adc_value(1);
         uint16_t adc2 = adc_value(2);
@@ -424,8 +412,7 @@ void main(void)
     }
         
     default: {
-        bool use_dsm2 = eeprom_read(EEPROM_DSMPROT_OFFSET);
-        radio_start_send(use_dsm2);
+        radio_start_send(true);
         break;
     }
     }

@@ -18,41 +18,42 @@ void chip_init(void)
     gpio_config(PIN_SW2, GPIO_INPUT_PULLUP);
     gpio_config(PIN_SW3, GPIO_INPUT_PULLUP);
     gpio_config(PIN_SW4, GPIO_INPUT_PULLUP);
-    gpio_config(PIN_USER, GPIO_INPUT_FLOAT);
-    gpio_config(PIN_MODE, GPIO_INPUT_PULLUP);
+    gpio_config(PIN_SW5, GPIO_INPUT_PULLUP);
+    gpio_config(PIN_SW6, GPIO_INPUT_PULLUP);
 }
 
 void led_init(void)
 {
-    gpio_config(LED_GREEN|LED_YELLOW, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
+    gpio_config(LED_GPS,  GPIO_OUTPUT_PUSHPULL|GPIO_SET);
+    gpio_config(LED_MODE, GPIO_OUTPUT_PUSHPULL|GPIO_SET);
 }
 
-void led_green_set(bool set)
+void led_gps_set(bool set)
 {
     if (!set) {
-        gpio_set(LED_GREEN);
+        gpio_set(LED_GPS);
     } else {
-        gpio_clear(LED_GREEN);
+        gpio_clear(LED_GPS);
     }
 }
 
-void led_yellow_set(bool set)
+void led_mode_set(bool set)
 {
     if (set) {
-        gpio_clear(LED_YELLOW);
+        gpio_clear(LED_MODE);
     } else {
-        gpio_set(LED_YELLOW);
+        gpio_set(LED_MODE);
     }
 }
 
-void led_green_toggle(void)
+void led_gps_toggle(void)
 {
-    gpio_toggle(LED_GREEN);
+    gpio_toggle(LED_GPS);
 }
 
-void led_yellow_toggle(void)
+void led_mode_toggle(void)
 {
-    gpio_toggle(LED_YELLOW);
+    gpio_toggle(LED_MODE);
 }
 
 void delay_ms(uint16_t d)

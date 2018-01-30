@@ -8,11 +8,13 @@
  */
 uint16_t channel_value(uint8_t chan);
 
-#define BUTTON_LEFT 0x01
-#define BUTTON_RIGHT 0x02
-#define BUTTON_LEFT_SHOULDER 0x04
-#define BUTTON_RIGHT_SHOULDER 0x08
-#define BUTTON_POWER 0x10
+// map button values to an 8 bit mask
+#define BUTTON_MODE   0x01
+#define BUTTON_LL     0x02
+#define BUTTON_GPS    0x04
+#define BUTTON_STUNT  0x08
+#define BUTTON_VIDEO  0x10
+#define BUTTON_USER   0x20
 
 // get buttons
 uint8_t get_buttons(void);

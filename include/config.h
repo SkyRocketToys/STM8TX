@@ -2,9 +2,27 @@
   hardware specific pin mapping and chip setup
  */
 
+// SWn pins
+#define PIN_SW1 (GPIO_PORTD|GPIO_PIN1) // shared with SWIM
+#define PIN_SW2 (GPIO_PORTE|GPIO_PIN5) // launch/land
+#define PIN_SW3 (GPIO_PORTC|GPIO_PIN1) // GPS
+#define PIN_SW4 (GPIO_PORTA|GPIO_PIN1) // stunt
+#define PIN_SW5 (GPIO_PORTA|GPIO_PIN2) // video
+#define PIN_SW6 (GPIO_PORTC|GPIO_PIN2) // user
+
+// named buttons
+#define PIN_MODE_BUTTON  PIN_SW1
+#define PIN_LL_BUTTON    PIN_SW2
+#define PIN_GPS_BUTTON   PIN_SW3
+#define PIN_STUNT_BUTTON PIN_SW4
+#define PIN_VIDEO_BUTTON PIN_SW5
+#define PIN_USER_BUTTON  PIN_SW6
+
+
 #define PIN_POWER  (GPIO_PORTB|GPIO_PIN4)
-#define LED_GREEN  (GPIO_PORTD|GPIO_PIN3) // LED_GPS
-#define LED_YELLOW (GPIO_PORTD|GPIO_PIN7) // LED_MODE
+
+#define LED_GPS  (GPIO_PORTD|GPIO_PIN3)
+#define LED_MODE (GPIO_PORTD|GPIO_PIN7)
 
 
 // cypress radio
@@ -41,20 +59,6 @@
 #endif
 
 
-// buttons
-#define PIN_SW1  (GPIO_PORTE|GPIO_PIN5) // BUTTON_LAUNCH_LAND
-#define PIN_SW2  (GPIO_PORTC|GPIO_PIN1) // BUTTON_GPS
-#define PIN_SW3  (GPIO_PORTA|GPIO_PIN2) // BUTTON_VIDEO
-#define PIN_SW4  (GPIO_PORTA|GPIO_PIN1) // BUTTON_STUNT
-#define PIN_USER (GPIO_PORTC|GPIO_PIN2) // user power on
-#define PIN_MODE (GPIO_PORTD|GPIO_PIN0) // BUTTON_MODE
-
-#define PIN_LEFT_BUTTON  PIN_SW1
-#define PIN_RIGHT_BUTTON PIN_SW2
-#define PIN_POWER_BUTTON PIN_USER
-#define PIN_LAUNCH_LAND_BUTTON PIN_SW1
-#define PIN_GPS_BUTTON PIN_SW2
-
 // time to power off, ms
 #define POWER_OFF_MS 2000
 #define POWER_OFF_DISARMED_MS 500
@@ -65,12 +69,7 @@
 // location in flash of new firmware
 #define NEW_FIRMWARE_BASE 0xC000
 
-// should we support DSMX ?
-#define SUPPORT_DSMX 0
-
 // stick inputs on PB2, PB3, PB1 and PB0
-
-// SWIM on PD1
 
 #define UART_TX (GPIO_PORTD|GPIO_PIN5)
 #define UART_RX (GPIO_PORTD|GPIO_PIN6)

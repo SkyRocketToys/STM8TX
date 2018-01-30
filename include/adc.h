@@ -6,5 +6,5 @@ void adc_irq(void);
 // mode2 stick mapping
 #define STICK_ROLL     1
 #define STICK_PITCH    0
-#define STICK_THROTTLE 3
-#define STICK_YAW      2
+#define STICK_THROTTLE 2
+#define STICK_YAW      3

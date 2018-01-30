@@ -33,7 +33,7 @@ void timer_irq(void)
             g_callback_t_ms = 0;
             g_callback();
         }
-        pin_user = gpio_get(PIN_USER);
+        pin_user = gpio_get(PIN_USER_BUTTON);
         if (!pin_user) {
             // only activate if its been off at least once since boot
             activate_power_pin = true;
