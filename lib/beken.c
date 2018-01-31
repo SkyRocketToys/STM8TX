@@ -151,7 +151,7 @@ typedef enum BK_SPI_CMD_e {
 	BK_REG_MASK        = 0x1F,  ///< The range of registers that can be read and written
 	BK_READ_REG        = 0x00,  ///< Define read command to register (0..1F)
 	BK_WRITE_REG       = 0x20,  ///< Define write command to register (0..1F)
-	BK_ACTIVATE_CMD	   = 0x50,  ///<
+	BK_ACTIVATE_CMD	   = 0x50,  ///< Must NOT have BK_WRITE_REG added to it
 	BK_R_RX_PL_WID_CMD = 0x60,
 	BK_RD_RX_PLOAD     = 0x61,  ///< Define RX payload register address
 	BK_WR_TX_PLOAD     = 0xA0,  ///< Define TX payload register address
@@ -283,6 +283,8 @@ enum {
 	IREG1_4A,
 	IREG_MAX
 };
+
+// Note that bank 1 registers 0...8 are MSB first; others are LSB first
 
 // (Lets make it one radio interface for both projects)
 #define PLL_SPEED { BK2425_R1_12, 0x00,0x12,0x73,0x05 } // 0x00127305ul, // PLL locking time 130us compatible with nRF24L01;
@@ -503,7 +505,7 @@ void BK2425_SwitchToRxMode(void)
 
 	SPI_Write_Cmd(BK_FLUSH_RX); // flush Rx
  	value = SPI_Read_Status(); // read register STATUS's value
-	SPI_Write_Reg(BK_WRITE_REG|BK_STATUS, value); // clear RX_DR or TX_DS or MAX_RT interrupt flag
+	SPI_Write_Reg(BK_WRITE_REG | BK_STATUS, value); // clear RX_DR or TX_DS or MAX_RT interrupt flag
 
 	BEKEN_CE_LOW();
 	for (value = 0; value < 40; ++value)
@@ -558,7 +560,7 @@ void BK2425_SwitchToSleepMode(void)
 	SPI_Write_Cmd(BK_FLUSH_RX); // flush Rx
  	SPI_Write_Cmd(BK_FLUSH_TX); // flush Tx
  	value = SPI_Read_Status(); // read register STATUS's value
-	SPI_Write_Reg(BK_WRITE_REG|BK_STATUS, value); // clear RX_DR or TX_DS or MAX_RT interrupt flag
+	SPI_Write_Reg(BK_WRITE_REG | BK_STATUS, value); // clear RX_DR or TX_DS or MAX_RT interrupt flag
 
 	BEKEN_PA_LOW();
 	BEKEN_CE_LOW();
@@ -580,7 +582,7 @@ void BK2425_SetRBank(
 	uint8_t bank = SPI_Read_Status() & BK_STATUS_RBANK;
 	if (!bank != !_cfg)
 	{
-		SPI_Write_Reg(BK_ACTIVATE_CMD, 0x53);
+		SPI_Write_Reg(BK_ACTIVATE_CMD, 0x53); // Note: Must NOT have BK_WRITE_REF added to it
 	}
 }
 
@@ -622,19 +624,21 @@ void BK2425_Initialize(
 		uint8_t value = Bank0_Reg[i][1];
 		if (idx == BK_RF_SETUP) // Adjust for speed
 			value = Bank0_Reg6[spd][1];
-		SPI_Write_Reg((BK_WRITE_REG|idx), value);
+		SPI_Write_Reg((BK_WRITE_REG | idx), value);
 	}
 
 	// Set the various 5 byte addresses
-	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P0),beken.RX0_Address,5); // reg 10 - Rx0 addr
-	SPI_Write_Buf((BK_WRITE_REG|BK_RX_ADDR_P1),beken.RX1_Address,5); // REG 11 - Rx1 addr
-	SPI_Write_Buf((BK_WRITE_REG|BK_TX_ADDR),beken.TX1_Address,5); // REG 16 - TX addr
+	SPI_Write_Buf((BK_WRITE_REG | BK_RX_ADDR_P0), beken.RX0_Address, 5); // reg 10 - Rx0 addr
+	SPI_Write_Buf((BK_WRITE_REG | BK_RX_ADDR_P1), beken.RX1_Address, 5); // REG 11 - Rx1 addr
+	SPI_Write_Buf((BK_WRITE_REG | BK_TX_ADDR), beken.TX1_Address, 5); // REG 16 - TX addr
 
+	// Enable the feature register and set it
 	i = SPI_Read_Reg(BK_FEATURE);
-	if (i == 0) // i!=0 showed that chip has been actived.so do not active again.
-		SPI_Write_Reg(BK_ACTIVATE_CMD,0x73);// Active
+	if (i == 0) // i!=0 shows that chip has already been activated. So do not toggle activation.
+		SPI_Write_Reg(BK_ACTIVATE_CMD, 0x73); // Note: Must NOT have BK_WRITE_REF added to it
+	// Now that BK_FEATURE and BK_DYNPD are activated, use them
 	for (i = 22; i >= 21; i--)
-		SPI_Write_Reg((BK_WRITE_REG|Bank0_Reg[i][0]),Bank0_Reg[i][1]);
+		SPI_Write_Reg((BK_WRITE_REG | Bank0_Reg[i][0]), Bank0_Reg[i][1]);
 
 	//********************Write Bank1 register******************
 	BK2425_SetRBank(1);
@@ -713,7 +717,7 @@ void BK2425_ChangeChannel(
 {
 	if (channelNumber > CHANNEL_MAX_PHYSICAL)
 		return;
-	SPI_Write_Reg((BK_WRITE_REG|BK_RF_CH), channelNumber);
+	SPI_Write_Reg((BK_WRITE_REG | BK_RF_CH), channelNumber);
 }
 
 // ----------------------------------------------------------------------------
@@ -728,7 +732,7 @@ bool BK2425_ClearAckOverflow(void)
 	}
 	else
 	{
-		SPI_Write_Reg((BK_WRITE_REG|BK_STATUS), BK_STATUS_MAX_RT);
+		SPI_Write_Reg((BK_WRITE_REG | BK_STATUS), BK_STATUS_MAX_RT);
     	return true;
 	}
 }
@@ -740,17 +744,17 @@ void beken_set_address(void)
 	const uint8_t* uuid = (const uint8_t*) U_ID00;
 	uint32_t address = crc_crc32(uuid, 12); // Unique chip ID (x:16, y:16, wafer:8, lot:56)
 
-	beken.TX0_Address[0] = 0x32;
-	beken.TX0_Address[1] = 0x99;
+	beken.TX0_Address[0] = 0x31;
+	beken.TX0_Address[1] = (address >> 16) & 0xff;
 	beken.TX0_Address[2] = 0x59;
-	beken.TX0_Address[3] = 0xC6;
-	beken.TX0_Address[4] = 0x2D;
+	beken.TX0_Address[3] = (address >> 8) & 0xff;
+	beken.TX0_Address[4] = (address) & 0xff;
 
-	beken.TX1_Address[0] = 0x31;
-	beken.TX1_Address[1] = (address >> 16) & 0xff;
+	beken.TX1_Address[0] = 0x32;
+	beken.TX1_Address[1] = 0x99;
 	beken.TX1_Address[2] = 0x59;
-	beken.TX1_Address[3] = (address >> 8) & 0xff;
-	beken.TX1_Address[4] = (address) & 0xff;
+	beken.TX1_Address[3] = 0xC6;
+	beken.TX1_Address[4] = 0x2D;
 
 	beken.RX1_Address[0] = beken.RX0_Address[0] = 0x33;
 	beken.RX1_Address[1] = beken.RX0_Address[1] = (address >> 16) & 0xff;
@@ -880,7 +884,7 @@ void BK2425_SetTxPower(
 		setup |= (RegPower[power][1] << 1); // Bits 1..2
 		if (beken.lastTxCwMode)
 			setup |= 0x10;
-		SPI_Write_Reg((BK_WRITE_REG|BK_RF_SETUP), setup);
+		SPI_Write_Reg((BK_WRITE_REG | BK_RF_SETUP), setup);
 	}
 	beken.lastTxPower = power;
 	bkReady = oldready;
@@ -922,7 +926,7 @@ void BK2425_SetCarrierMode(
 		setup |= (RegPower[beken.lastTxPower][1] << 1); // Bits 1..2
 		if (cw)
 			setup |= 0x10;
-		SPI_Write_Reg((BK_WRITE_REG|BK_RF_SETUP), setup);
+		SPI_Write_Reg((BK_WRITE_REG | BK_RF_SETUP), setup);
 	}
 	beken.lastTxCwMode = cw;
 	bkReady = oldready;
@@ -974,7 +978,7 @@ uint8_t Receive_Packet(
 			}
 			else // Packet was too long
 			{
-				SPI_Write_Reg(BK_FLUSH_RX, 0); // flush Rx
+				SPI_Write_Cmd(BK_FLUSH_RX); // flush Rx
 			}
 			fifo_sta = SPI_Read_Reg(BK_FIFO_STATUS);	// read register FIFO_STATUS's value
 		} while (!(fifo_sta & BK_FIFO_STATUS_RX_EMPTY)); // while not empty
@@ -1182,7 +1186,7 @@ void beken_irq(void)
 	}
 
 	// Clear the bits
-	SPI_Write_Reg((BK_WRITE_REG|BK_STATUS), (BK_STATUS_MAX_RT | BK_STATUS_TX_DS | BK_STATUS_RX_DR));
+	SPI_Write_Reg((BK_WRITE_REG | BK_STATUS), (BK_STATUS_MAX_RT | BK_STATUS_TX_DS | BK_STATUS_RX_DR));
 }
 
 // ----------------------------------------------------------------------------
@@ -1330,7 +1334,7 @@ void beken_timer_irq(void)
 			Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_BIND);
 			return;
 		}
-		else if (bindTimer == 0)
+		else if (bindTimer == 1)
 		{
 			BK2425_SwitchToIdleMode();
 			ChangeAddressTx(0); // Unique address for this controls
