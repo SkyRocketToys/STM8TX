@@ -826,7 +826,7 @@ static void write_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len)
 
 static uint8_t last_mode;
 
-static void process_telem_packet(const struct telem_packet *pkt)
+static void process_telem_packet(const struct telem_packet_cypress *pkt)
 {
     switch (pkt->type) {
     case TELEM_STATUS:
@@ -871,7 +871,7 @@ static void process_telem_packet(const struct telem_packet *pkt)
  */
 static void irq_handler_recv(uint8_t rx_status)
 {
-    struct telem_packet pkt;
+    struct telem_packet_cypress pkt;
     uint8_t rlen;
     uint8_t crc;
     
