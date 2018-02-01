@@ -469,7 +469,7 @@ void main(void)
         if (FCC_chan != -1) {
             next_ms += 400;
         } else {
-            next_ms += 800;
+            next_ms += 1000;
         }
     }
 }
