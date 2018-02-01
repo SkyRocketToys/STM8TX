@@ -388,6 +388,7 @@ void main(void)
         uint16_t adc1 = adc_value(1);
         uint16_t adc2 = adc_value(2);
         uint16_t adc3 = adc_value(3);
+        uint16_t adc4 = adc_value(4);
         if (adc3 > 800 && adc2 > 300 && adc2 < 700) {
             factory_mode = 1;
         } else if (adc2 > 800 && adc3 > 300 && adc3 < 700) {
@@ -405,8 +406,8 @@ void main(void)
         } else if (adc1 < 200 && adc0 > 300 && adc0 < 700) {
             factory_mode = 8;
         }
-        printf("Factory mode %u adc=[%u %u %u %u]\n", factory_mode,
-            adc0, adc1, adc2, adc3);
+        printf("Factory mode %u adc=[%u %u %u %u] V:%u\n", factory_mode,
+               adc0, adc1, adc2, adc3, adc4);
         radio_start_factory_test(factory_mode);
         break;
     }
@@ -439,8 +440,8 @@ void main(void)
 
         telem_pps = get_telem_pps();
         
-        printf("%u: ADC=[%u %u %u %u] B:0x%x PWR:%u",
-               counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
+        printf("%u: ADC=[%u %u %u %u] V:%u B:0x%x PWR:%u",
+               counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3), adc_value(4),
                (unsigned)get_buttons(), get_tx_power());
         if (FCC_chan != -1) {
             printf(" FCC %d CW:%u\n", FCC_chan, fcc_CW_mode);
