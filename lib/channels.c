@@ -44,7 +44,7 @@ uint16_t channel_value(uint8_t chan)
         if (gpio_get(PIN_SW2)==0) {
             v |= 2;
         }
-        if (gpio_get(PIN_SW3)!=0) {
+        if (gpio_get(PIN_SW3)==0) {
             v |= 4;
         }
         v *= 100;
@@ -58,14 +58,14 @@ uint16_t channel_value(uint8_t chan)
         if (gpio_get(PIN_SW5)==0) {
             v |= 2;
         }
-        if (gpio_get(PIN_SW6)!=0) {
+        if (gpio_get(PIN_SW6)==0) {
             v |= 4;
         }
         v *= 100;
         break;
     case 6:
-        // spare channel
-        v = 0;
+        // TX battery voltage
+        v = adc_value(4);
         break;
     case 7: {
         uint8_t tvalue=0;
@@ -144,4 +144,31 @@ uint8_t get_buttons(void)
         ret |= BUTTON_USER;
     }
     return ret;
+}
+
+/*
+  fill in a normal SRT packet
+ */
+void fill_packet(struct srt_packet *pkt)
+{
+    uint16_t v[4];
+    uint8_t i;
+    for (i=0; i<4; i++) {
+        v[i] = adc_value(stick_map[i]);
+        if (v[i] > 1000) {
+            v[i] = 0;
+        } else {
+            v[i] = 1000 - v[i];
+        }
+    }
+    pkt->version = 1;
+    pkt->chan1 = v[0] & 0xFF;
+    pkt->chan2 = v[1] & 0xFF;
+    pkt->chan3 = v[2] & 0xFF;
+    pkt->chan4 = v[3] & 0xFF;
+    pkt->chan_high = ((v[0]>>2)&0xC0) | ((v[1]>>4)&0x30) | ((v[2]>>6)&0x0C) | ((v[3]>>8)&0x03);
+    pkt->tx_voltage = adc_value(4) / 4;
+    pkt->buttons = get_buttons();
+    pkt->telem_pps = get_telem_pps();
+    pkt->telem_rssi = get_telem_rssi();
 }

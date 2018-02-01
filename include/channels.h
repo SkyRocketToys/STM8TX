@@ -3,6 +3,8 @@
  */
 
 
+#include "telem_structure.h"
+
 /*
   return an 11 bit channel output value
  */
@@ -18,3 +20,9 @@ uint16_t channel_value(uint8_t chan);
 
 // get buttons
 uint8_t get_buttons(void);
+
+/*
+  fill in a normal SRT packet
+ */
+void fill_packet(struct srt_packet *pkt);
+
