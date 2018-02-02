@@ -167,7 +167,9 @@ void fill_packet(struct srt_packet *pkt)
     pkt->chan3 = v[2] & 0xFF;
     pkt->chan4 = v[3] & 0xFF;
     pkt->chan_high = ((v[0]>>2)&0xC0) | ((v[1]>>4)&0x30) | ((v[2]>>6)&0x0C) | ((v[3]>>8)&0x03);
-    pkt->tx_voltage = adc_value(4) / 4;
+
+    // send tx_voltage in 0.025 volt units, giving us a range of up to 6.3V
+    pkt->tx_voltage = adc_value(4) * 25 / 156;
     pkt->buttons = get_buttons();
     pkt->telem_pps = get_telem_pps();
     pkt->telem_rssi = get_telem_rssi();
