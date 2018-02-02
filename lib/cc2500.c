@@ -404,12 +404,26 @@ static void setup_hopping_table(void)
     }
 }
 
+static uint16_t calc_crc(const uint8_t *data, uint8_t len)
+{
+    uint16_t crc = 0;
+    uint8_t i;
+    for (i=0; i < len; i++) {
+        crc = (crc<<8) ^ (CRCTable[((uint8_t)(crc>>8) ^ *data++) & 0xFF]);
+    }
+    return crc;
+}
+
+
 /*
   initialise the radio
  */
 static void radio_init_hw(void)
 {
     uint8_t i;
+    uint16_t bind_crc;
+    uint8_t bind_xor;
+    const uint8_t *cpu_id = U_ID00;
 
     printf("cc2500: radio_init_hw starting\n");
     while (cc2500_ReadReg(CC2500_30_PARTNUM | CC2500_READ_BURST) != 0x80 ||
@@ -428,11 +442,26 @@ static void radio_init_hw(void)
     }
     cc2500_Strobe(CC2500_SIDLE);	// Go to idle...
 
-    // need to read radio ID from radio
-    bindTxId[0] = 15;
-    bindTxId[1] = 20;
+#if 0
+    // debug for CPU IDs
+    printf("CPUID: %x %x %x %x %x %x %x %x %x %x %x %x\n",
+           cpu_id[0], cpu_id[1], cpu_id[2], cpu_id[3],
+           cpu_id[4], cpu_id[5], cpu_id[6], cpu_id[7],
+           cpu_id[8], cpu_id[9], cpu_id[10], cpu_id[11]);
+#endif
 
-    chanskip = 3;
+    // use CRC of CPUID to setup bind IDs
+    bind_crc = calc_crc(cpu_id, 12);
+    bindTxId[0] = bind_crc>>8;
+    bindTxId[1] = bind_crc&0xFF;
+
+    // use XOR of CPUID to get chanskip, giving us a bit more randomness
+    bind_xor = 0;
+    for (i=0; i<12; i++) {
+        bind_xor ^= cpu_id[i];
+    }
+    chanskip = (bind_xor % 46) + 1;
+    printf("TXID %x:%x chanskip %u\n", bindTxId[0], bindTxId[1], chanskip);
 
     setup_hopping_table();
 
@@ -459,16 +488,6 @@ static void radio_init_hw(void)
 // radio IRQ handler unused for cc2500
 void radio_irq(void)
 {
-}
-
-static uint16_t calc_crc(const uint8_t *data, uint8_t len)
-{
-    uint16_t crc = 0;
-    uint8_t i;
-    for (i=0; i < len; i++) {
-        crc = (crc<<8) ^ (CRCTable[((uint8_t)(crc>>8) ^ *data++) & 0xFF]);
-    }
-    return crc;
 }
 
 static void send_packet(uint8_t len, const uint8_t *packet)
