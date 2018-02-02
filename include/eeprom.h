@@ -5,6 +5,8 @@ uint8_t eeprom_read(uint16_t offset);
 void eeprom_unlock(void);
 void progmem_unlock(void);
 void eeprom_lock(void);
+void eeprom_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len);
+
 #define progmem_lock() eeprom_lock()
 
 #define EEPROM_DSMPROT_OFFSET 0

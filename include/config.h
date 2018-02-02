@@ -76,3 +76,6 @@
 
 #define PIN_BEEP (GPIO_PORTD|GPIO_PIN4)
 
+// this PACKED define allows common telem header with stm32
+#define PACKED
+

@@ -1,6 +1,7 @@
 #include "stm8l.h"
 #include <stdint.h>
 #include <util.h>
+#include <adc.h>
 
 #define NUM_CHANS 5 // includes battery voltage as last channel
 static uint8_t chan=0;

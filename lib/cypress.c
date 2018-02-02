@@ -70,7 +70,7 @@ static struct stats {
 } stats;
 
 struct telem_status t_status;
-uint8_t telem_ack_value;
+extern uint8_t telem_ack_value;
 
 /* The SPI interface defines */
 enum {
@@ -799,31 +799,6 @@ static void start_telem_receive(void)
     write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN | CYRF_RXE_IRQEN);
 }
 
-/*
-  write to new firmware location
- */
-static void write_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len)
-{
-    uint16_t dest = NEW_FIRMWARE_BASE + offset;
-    uint8_t *ptr1;
-    ptr1 = (uint8_t *)dest;
-
-    progmem_unlock();
-
-    FLASH_CR1 = 0;
-    FLASH_CR2 = 0x40;
-    FLASH_NCR2 = (uint8_t)(~0x40);
-    memcpy(&ptr1[0], &data[0], 4);
-
-    if (len > 4) {
-        FLASH_CR2 = 0x40;
-        FLASH_NCR2 = (uint8_t)~0x40;
-        memcpy(&ptr1[4], &data[4], 4);
-    }
-    
-    progmem_lock();
-}
-
 static uint8_t last_mode;
 
 static void process_telem_packet(const struct telem_packet_cypress *pkt)
@@ -855,7 +830,7 @@ static void process_telem_packet(const struct telem_packet_cypress *pkt)
         fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
         if (pkt->type == TELEM_FW) {
             if (fw.offset < 16*1024 && fw.len <= 8) {
-                write_flash_copy(fw.offset, &fw.data[0], fw.len);
+                eeprom_flash_copy(fw.offset, &fw.data[0], fw.len);
             }
         } else {
             buzzer_tune_add(fw.offset, &fw.data[0], fw.len);

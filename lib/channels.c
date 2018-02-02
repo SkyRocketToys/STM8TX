@@ -7,7 +7,7 @@
 #include "radio.h"
 
 static const uint8_t stick_map[4] = { STICK_ROLL, STICK_PITCH, STICK_THROTTLE, STICK_YAW };
-extern uint8_t telem_ack_value;
+uint8_t telem_ack_value;
 static uint8_t last_telem_ack_value;
 static uint8_t telem_ack_send_count;
 static uint8_t telem_extra_type;
@@ -153,6 +153,8 @@ void fill_packet(struct srt_packet *pkt)
 {
     uint16_t v[4];
     uint8_t i;
+    uint8_t data = 0;
+    
     for (i=0; i<4; i++) {
         v[i] = adc_value(stick_map[i]);
         if (v[i] > 1000) {
@@ -168,9 +170,52 @@ void fill_packet(struct srt_packet *pkt)
     pkt->chan4 = v[3] & 0xFF;
     pkt->chan_high = ((v[0]>>2)&0xC0) | ((v[1]>>4)&0x30) | ((v[2]>>6)&0x0C) | ((v[3]>>8)&0x03);
 
-    // send tx_voltage in 0.025 volt units, giving us a range of up to 6.3V
-    pkt->tx_voltage = adc_value(4) * 25 / 156;
     pkt->buttons = get_buttons();
-    pkt->telem_pps = get_telem_pps();
-    pkt->telem_rssi = get_telem_rssi();
+
+    // cycle between data types
+    telem_extra_type = (telem_extra_type+1) % PKTYPE_NUM_TYPES;
+
+    // ack data gets priority when there is new data to make OTA
+    // updates faster
+    if (telem_ack_value != last_telem_ack_value ||
+        telem_ack_send_count < 20) {
+        telem_extra_type = PKTYPE_FW_ACK;
+    }
+
+    switch (telem_extra_type) {
+    case PKTYPE_VOLTAGE:
+        // send tx_voltage in 0.025 volt units, giving us a range of up to 6.3V
+        data = adc_value(4) * 25 / 156;
+        break;
+    case PKTYPE_YEAR:
+        data = BUILD_DATE_YEAR-2017;
+        break;
+    case PKTYPE_MONTH:
+        data = BUILD_DATE_MONTH;
+        break;
+    case PKTYPE_DAY:
+        data = BUILD_DATE_DAY;
+        break;
+    case PKTYPE_TELEM_RSSI:
+        data = get_telem_rssi();
+        break;
+    case PKTYPE_TELEM_PPS:
+        data = get_telem_pps();
+        break;
+    case PKTYPE_BL_VERSION:
+        data = get_bl_version();
+        break;
+    case PKTYPE_FW_ACK: {
+        if (last_telem_ack_value != telem_ack_value) {
+            telem_ack_send_count = 0;
+        }
+        last_telem_ack_value = telem_ack_value;
+        telem_ack_send_count++;
+        data = telem_ack_value;
+        break;
+    }
+    }
+
+    pkt->data = data;
+    pkt->pkt_type = telem_extra_type;
 }

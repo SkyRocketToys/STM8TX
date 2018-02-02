@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "stm8l.h"
 #include "config.h"
+#include <uart.h>
 
 void uart2_init(void)
 {

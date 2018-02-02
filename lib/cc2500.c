@@ -175,7 +175,7 @@ static struct {
 } rates;
 
 struct telem_status t_status;
-uint8_t telem_ack_value;
+extern uint8_t telem_ack_value;
 
 #define NUM_CHANNELS 47
 static uint8_t calData[NUM_CHANNELS][3];
@@ -227,7 +227,7 @@ static void radio_init_hw(void);
 
 void radio_init(void)
 {
-    printf("radio_init\n");
+    printf("radio_init PS=%u TS=%u\n", sizeof(struct srt_packet), sizeof(struct telem_packet_cc2500));
 
     // setup PACTL
     gpio_config(RADIO_PACTL, GPIO_INPUT_FLOAT);
@@ -518,6 +518,22 @@ static void parse_telem_packet(const uint8_t *packet)
     case TELEM_STATUS: {
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
         break;
+    case TELEM_FW:
+    case TELEM_PLAY: {
+        struct telem_firmware fw;
+        memcpy(&fw, &pkt->payload.fw, sizeof(fw));
+        printf("FW type=%u ofs=%u len=%u seq=%u\n", pkt->type, fw.offset, fw.len, fw.seq);
+        fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
+        if (pkt->type == TELEM_FW) {
+            if (fw.offset < 16*1024 && fw.len <= 8) {
+                eeprom_flash_copy(fw.offset, &fw.data[0], fw.len);
+            }
+        } else {
+            buzzer_tune_add(fw.offset, &fw.data[0], fw.len);
+        }
+        telem_ack_value = fw.seq;
+        break;
+    }
     }
     }
 }
