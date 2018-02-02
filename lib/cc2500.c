@@ -522,8 +522,8 @@ static void parse_telem_packet(const uint8_t *packet)
     case TELEM_PLAY: {
         struct telem_firmware fw;
         memcpy(&fw, &pkt->payload.fw, sizeof(fw));
-        printf("FW type=%u ofs=%u len=%u seq=%u\n", pkt->type, fw.offset, fw.len, fw.seq);
         fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
+        printf("FW type=%u ofs=%u len=%u seq=%u\n", pkt->type, fw.offset, fw.len, fw.seq);
         if (pkt->type == TELEM_FW) {
             if (fw.offset < 16*1024 && fw.len <= 8) {
                 eeprom_flash_copy(fw.offset, &fw.data[0], fw.len);
@@ -545,6 +545,9 @@ static void check_rx_packet(void)
 {
     uint8_t ccLen;
     bool matched = false;
+    bool got_telem = false;
+    uint8_t packet[sizeof(struct telem_packet_cc2500)+2];
+    
     do {
         uint8_t ccLen2;
         ccLen = cc2500_ReadReg(CC2500_3B_RXBYTES | CC2500_READ_BURST);
@@ -557,13 +560,22 @@ static void check_rx_packet(void)
         printf("Fifo overflow %02x\n", ccLen);
         cc2500_Strobe(CC2500_SFRX);
     } else if (ccLen == sizeof(struct telem_packet_cc2500)+2) {
-        uint8_t packet[sizeof(struct telem_packet_cc2500)+2];
-        uint8_t rssi_raw, rssi_dbm;
         cc2500_ReadFifo(packet, ccLen);
         // first byte in FIFO is length. Last two bytes are RSSI and LQI
         if (packet[0] == sizeof(struct telem_packet_cc2500)-1) {
-            parse_telem_packet(&packet[0]);
+            got_telem = true;
         }
+    } else if (ccLen != 0) {
+        printf("ccLen=%u\n", ccLen);
+        cc2500_Strobe(CC2500_SFRX);
+    }
+
+    // we start the send before we parse, so we overlap send with processing telem packet
+    send_normal_packet();    
+
+    if (got_telem) {
+        uint8_t rssi_raw, rssi_dbm;
+        parse_telem_packet(&packet[0]);
         rssi_raw = packet[ccLen-2];
         if (rssi_raw >= 128) {
             rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) - 82;
@@ -573,11 +585,7 @@ static void check_rx_packet(void)
         rssi_sum += rssi_dbm;
         rssi_count++;
         stats.recv_packets++;
-    } else if (ccLen != 0) {
-        printf("ccLen=%u\n", ccLen);
-        cc2500_Strobe(CC2500_SFRX);
     }
-    send_normal_packet();
 }
 
 /*
