@@ -15,6 +15,7 @@ void beken_FCC_toggle_scan(void);
 uint8_t get_tx_power(void);
 int8_t get_FCC_chan(void);
 uint8_t get_FCC_power(void);
+void beken_DumpRegisters(void);
 
 #define radio_init beken_init
 #define radio_irq beken_irq

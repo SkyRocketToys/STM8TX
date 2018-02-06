@@ -1288,6 +1288,7 @@ bool CheckUpdateFccParams(void)
 		if (beken.fcc.CW_mode != beken.lastTxCwMode) {
 			BK2425_SetCarrierMode(beken.fcc.CW_mode);
 			result = true;
+//			beken_DumpRegisters();
 		}
 	}
 	return result;
@@ -1466,6 +1467,44 @@ void radio_set_pps_rssi(void)
 }
 
 #endif
+
+// ----------------------------------------------------------------------------
+// For debugging - tell us the current beken register values (from bank 0)
+// This just prints it to the UART rather than to the console over WiFi
+void beken_DumpRegisters(void)
+{
+	uint8_t i;
+	for (i = 0; i <= BK_FEATURE; ++i)
+	{
+		uint8_t len = 1;
+		switch (i) {
+			case 10: case 11: case 16: len = 5; break;
+			case 24: case 25: case 26: case 27: len = 0; break;
+			default: len = 1; break;
+		};
+		if (len == 1)
+		{
+			printf("Bank0reg%d : %x\r\n", i, SPI_Read_Reg(i));
+		}
+		else if (len == 5)
+		{
+			uint8_t data[5];
+			spi_read_registers(i, &data[0], len);
+			printf("Bank0reg%d : %x %x %x %x %x\r\n", i, data[0], data[1], data[2], data[3], data[4]);
+		}
+	}
+	BK2425_SetRBank(1);
+	for (i = IREG1_4; i <= IREG1_13; ++i)
+	{
+		uint8_t len = 4;
+		uint8_t idx = Bank1_RegTable[0][i][0];
+		uint8_t data[4];
+		spi_read_registers(i, &data[0], len);
+		printf("Bank1reg%d : %x %x %x %x\r\n", idx, data[0], data[1], data[2], data[3]);
+	}
+	BK2425_SetRBank(0);
+}
+
 
 /** @}*/
 
