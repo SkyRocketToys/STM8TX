@@ -20,8 +20,11 @@
 #if SUPPORT_BEKEN
 
 #define SUPPORT_UART 1 // Output some info
-#define CHANNEL_DWELL_PACKETS 1 // 5ms frequency changes
-#define CHANNEL_COUNT_LOGICAL 60
+enum {
+	CHANNEL_DWELL_PACKETS = 1, // 5ms frequency changes
+	CHANNEL_COUNT_LOGICAL = 16,
+	CHANNEL_NUM_TABLES = 6
+};
 
 /** \file */
 /** \addtogroup beken Beken BK2425 radio module
@@ -47,6 +50,22 @@ enum BK_PKT_TYPE_E {
 };
 typedef uint8_t BK_PKT_TYPE;
 
+/** The type of info being sent in control packets */
+enum BK_INFO_TYPE_E {
+	BK_INFO_MIN = 1,
+	BK_INFO_FW_VER = 1,
+	BK_INFO_DFU_RX = 2,
+	BK_INFO_FW_CRC_LO = 3,
+	BK_INFO_FW_CRC_HI = 4,
+	BK_INFO_FW_YM = 5,
+	BK_INFO_FW_DAY = 6,
+	BK_INFO_MODEL = 7,
+	BK_INFO_PPS = 8,
+	BK_INFO_BATTERY = 9,
+	BK_INFO_COUNTDOWN = 10,
+	BK_INFO_MAX
+};
+typedef uint8_t BK_INFO_TYPE;
 
 /** Data for packets that are not droneid packets
 	Onair order = little-endian */
@@ -258,19 +277,7 @@ enum BK_FEATURE_e {
 #define BEKEN_PA_HIGH()      gpio_set(RADIO_TXEN)
 #define BEKEN_PA_LOW()       gpio_clear(RADIO_TXEN)
 
-enum {
-	INFO_FW_VER = 1,
-	INFO_DFU_RX,
-	INFO_FW_CRC_LO,
-	INFO_FW_CRC_HI,
-	INFO_FW_YM,
-	INFO_FW_DAY,
-	INFO_MODEL,
-	INFO_RSSI,
-	INFO_BATTERY,
-	INFO_MAX,
-};
-uint16_t gFwInfo[INFO_MAX];
+uint16_t gFwInfo[BK_INFO_MAX];
 
 
 // ----------------------------------------------------------------------------
@@ -410,7 +417,7 @@ typedef struct RadioInfo_s {
 	packetFormatTx pktDataTx; // Packet data to send
 	packetFormatRx pktDataRx; // Last valid packet that has been received
 	packetFormatRx pktDataRecv; // Packet data in process of being received
-	uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL
+	uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL * CHANNEL_NUM_TABLES * CHANNEL_DWELL_PACKETS
 	uint8_t lastTxPower; // 0..7
 	bool lastTxCwMode; // 0=packet, 1=carrier wave
 	uint8_t TX0_Address[5]; // Base address of ctrl tx
@@ -421,6 +428,9 @@ typedef struct RadioInfo_s {
 
 RadioInfo beken;
 struct telem_status t_status;
+
+// ----------------------------------------------------------------------------
+uint8_t beken_get_tx_channel(void) { return beken.lastTxChannel; }
 
 // ----------------------------------------------------------------------------
 /** Kick the independant windowed watchdog so that it does not reset the CPU by timing out */
@@ -496,6 +506,94 @@ void SPI_Write_Buf(
 	spi_write(length, pBuf);
 	spi_force_chip_select(false);
 }
+
+// ----------------------------------------------------------------------------
+// Frequency hopping
+// ----------------------------------------------------------------------------
+
+uint8_t gChannelIdxMin = 0;
+uint8_t gChannelIdxMax = CHANNEL_COUNT_LOGICAL * 1 /* CHANNEL_NUM_TABLES */ * CHANNEL_DWELL_PACKETS;
+uint8_t gCountdown = 0; // For counting down to changing wifi table
+uint8_t gCountdownTable = 0;
+uint8_t gLastWifiChannel = 0;
+
+const uint8_t channelTable[CHANNEL_NUM_TABLES*CHANNEL_COUNT_LOGICAL] = {
+#if 0
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
+#else
+	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,45, // Normal
+	57,62,67,72,58,63,68,59, 64,69,60,65,70,61,66,71, // Wifi channel 1,2,3,4,5
+	62,10,67,72,63,68,11,64, 69,60,65,70,12,61,66,71, // Wifi channel 6
+	10,67,11,72,12,68,13,69, 14,65,15,70,16,66,17,71, // Wifi channel 7
+	10,70,15,20,11,71,16,21, 12,17,22,72,13,18,14,19, // Wifi channel 8
+	10,15,20,25,11,16,21,12, 17,22,13,18,23,14,19,24, // Wifi channel 9,10,11
+#endif
+};
+
+
+// ----------------------------------------------------------------------------
+/** Set the range of the channel indexes we are using
+\return true if we changed something */
+bool SetChannelRange(
+	uint8_t min, ///< The minimum logical channel range
+	uint8_t max) ///< The maximum logical channel range
+{
+	min *= CHANNEL_DWELL_PACKETS;
+	max *= CHANNEL_DWELL_PACKETS;
+	if ((gChannelIdxMin != min) || (gChannelIdxMax != max))
+	{
+		gChannelIdxMin = min;
+		gChannelIdxMax = max;
+		return true;
+	}
+	return false;
+}
+
+// ----------------------------------------------------------------------------
+/** Convert a logical channel index into a physical channel
+\return The physical channel, in MHz above 2400Mhz. */
+uint8_t LookupChannel(
+	uint8_t idx) ///< The logical channel, as an index into a frequency hopping table.
+{
+	return channelTable[idx / CHANNEL_DWELL_PACKETS];
+}
+
+// ----------------------------------------------------------------------------
+/** Channel hopping algorithm implementation.
+	Calculate the next channel to use for transmission and change to it
+	\return The next value of the logical channel index. */
+uint8_t NextChannelIndex(
+	uint8_t seq) ///< The current value of the logical channel index
+{
+	if (gCountdown)
+	{
+		if (--gCountdown == 0)
+		{
+			SetChannelRange(gCountdownTable, gCountdownTable + CHANNEL_COUNT_LOGICAL);
+			seq = gCountdownTable;
+			printf("Switched to table %d\r\n", gCountdownTable);
+			return seq;
+		}
+	}
+	{
+		++seq;
+		if (seq >= gChannelIdxMax)
+			seq = gChannelIdxMin;
+		else if (seq < gChannelIdxMin)
+			seq = gChannelIdxMin;
+	}
+	return seq;
+}
+
+// ----------------------------------------------------------------------------
+// Beken higher level functions
+// ----------------------------------------------------------------------------
+
 
 // ----------------------------------------------------------------------------
 /** Switch the Beken radio to Rx mode */
@@ -790,7 +888,7 @@ void describeBeken(void)
 #if SUPPORT_UART
 	uint8_t i;
 	printf("# TxSpeed %dkbps\r\n", (int) BK2425_GetSpeed() );
-	printf("# Channels[%d]=", (int) CHANNEL_COUNT_LOGICAL );
+	printf("# Channels[%d][%d]=", (int) CHANNEL_NUM_TABLES, (int) CHANNEL_COUNT_LOGICAL );
 	for (i = 0; i < CHANNEL_COUNT_LOGICAL; ++i)
 	{
 		printf("%d ", (int) LookupChannel(i));
@@ -1025,77 +1123,6 @@ void VerifyBekenChipID(void)
 	}
 }
 
-// ----------------------------------------------------------------------------
-// Frequency hopping
-// ----------------------------------------------------------------------------
-
-uint8_t gChannelIdxMin = 0;
-uint8_t gChannelIdxMax = CHANNEL_COUNT_LOGICAL * CHANNEL_DWELL_PACKETS;
-
-const uint8_t channelTable[CHANNEL_COUNT_LOGICAL] = {
-#if (CHANNEL_COUNT_LOGICAL==60) // Use 15 channels 4 times
-#if 0
-//	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
-//	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
-//	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
-//	54,54,54,54,54,54,54,54,54,54,54,54,54,54,54,
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-#else
-	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
-	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
-	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
-	46,41,31,52,36,13,72,69,21,56,16,26,61,66,10,
-#endif
-#endif
-};
-
-// ----------------------------------------------------------------------------
-/** Set the range of the channel indexes we are using
-\return true if we changed something */
-bool SetChannelRange(
-	uint8_t min, ///< The minimum logical channel range
-	uint8_t max) ///< The maximum logical channel range
-{
-	min *= CHANNEL_DWELL_PACKETS;
-	max *= CHANNEL_DWELL_PACKETS;
-	if ((gChannelIdxMin != min) || (gChannelIdxMax != max))
-	{
-		gChannelIdxMin = min;
-		gChannelIdxMax = max;
-		return true;
-	}
-	return false;
-}
-
-// ----------------------------------------------------------------------------
-/** Convert a logical channel index into a physical channel
-\return The physical channel, in MHz above 2400Mhz. */
-uint8_t LookupChannel(
-	uint8_t idx) ///< The logical channel, as an index into a frequency hopping table.
-{
-	return channelTable[idx / CHANNEL_DWELL_PACKETS];
-}
-
-// ----------------------------------------------------------------------------
-/** Channel hopping algorithm implementation.
-	Calculate the next channel to use for transmission and change to it
-	\return The next value of the logical channel index. */
-uint8_t NextChannelIndex(
-	uint8_t seq) ///< The current value of the logical channel index
-{
-	{
-		++seq;
-		if (seq >= gChannelIdxMax)
-			seq = gChannelIdxMin;
-		else if (seq < gChannelIdxMin)
-			seq = gChannelIdxMin;
-	}
-	return seq;
-}
-
 
 // ----------------------------------------------------------------------------
 // Interface expected by main program
@@ -1107,15 +1134,16 @@ void beken_init(void)
 {
 	// Initialise the firmware data
 	uint32_t crc = crc_crc32((const uint8_t *)0x8700, (0xc000-0x8700));
-	gFwInfo[INFO_FW_CRC_LO] = crc & 0xffff;
-	gFwInfo[INFO_FW_CRC_HI] = (crc >> 16) & 0xffff;
-	gFwInfo[INFO_FW_VER] = 0;
-	gFwInfo[INFO_DFU_RX] = 0;
-	gFwInfo[INFO_FW_YM] = 0;
-	gFwInfo[INFO_FW_DAY] = 0;
-	gFwInfo[INFO_MODEL] = 1;
-	gFwInfo[INFO_RSSI] = 0; // ... needs to be updated over time
-	gFwInfo[INFO_BATTERY] = 0; // ... needs to be updated over time
+	gFwInfo[BK_INFO_FW_CRC_LO] = crc & 0xffff;
+	gFwInfo[BK_INFO_FW_CRC_HI] = (crc >> 16) & 0xffff;
+	gFwInfo[BK_INFO_FW_VER] = 0;
+	gFwInfo[BK_INFO_DFU_RX] = 0;
+	gFwInfo[BK_INFO_FW_YM] = 0;
+	gFwInfo[BK_INFO_FW_DAY] = 0;
+	gFwInfo[BK_INFO_MODEL] = 1;
+	gFwInfo[BK_INFO_PPS] = 0; // ... needs to be updated over time
+	gFwInfo[BK_INFO_BATTERY] = 0; // ... needs to be updated over time
+	gFwInfo[BK_INFO_COUNTDOWN] = 0; // Will be updated over time
 
 	// Setup the Beken chip. Assumes that SPI is initialised by now
 	delay_ms(10);
@@ -1142,6 +1170,23 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 	if (rx->packetType == BK_PKT_TYPE_TELEMETRY)
 	{
 		beken.stats.lastTelemetryPktTime = timer_get_ms();
+
+		// Should we change channel table due to Wi-Fi changes?
+		if (rx->wifi != gLastWifiChannel)
+		{
+			uint8_t wanted = 0;
+			gLastWifiChannel = rx->wifi;
+			switch (rx->wifi) {
+			case 0: wanted = 0; break;
+			case 1: case 2: case 3: case 4: case 5: wanted = 1; break;
+			case 6: wanted = 2; break;
+			case 7: wanted = 3; break;
+			case 8: wanted = 4; break;
+			default: wanted = 5; break;
+			}
+			gCountdown = 10;
+			gCountdownTable = wanted * CHANNEL_COUNT_LOGICAL;
+		}
 	}
 	else if (rx->packetType == BK_PKT_TYPE_DFU)
 	{
@@ -1231,10 +1276,18 @@ void UpdateTxData(void)
 	tx->u.ctrl.lsb |= (val & 3) << 6;
 
 	// Put in the extra data fields
-	if (++txInfo >= INFO_MAX)
-		txInfo = 1;
-	val = gFwInfo[txInfo];
-	tx->u.ctrl.data_type = txInfo;
+	if (gCountdown)
+	{
+		val = gCountdown + 256 * gCountdownTable;
+		tx->u.ctrl.data_type = BK_INFO_COUNTDOWN;
+	}
+	else
+	{
+		if (++txInfo >= BK_INFO_MAX)
+			txInfo = BK_INFO_MIN;
+		val = gFwInfo[txInfo];
+		tx->u.ctrl.data_type = txInfo;
+	}
 	tx->u.ctrl.data_value_lo = val & 0xff;
 	tx->u.ctrl.data_value_hi = (val >> 8) & 0xff;
 }

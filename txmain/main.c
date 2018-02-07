@@ -396,8 +396,8 @@ void display_sticks(void)
 	val = channel_value(3);
 	printf("Yaw: %d ", val+1000);
 	val = get_buttons_held();
-	printf("Buttons: %d%d%d%d%d%d\r\n", (val&1)!=0, (val&2)!=0, (val&4)!=0, (val&8)!=0, (val&16)!=0, (val&32)!=0);
-
+	printf("Buttons: %d%d%d%d%d%d ", (val&1)!=0, (val&2)!=0, (val&4)!=0, (val&8)!=0, (val&16)!=0, (val&32)!=0);
+	printf("Ch:%d\r\n", beken_get_tx_channel());
     if (FCC_chan != -1) {
         printf(" FCC %d CW:%u\r\n", FCC_chan, fcc_CW_mode);
     }
