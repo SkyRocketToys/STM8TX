@@ -102,7 +102,7 @@ enum packet_type {
  */
 struct PACKED srt_packet {
     uint8_t length;     // required for cc2500 FIFO
-    uint8_t txid[2];
+    uint8_t txid[2];    // The address (16 bits)
     uint8_t version:4;  // protocol version
     uint8_t pkt_type:4; // packet type
     uint8_t chan1;
