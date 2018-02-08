@@ -201,8 +201,8 @@ RADIO_PACTL | B5
 
 
 // time to power off, ms
-#define POWER_OFF_DISARMED_MS 500 // Quick power off (if we are connected to a drone and it is disarmed)
 #define POWER_OFF_MS 2000 // Slow power off (all situations)
+#define POWER_OFF_DISARMED_MS 500 // Quick power off (if we are connected to a drone and it is disarmed)
 
 // battery sense analog
 #define PIN_VBAT (GPIOF|GPIO_PIN4)

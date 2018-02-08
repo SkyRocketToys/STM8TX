@@ -103,11 +103,11 @@ static void delay_ms(uint16_t d)
 // This displays an error message via the LED that is very fast - it can only be seen by an oscilloscope
 static void toggle_code(uint8_t n)
 {
-    gpio_clear(LED_YELLOW);
+    gpio_clear(LED_GPS);
     delay_ms(1);
     while (n--) {
-        gpio_set(LED_YELLOW);
-        gpio_clear(LED_YELLOW);
+        gpio_set(LED_GPS);
+        gpio_clear(LED_GPS);
     }
     delay_ms(1);
 }
@@ -122,8 +122,8 @@ static void flash_copy(uint16_t to, uint16_t from, uint16_t size)
 
     progmem_unlock();
     // copy using word mode, takes 14 seconds for 11k
-    gpio_clear(LED_MODE);
-    gpio_set(LED_GPS);
+    gpio_clear(LED_GPS);
+    gpio_set(LED_MODE);
 
     while (nwords--) {
         FLASH_CR2 |= 0x40;
@@ -132,8 +132,8 @@ static void flash_copy(uint16_t to, uint16_t from, uint16_t size)
         *ptr1++ = *ptr2++;
 
         if (nwords % 64 == 0) {
-            gpio_toggle(LED_MODE);
             gpio_toggle(LED_GPS);
+            gpio_toggle(LED_MODE);
         }
     }
     gpio_set(LED_GPS);
