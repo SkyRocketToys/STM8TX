@@ -5,6 +5,7 @@
 #include "config.h"
 #include "stm8l.h"
 #include "eeprom.h"
+#include <string.h>
 
 // -----------------------------------------------------------------------------
 /** \addtogroup eeprom EEPROM reading/writing (NOT flash)
@@ -58,6 +59,33 @@ uint8_t eeprom_read(
 	uint16_t offset) ///< The offset of the data within EEPROM
 {
     return (EEPROM_START_ADDR)[offset];
+}
+
+// -----------------------------------------------------------------------------
+/** Write to new firmware location, used for OTA update */
+void eeprom_flash_copy(
+	uint16_t offset, ///< The offset of the data within EEPROM
+	const uint8_t *data, ///< The data to write
+	uint8_t len) ///< The length of the data to write, in bytes
+{
+    uint16_t dest = NEW_FIRMWARE_BASE + offset;
+    uint8_t *ptr1;
+    ptr1 = (uint8_t *)dest;
+
+    progmem_unlock();
+
+    FLASH_CR1 = 0;
+    FLASH_CR2 = 0x40;
+    FLASH_NCR2 = (uint8_t)(~0x40);
+    memcpy(&ptr1[0], &data[0], 4);
+
+    if (len > 4) {
+        FLASH_CR2 = 0x40;
+        FLASH_NCR2 = (uint8_t)~0x40;
+        memcpy(&ptr1[4], &data[4], 4);
+    }
+
+    progmem_lock();
 }
 
 /** @}*/

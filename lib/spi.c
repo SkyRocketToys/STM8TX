@@ -107,6 +107,17 @@ uint8_t spi_read1(void)
 }
 
 // -----------------------------------------------------------------------------
+/** Read a number of bytes over the SPI interface */
+void spi_read(
+	uint8_t n, ///< The number of bytes to transfer in each direction over the SPI interface.
+	uint8_t *buf) ///< A buffer array of bytes to store the data read from the SPI interface. Must not be NULL.
+{
+    while (n--) {
+        *buf++ = spi_read1();
+    }
+}
+
+// -----------------------------------------------------------------------------
 /** Transfer two arrays of bytes in both directions over the SPI interface */
 void spi_transfer(
 	uint8_t n, ///< The number of bytes to transfer in each direction over the SPI interface.

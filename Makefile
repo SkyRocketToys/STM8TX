@@ -106,7 +106,7 @@ txmain.flash: txmain.ihx
 
 txmain.img: txmain.ihx blimage
 	@echo Creating txmain.bin
-	@hex2bin.py txmain.ihx txmain.bin
+	@hex2bin.py --size=14592 txmain.ihx txmain.bin
 	@echo Creating txmain.img
 	@./blimage
 

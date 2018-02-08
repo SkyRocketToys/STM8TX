@@ -10,7 +10,7 @@
 /** \addtogroup adc Analog to Digital Conversion
 @{ */
 
-#define NUM_CHANS 4
+#define NUM_CHANS 5 // includes battery voltage as last channel
 static uint8_t chan=0;
 static bool take_next;
 static uint16_t values[NUM_CHANS];
@@ -29,10 +29,12 @@ void adc_irq(void)
         v = ADC_DRL;
         v |= ADC_DRH << 8;
         values[chan] = v;
-        chan = (chan + 1) & (NUM_CHANS-1);
+        chan = (chan + 1) % NUM_CHANS;
     }
     ADC_CSR &= 0x3f; // clear EOC & AWD flags
-    ADC_CSR = 0x20 | chan;
+
+    // battery voltage is on AIN12, the other channels are on AIN0 to AIN3
+    ADC_CSR = 0x20 | (chan==4?12:chan);
 
     take_next = !take_next;
 }

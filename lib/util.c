@@ -38,43 +38,43 @@ void chip_init(void)
 /** Initialise the LEDs */
 void led_init(void)
 {
-    gpio_config(LED_GREEN|LED_YELLOW, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
+    gpio_config(LED_GPS | LED_MODE, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
 }
 
 // -----------------------------------------------------------------------------
 /** Turn the green LED on or off as specified */
-void led_green_set(bool set)
+void led_gps_set(bool set)
 {
     if (!set) {
-        gpio_set(LED_GREEN);
+        gpio_set(LED_GPS);
     } else {
-        gpio_clear(LED_GREEN);
+        gpio_clear(LED_GPS);
     }
 }
 
 // -----------------------------------------------------------------------------
 /** Turn the yellow LED on or off as specified */
-void led_yellow_set(bool set)
+void led_mode_set(bool set)
 {
     if (set) {
-        gpio_clear(LED_YELLOW);
+        gpio_clear(LED_MODE);
     } else {
-        gpio_set(LED_YELLOW);
+        gpio_set(LED_MODE);
     }
 }
 
 // -----------------------------------------------------------------------------
 /** Toggle the green LED on or off  */
-void led_green_toggle(void)
+void led_gps_toggle(void)
 {
-    gpio_toggle(LED_GREEN);
+    gpio_toggle(LED_GPS);
 }
 
 // -----------------------------------------------------------------------------
-/** Toggle the yellow LED on or off  */
-void led_yellow_toggle(void)
+/** Toggle the yellow mode LED on or off  */
+void led_mode_toggle(void)
 {
-    gpio_toggle(LED_YELLOW);
+    gpio_toggle(LED_MODE);
 }
 
 // -----------------------------------------------------------------------------

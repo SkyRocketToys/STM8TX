@@ -26,6 +26,9 @@
 
 #if SUPPORT_CC2500
 
+// allow for FrSky D16 format for testing
+#define USE_D16_FORMAT 0
+
 /** \addtogroup cc2500 Texas Instruments CC2500 radio module
 @{ */
 
@@ -161,12 +164,22 @@ static struct stats {
     uint32_t bad_packets;
     uint32_t recv_errors;
     uint32_t recv_packets;
+    uint32_t send_packets;
     uint32_t lost_packets;
     uint32_t timeouts;
-} stats;
+} stats, last_stats;
+
+static uint32_t rssi_sum;
+static uint16_t rssi_count;
+
+static struct {
+    uint16_t telem_pps;
+    uint16_t send_pps;
+    uint8_t telem_rssi;
+} rates;
 
 struct telem_status t_status;
-uint8_t telem_ack_value;
+extern uint8_t telem_ack_value;
 
 #define NUM_CHANNELS 47
 static uint8_t calData[NUM_CHANNELS][3];
@@ -215,25 +228,17 @@ static const uint16_t CRCTable[] = {
 };
 
 static void radio_init_hw(void);
+void fill_packet(struct srt_packet *pkt);
 
 void radio_init(void)
 {
-    printf("radio_init\n");
+    printf("radio_init PS=%u TS=%u\n", sizeof(struct srt_packet), sizeof(struct telem_packet_cc2500));
 
     // setup PACTL
-    gpio_config(RADIO_PACTL, GPIO_OUTPUT_PUSHPULL);
-    gpio_clear(RADIO_PACTL);
-
-    // setup PACTL
-    gpio_config(RADIO_PACTL, GPIO_OUTPUT_PUSHPULL);
-    gpio_clear(RADIO_PACTL);
+    gpio_config(RADIO_TXEN, GPIO_INPUT_FLOAT);
 
     // setup radio CE
-    gpio_config(RADIO_CE, GPIO_OUTPUT_PUSHPULL);
-    gpio_set(RADIO_CE);
-
-    // setup interrupt
-    gpio_config(RADIO_INT, GPIO_INPUT_FLOAT_IRQ);
+    gpio_config(RADIO_CE, GPIO_INPUT_FLOAT);
 
     radio_init_hw();
 }
@@ -306,8 +311,9 @@ static const struct {
     uint8_t reg;
     uint8_t value;
 } radio_config[] = {
-    {CC2500_02_IOCFG0,   0x01}, // GD0 high on RXFIFO filled or end of packet
-    {CC2500_17_MCSM1,    0x0C}, // stay in RX on packet receive, CCA always, TX -> IDLE
+    {CC2500_02_IOCFG0,   0x1C}, // LNA_PD
+    {CC2500_00_IOCFG2,   0x1B}, // PA_PD
+    {CC2500_17_MCSM1,    0x03}, // CCA always, RX->IDLE, TX -> RX
     {CC2500_18_MCSM0,    0x18}, // XOSC expire 64, cal on IDLE -> TX or RX
     {CC2500_06_PKTLEN,   0x1E}, // packet length 30
     {CC2500_07_PKTCTRL1, 0x04}, // enable RSSI+LQI, no addr check, no autoflush, PQT=0
@@ -335,7 +341,7 @@ static const struct {
     {CC2500_24_FSCAL2,   0x0A}, // frequency synth cal2
     {CC2500_25_FSCAL1,   0x00}, // frequency synth cal1
     {CC2500_26_FSCAL0,   0x11}, // frequency synth cal0
-    //{CC2500_29_FSTEST,   0x59}, disabled FSTEST write
+    {CC2500_29_FSTEST,   0x59}, // test bits
     {CC2500_2C_TEST2,    0x88}, // test settings
     {CC2500_2D_TEST1,    0x31}, // test settings
     {CC2500_2E_TEST0,    0x0B}, // test settings
@@ -358,7 +364,7 @@ static void initialiseData(uint8_t adr)
     cc2500_WriteReg(CC2500_0C_FSCTRL0, 0);
     cc2500_WriteReg(CC2500_18_MCSM0, 0x8);
     cc2500_WriteReg(CC2500_09_ADDR, adr ? 0x03 : bindTxId[0]);
-    cc2500_WriteReg(CC2500_07_PKTCTRL1, 0x0D); // address check, no broadcast, autoflush, status enable
+    //cc2500_WriteReg(CC2500_07_PKTCTRL1, 0x0D); // address check, no broadcast, autoflush, status enable
     cc2500_WriteReg(CC2500_19_FOCCFG, 0x16);
 }
 
@@ -403,12 +409,26 @@ static void setup_hopping_table(void)
     }
 }
 
+static uint16_t calc_crc(const uint8_t *data, uint8_t len)
+{
+    uint16_t crc = 0;
+    uint8_t i;
+    for (i=0; i < len; i++) {
+        crc = (crc<<8) ^ (CRCTable[((uint8_t)(crc>>8) ^ *data++) & 0xFF]);
+    }
+    return crc;
+}
+
+
 /*
   initialise the radio
  */
 static void radio_init_hw(void)
 {
     uint8_t i;
+    uint16_t bind_crc;
+    uint8_t bind_xor;
+    const uint8_t *cpu_id = (const uint8_t *) U_ID00;
 
     printf("cc2500: radio_init_hw starting\n");
     while (cc2500_ReadReg(CC2500_30_PARTNUM | CC2500_READ_BURST) != 0x80 ||
@@ -427,11 +447,26 @@ static void radio_init_hw(void)
     }
     cc2500_Strobe(CC2500_SIDLE);	// Go to idle...
 
-    // need to read radio ID from radio
-    bindTxId[0] = 15;
-    bindTxId[1] = 20;
+#if 0
+    // debug for CPU IDs
+    printf("CPUID: %x %x %x %x %x %x %x %x %x %x %x %x\n",
+           cpu_id[0], cpu_id[1], cpu_id[2], cpu_id[3],
+           cpu_id[4], cpu_id[5], cpu_id[6], cpu_id[7],
+           cpu_id[8], cpu_id[9], cpu_id[10], cpu_id[11]);
+#endif
 
-    chanskip = 1;
+    // use CRC of CPUID to setup bind IDs
+    bind_crc = calc_crc(cpu_id, 12);
+    bindTxId[0] = bind_crc>>8;
+    bindTxId[1] = bind_crc&0xFF;
+
+    // use XOR of CPUID to get chanskip, giving us a bit more randomness
+    bind_xor = 0;
+    for (i=0; i<12; i++) {
+        bind_xor ^= cpu_id[i];
+    }
+    chanskip = (bind_xor % 46) + 1;
+    printf("TXID %x:%x chanskip %u\n", bindTxId[0], bindTxId[1], chanskip);
 
     setup_hopping_table();
 
@@ -450,39 +485,119 @@ static void radio_init_hw(void)
 
     // setup for sending bind packets
     initialiseData(1);
+
+    // setup interrupt
+    gpio_config(RADIO_INT, GPIO_INPUT_FLOAT_IRQ);
 }
 
-static uint16_t calc_crc(uint8_t *data, uint8_t len)
+// radio IRQ handler unused for cc2500
+void radio_irq(void)
 {
-    uint16_t crc = 0;
-    uint8_t i;
-    for (i=0; i < len; i++) {
-        crc = (crc<<8) ^ (CRCTable[((uint8_t)(crc>>8) ^ *data++) & 0xFF]);
-    }
-    return crc;
 }
 
 static void send_packet(uint8_t len, const uint8_t *packet)
 {
-    gpio_set(RADIO_PACTL);
+    //gpio_set(RADIO_CE);
     cc2500_Strobe(CC2500_SFTX);
     cc2500_WriteFifo(packet, len);
     cc2500_Strobe(CC2500_STX);
+    stats.send_packets++;
 }
 
 static void send_normal_packet(void);
 
-static void start_receive(void)
+/*
+  parse an incoming telemetry packet
+ */
+static void parse_telem_packet(const uint8_t *packet)
 {
-    gpio_clear(RADIO_PACTL);
-    channr = (channr + chanskip) % 47;
-    cc2500_Strobe(CC2500_SIDLE);
-    setChannel(channr);
-    cc2500_Strobe(CC2500_SRX);
-    timer_call_after_ms(3, send_normal_packet);
+    const struct telem_packet_cc2500 *pkt = (const struct telem_packet_cc2500 *)packet;
+    uint16_t lcrc = calc_crc(packet, sizeof(*pkt)-2);
+    if (pkt->crc[0] != (lcrc>>8) || pkt->crc[1] != (lcrc&0xFF)) {
+        printf("bad telem CRC %x %x %x %x %u\n",
+               pkt->crc[0], pkt->crc[1], (lcrc>>8), (lcrc&0xFF),
+               sizeof(struct telem_packet_cc2500)-2);
+        return;
+    }
+    switch (pkt->type) {
+    case TELEM_STATUS: {
+        memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
+        break;
+    case TELEM_FW:
+    case TELEM_PLAY: {
+        struct telem_firmware fw;
+        memcpy(&fw, &pkt->payload.fw, sizeof(fw));
+        fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
+        printf("FW type=%u ofs=%u len=%u seq=%u\n", pkt->type, fw.offset, fw.len, fw.seq);
+        if (pkt->type == TELEM_FW) {
+            if (fw.offset < 16*1024 && fw.len <= 8) {
+                eeprom_flash_copy(fw.offset, &fw.data[0], fw.len);
+            }
+        } else {
+            buzzer_tune_add(fw.offset, &fw.data[0], fw.len);
+        }
+        telem_ack_value = fw.seq;
+        break;
+    }
+    }
+    }
 }
 
-static void send_normal_packet(void)
+/*
+  called 9ms after sending a packet to check if we have received a telemetry packet
+ */
+static void check_rx_packet(void)
+{
+    uint8_t ccLen;
+    bool matched = false;
+    bool got_telem = false;
+    uint8_t packet[sizeof(struct telem_packet_cc2500)+2];
+
+    do {
+        uint8_t ccLen2;
+        ccLen = cc2500_ReadReg(CC2500_3B_RXBYTES | CC2500_READ_BURST);
+        ccLen2 = cc2500_ReadReg(CC2500_3B_RXBYTES | CC2500_READ_BURST);
+        matched = (ccLen == ccLen2);
+    } while (!matched);
+
+    if (ccLen & 0x80) {
+        // RX FIFO overflow
+        printf("Fifo overflow %02x\n", ccLen);
+        cc2500_Strobe(CC2500_SFRX);
+    } else if (ccLen == sizeof(struct telem_packet_cc2500)+2) {
+        cc2500_ReadFifo(packet, ccLen);
+        // first byte in FIFO is length. Last two bytes are RSSI and LQI
+        if (packet[0] == sizeof(struct telem_packet_cc2500)-1) {
+            got_telem = true;
+        }
+    } else if (ccLen != 0) {
+        printf("ccLen=%u\n", ccLen);
+        cc2500_Strobe(CC2500_SFRX);
+    }
+
+    // we start the send before we parse, so we overlap send with processing telem packet
+    send_normal_packet();
+
+    if (got_telem) {
+        uint8_t rssi_raw, rssi_dbm;
+        parse_telem_packet(&packet[0]);
+        rssi_raw = packet[ccLen-2];
+        if (rssi_raw >= 128) {
+            rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) - 82;
+        } else {
+            rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) + 65;
+        }
+        rssi_sum += rssi_dbm;
+        rssi_count++;
+        stats.recv_packets++;
+    }
+}
+
+#if 0
+/*
+  send a FrSky D16 packet (replaced by SRT packet)
+ */
+static void send_D16_packet(void)
 {
     uint8_t packet[30];
     uint8_t i, ofs;
@@ -516,8 +631,45 @@ static void send_normal_packet(void)
     cc2500_Strobe(CC2500_SIDLE);
     cc2500_Strobe(CC2500_SFRX);
     send_packet(sizeof(packet), packet);
+}
+#endif
 
-    timer_call_after_ms(6, start_receive);
+/*
+  send a SkyRocket packet
+ */
+static void send_SRT_packet(void)
+{
+    struct srt_packet pkt;
+    uint16_t lcrc;
+    fill_packet(&pkt);
+
+    pkt.length = sizeof(pkt)-1;
+    pkt.txid[0] = bindTxId[0];
+    pkt.txid[1] = bindTxId[1];
+    pkt.channr = channr;
+    pkt.chanskip = chanskip;
+
+    lcrc = calc_crc((uint8_t *)&pkt, sizeof(pkt)-2);
+    pkt.crc[0] = lcrc>>8;
+    pkt.crc[1] = lcrc&0xFF;
+
+    cc2500_Strobe(CC2500_SIDLE);
+    cc2500_Strobe(CC2500_SFRX);
+    send_packet(sizeof(pkt), (uint8_t *)&pkt);
+}
+
+static void send_normal_packet(void)
+{
+    channr = (channr + chanskip) % 47;
+    setChannel(channr);
+
+#if USE_D16_FORMAT
+    send_D16_packet();
+    timer_call_after_ms(9, send_normal_packet);
+#else
+    send_SRT_packet();
+    timer_call_after_ms(8, check_rx_packet);
+#endif
 }
 
 /*
@@ -572,17 +724,13 @@ static void send_bind_packet(void)
 
 
 /*
-  IRQ handler
- */
-void radio_irq(void)
-{
-}
-
-/*
   setup radio for bind on send side
  */
 void radio_start_bind_send(bool use_dsm2)
 {
+    printf("radio_start_bind\n");
+    setChannel(0);
+    timer_call_after_ms(2, send_bind_packet);
 }
 
 
@@ -601,7 +749,7 @@ void radio_start_send(bool use_dsm2)
 {
     printf("radio_start_send\n");
     setChannel(0);
-    timer_call_after_ms(2, send_bind_packet);
+    timer_call_after_ms(2, send_normal_packet);
 }
 
 /*
@@ -621,6 +769,15 @@ uint8_t get_tx_power(void)
  */
 void radio_set_pps_rssi(void)
 {
+    rates.telem_pps = stats.recv_packets - last_stats.recv_packets;
+    rates.send_pps = stats.send_packets - last_stats.send_packets;
+    if (rssi_count != 0) {
+        rates.telem_rssi = rssi_sum / rssi_count;
+        rssi_sum = 0;
+        rssi_count = 0;
+    }
+
+    memcpy(&last_stats, &stats, sizeof(stats));
 }
 
 /*
@@ -628,7 +785,7 @@ void radio_set_pps_rssi(void)
  */
 uint8_t get_telem_rssi(void)
 {
-    return 0;
+    return rates.telem_rssi;
 }
 
 /*
@@ -636,7 +793,7 @@ uint8_t get_telem_rssi(void)
  */
 uint8_t get_send_pps(void)
 {
-    return 0;
+    return rates.send_pps;
 }
 
 /*
@@ -644,7 +801,7 @@ uint8_t get_send_pps(void)
  */
 uint8_t get_telem_pps(void)
 {
-    return 0;
+    return rates.telem_pps;
 }
 
 /*
@@ -659,7 +816,7 @@ void radio_next_FCC_power(void)
  */
 int8_t get_FCC_chan(void)
 {
-    return 0;
+    return -1;
 }
 
 /*

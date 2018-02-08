@@ -79,7 +79,7 @@ static struct stats {
 #endif
 
 struct telem_status t_status;
-uint8_t telem_ack_value;
+extern uint8_t telem_ack_value;
 
 /* The SPI interface defines */
 enum {
@@ -422,10 +422,12 @@ static void send_bind_packet(void);
 static void cypress_reset(void)
 {
     // hold reset high for 500ms
+#ifdef RADIO_RST
     gpio_set(RADIO_RST);
     delay_ms(500);
     gpio_clear(RADIO_RST);
     delay_ms(500);
+#endif
 }
 
 void cypress_init(void)
@@ -434,8 +436,10 @@ void cypress_init(void)
 
     printf("cypress_init\n");
 
+#ifdef RADIO_RST
     // setup RST pin on PD0
     gpio_config(RADIO_RST, GPIO_OUTPUT_PUSHPULL);
+#endif
 
     // setup TXEN
     gpio_config(RADIO_TXEN, GPIO_OUTPUT_PUSHPULL);
@@ -653,6 +657,9 @@ static void scan_channels(void)
             // avoid low and high channels
             rssi[i/2] = 0xff;
             i += 2;
+            if (i >= DSM_MAX_CHANNEL) {
+                break;
+            }
             continue;
         }
 
@@ -805,32 +812,9 @@ static void start_telem_receive(void)
     write_register(CYRF_RX_CTRL, CYRF_RX_GO | CYRF_RXC_IRQEN | CYRF_RXE_IRQEN);
 }
 
-/*
-  write to new firmware location
- */
-static void write_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len)
-{
-    uint16_t dest = NEW_FIRMWARE_BASE + offset;
-    uint8_t *ptr1;
-    ptr1 = (uint8_t *)dest;
+static uint8_t last_mode;
 
-    progmem_unlock();
-
-    FLASH_CR1 = 0;
-    FLASH_CR2 = 0x40;
-    FLASH_NCR2 = (uint8_t)(~0x40);
-    memcpy(&ptr1[0], &data[0], 4);
-
-    if (len > 4) {
-        FLASH_CR2 = 0x40;
-        FLASH_NCR2 = (uint8_t)~0x40;
-        memcpy(&ptr1[4], &data[4], 4);
-    }
-
-    progmem_lock();
-}
-
-static void process_telem_packet(const struct telem_packet *pkt)
+static void process_telem_packet(const struct telem_packet_cypress *pkt)
 {
     switch (pkt->type) {
     case TELEM_STATUS:
@@ -840,14 +824,27 @@ static void process_telem_packet(const struct telem_packet *pkt)
             // adjust power level on the fly
             dsm.tx_max_power = t_status.tx_max-1;
         }
+        if (t_status.flight_mode != last_mode) {
+            uint8_t i;
+            printf("mode: %u ", t_status.flight_mode);
+            for (i=0; i<14; i++) {
+                printf("%x ", pkt->payload.pkt[i]);
+            }
+            printf("\n");
+            last_mode = t_status.flight_mode;
+        }
+        dsm.telem_recv_count++;
         break;
     case TELEM_FW:
     case TELEM_PLAY: {
         struct telem_firmware fw;
         memcpy(&fw, &pkt->payload.fw, sizeof(fw));
+        printf("FW type=%u ofs=%u len=%u\n", pkt->type, fw.offset, fw.len);
         fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
         if (pkt->type == TELEM_FW) {
-            write_flash_copy(fw.offset, &fw.data[0], fw.len);
+            if (fw.offset < 16*1024 && fw.len <= 8) {
+                eeprom_flash_copy(fw.offset, &fw.data[0], fw.len);
+            }
         } else {
             buzzer_tune_add(fw.offset, &fw.data[0], fw.len);
         }
@@ -862,7 +859,7 @@ static void process_telem_packet(const struct telem_packet *pkt)
  */
 static void irq_handler_recv(uint8_t rx_status)
 {
-    struct telem_packet pkt;
+    struct telem_packet_cypress pkt;
     uint8_t rlen;
     uint8_t crc;
 
@@ -872,18 +869,16 @@ static void irq_handler_recv(uint8_t rx_status)
     }
 
     rlen = read_register(CYRF_RX_COUNT);
-    if (rlen > 16) {
-        rlen = 16;
+    if (rlen != 16) {
+        printf("rlen=%u\n", rlen);
+        spi_read_registers(CYRF_RX_BUFFER, (uint8_t *)&pkt, 16);
+        return;
     }
-    if (rlen > 0) {
-        spi_read_registers(CYRF_RX_BUFFER, (uint8_t *)&pkt, rlen);
-    }
-
+    spi_read_registers(CYRF_RX_BUFFER, (uint8_t *)&pkt, rlen);
     crc = crc_crc8((uint8_t*)&pkt.type, 15);
     if (crc == pkt.crc) {
         dsm.rssi_sum += read_register(CYRF_RSSI) & 0x1F;
         dsm.rssi_count++;
-        dsm.telem_recv_count++;
         process_telem_packet(&pkt);
     }
 }

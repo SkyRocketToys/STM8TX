@@ -5,8 +5,8 @@
 #include "gpio.h"
 
 static uint16_t /* gpio_pins_e */ pins[] = {
-    LED_GREEN,
-    LED_YELLOW,
+    LED_GPS,
+    LED_MODE,
     RADIO_TXEN,
     RADIO_INT,
     RADIO_NCS,

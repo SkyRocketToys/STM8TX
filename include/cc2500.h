@@ -12,6 +12,9 @@ void cc2500_FCC_toggle_scan(void);
 uint8_t get_tx_power(void);
 int8_t get_FCC_chan(void);
 uint8_t get_FCC_power(void);
+uint8_t get_telem_rssi(void);
+uint8_t get_telem_pps(void);
+
 
 #define radio_init cc2500_init
 #define radio_irq cc2500_irq

@@ -106,8 +106,8 @@ extern uint8_t note_adjust;
 static void update_leds(void)
 {
     uint8_t tick = (timer_get_ms() >> 6) & 0xF;
-    led_yellow_set(yellow_led_pattern & (1U<<tick));
-    led_green_set(green_led_pattern & (1U<<tick));
+    led_mode_set(yellow_led_pattern & (1U<<tick));
+    led_gps_set(green_led_pattern & (1U<<tick));
 }
 
 // -----------------------------------------------------------------------------
@@ -184,6 +184,7 @@ enum control_mode_t {
     AVOID_ADSB =   19,  ///< automatic avoidance of obstacles in the macro scale - e.g. full-sized aircraft
     GUIDED_NOGPS = 20,  ///< guided mode but only accepts attitude and altitude
     FLOWHOLD     = 21,  ///< hold with flow sensor
+    FLOWHOLD2    = 22,  ///< hold with flow sensor
 };
 
 static bool fcc_CW_mode;
@@ -308,7 +309,7 @@ static void status_update(bool have_link)
 
     if (desired_mode == THROW && (t_status.flags & TELEM_FLAG_ARMED)) {
         green_led_pattern = LED_PATTERN_RAPID;
-    } else if (desired_mode == ALT_HOLD || desired_mode == FLOWHOLD) {
+    } else if (desired_mode == ALT_HOLD || desired_mode == FLOWHOLD || desired_mode == FLOWHOLD2) {
         // GPS LED always off in "indoor" mode
         green_led_pattern = LED_PATTERN_OFF;
     } else {
@@ -330,7 +331,7 @@ static void status_update(bool have_link)
             last_batt_warn_ms = now;
             buzzer_tune(TONE_BATT_WARNING);
         }
-    } else if (desired_mode == FLOWHOLD) {
+    } else if (desired_mode == FLOWHOLD || desired_mode == FLOWHOLD2) {
         // indoor mode LED short blink
         yellow_led_pattern = LED_PATTERN_HIGH;
     } else if (desired_mode == ALT_HOLD ||
@@ -397,7 +398,9 @@ void display_sticks(void)
 	printf("Yaw: %d ", val+1000);
 	val = get_buttons_held();
 	printf("Buttons: %d%d%d%d%d%d ", (val&1)!=0, (val&2)!=0, (val&4)!=0, (val&8)!=0, (val&16)!=0, (val&32)!=0);
+#if SUPPORT_BEKEN
 	printf("Ch:%d\r\n", beken_get_tx_channel());
+#endif
     if (FCC_chan != -1) {
         printf(" FCC %d CW:%u\r\n", FCC_chan, fcc_CW_mode);
     }
@@ -417,7 +420,7 @@ void main(void)
     led_init();
 
     // give indication of power on quickly for user
-    led_yellow_set(true);
+    led_mode_set(true);
 
     adc_init();
     spi_init();
@@ -446,12 +449,20 @@ void main(void)
         printf("FCC test start\r\n");
         radio_start_FCC_test();
         break;
+#if SUPPORT_CC2500
+    case BUTTON_LEFT:
+        printf("Start bind\n");
+        eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
+        radio_start_bind_send(true);
+        break;
+#endif
 
     case BUTTON_LEFT_SHOULDER: {
         uint16_t adc0 = adc_value(0);
         uint16_t adc1 = adc_value(1);
         uint16_t adc2 = adc_value(2);
         uint16_t adc3 = adc_value(3);
+        uint16_t adc4 = adc_value(4);
         if (adc3 > 800 && adc2 > 300 && adc2 < 700) {
             factory_mode = 1;
         } else if (adc2 > 800 && adc3 > 300 && adc3 < 700) {
@@ -469,8 +480,8 @@ void main(void)
         } else if (adc1 < 200 && adc0 > 300 && adc0 < 700) {
             factory_mode = 8;
         }
-        printf("Factory mode %u adc=[%u %u %u %u]\r\n", factory_mode,
-            adc0, adc1, adc2, adc3);
+        printf("Factory mode %u adc=[%u %u %u %u] V:%u\r\n", factory_mode,
+            adc0, adc1, adc2, adc3, adc4);
         radio_start_factory_test(factory_mode);
         break;
     }
@@ -551,7 +562,9 @@ void main(void)
         status_update(link_ok);
 
         while (timer_get_ms() < next_ms) {
+#if SUPPORT_BEKEN
 			CheckUpdateFccParams();
+#endif
             update_leds();
             check_stick_activity();
         }

@@ -10,6 +10,8 @@
 #include "util.h"
 #include "channels.h"
 #include "cypress.h"
+#include "cc2500.h"
+#include "telem_structure.h"
 
 // -----------------------------------------------------------------------------
 /** \addtogroup channels Protocol logical channels
@@ -23,14 +25,14 @@ Support radio protocol logical channels
 #define BUILD_DATE_YEAR 2018
 #endif
 #ifndef BUILD_DATE_MONTH
-#define BUILD_DATE_MONTH 01
+#define BUILD_DATE_MONTH 2
 #endif
 #ifndef BUILD_DATE_DAY
-#define BUILD_DATE_DAY 17
+#define BUILD_DATE_DAY 8
 #endif
 
 static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
-extern uint8_t telem_ack_value;
+uint8_t telem_ack_value;
 static uint8_t last_telem_ack_value;
 static uint8_t telem_ack_send_count;
 static uint8_t telem_extra_type;
@@ -102,13 +104,13 @@ uint16_t channel_value(
 #if SUPPORT_PROTOCOL==1 // 2017 style channel data - force to analog
     case 4:
         v = latched_mode_button()?1000:0;
-        if (!gpio_get(PIN_LEFT_BUTTON)) {
+        if (!gpio_get(PIN_SW2)) {
             // this allows for long-press vs short-press actions
             v += 100;
         }
         break;
     case 5:
-        v = gpio_get(PIN_RIGHT_BUTTON)==0?1000:0;
+        v = gpio_get(PIN_SW1)==0?1000:0;
         break;
     case 6:
         // encode 3 switches onto channel 7
@@ -119,7 +121,7 @@ uint16_t channel_value(
         if (gpio_get(PIN_SW2)==0) {
             v |= 2;
         }
-        if (gpio_get(PIN_USER)!=0) {
+        if (gpio_get(PIN_SW6)!=0) {
             v |= 4;
         }
         v *= 100;
@@ -233,5 +235,81 @@ uint8_t get_buttons_toggled(void)
 	last = buttons;
 	return toggled;
 }
+
+#if SUPPORT_CC2500
+/*
+  fill in a normal SRT packet
+ */
+void fill_packet(struct srt_packet *pkt)
+{
+    uint16_t v[4];
+    uint8_t i;
+    uint8_t data = 0;
+
+    for (i=0; i<4; i++) {
+        v[i] = adc_value(stick_map[i]);
+        if (v[i] > 1000) {
+            v[i] = 0;
+        } else {
+            v[i] = 1000 - v[i];
+        }
+    }
+    pkt->version = 1;
+    pkt->chan1 = v[0] & 0xFF;
+    pkt->chan2 = v[1] & 0xFF;
+    pkt->chan3 = v[2] & 0xFF;
+    pkt->chan4 = v[3] & 0xFF;
+    pkt->chan_high = ((v[0]>>2)&0xC0) | ((v[1]>>4)&0x30) | ((v[2]>>6)&0x0C) | ((v[3]>>8)&0x03);
+
+    pkt->buttons = get_buttons_held();
+
+    // cycle between data types
+    telem_extra_type = (telem_extra_type+1) % PKTYPE_NUM_TYPES;
+
+    // ack data gets priority when there is new data to make OTA
+    // updates faster
+    if (telem_ack_value != last_telem_ack_value ||
+        telem_ack_send_count < 20) {
+        telem_extra_type = PKTYPE_FW_ACK;
+    }
+
+    switch (telem_extra_type) {
+    case PKTYPE_VOLTAGE:
+        // send tx_voltage in 0.025 volt units, giving us a range of up to 6.3V
+        data = adc_value(4) * 25 / 156;
+        break;
+    case PKTYPE_YEAR:
+        data = BUILD_DATE_YEAR-2017;
+        break;
+    case PKTYPE_MONTH:
+        data = BUILD_DATE_MONTH;
+        break;
+    case PKTYPE_DAY:
+        data = BUILD_DATE_DAY;
+        break;
+    case PKTYPE_TELEM_RSSI:
+        data = get_telem_rssi();
+        break;
+    case PKTYPE_TELEM_PPS:
+        data = get_telem_pps();
+        break;
+    case PKTYPE_BL_VERSION:
+        data = get_bl_version();
+        break;
+    case PKTYPE_FW_ACK: {
+        if (last_telem_ack_value != telem_ack_value) {
+            telem_ack_send_count = 0;
+        }
+        last_telem_ack_value = telem_ack_value;
+        telem_ack_send_count++;
+        data = telem_ack_value;
+        break;
+    }
+    }
+
+    pkt->data = data;
+    pkt->pkt_type = telem_extra_type;
+}
+#endif
 
 /** @}*/

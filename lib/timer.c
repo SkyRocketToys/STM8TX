@@ -68,10 +68,10 @@ void timer_irq(void)
 				// We are now waiting for the user to release the power button
 				for (;;)
 				{
-			        gpio_set(LED_GREEN);
-			        gpio_clear(LED_GREEN);
-			        gpio_set(LED_YELLOW);
-			        gpio_clear(LED_YELLOW);
+			        gpio_set(LED_GPS);
+			        gpio_clear(LED_GPS);
+			        gpio_set(LED_MODE);
+			        gpio_clear(LED_MODE);
 				}
             }
         } else {

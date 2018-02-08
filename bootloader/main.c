@@ -122,8 +122,8 @@ static void flash_copy(uint16_t to, uint16_t from, uint16_t size)
 
     progmem_unlock();
     // copy using word mode, takes 14 seconds for 11k
-    gpio_clear(LED_YELLOW);
-    gpio_set(LED_GREEN);
+    gpio_clear(LED_MODE);
+    gpio_set(LED_GPS);
 
     while (nwords--) {
         FLASH_CR2 |= 0x40;
@@ -132,12 +132,12 @@ static void flash_copy(uint16_t to, uint16_t from, uint16_t size)
         *ptr1++ = *ptr2++;
 
         if (nwords % 64 == 0) {
-            gpio_toggle(LED_YELLOW);
-            gpio_toggle(LED_GREEN);
+            gpio_toggle(LED_MODE);
+            gpio_toggle(LED_GPS);
         }
     }
-    gpio_set(LED_GREEN);
-    gpio_set(LED_YELLOW);
+    gpio_set(LED_GPS);
+    gpio_set(LED_MODE);
     progmem_lock();
 }
 
@@ -198,8 +198,8 @@ int main()
     gpio_config(PIN_POWER, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_SET));
 
     // setup yellow led for bootloader indication
-    gpio_config(LED_YELLOW, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_CLEAR));
-    gpio_config(LED_GREEN, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_CLEAR));
+    gpio_config(LED_MODE, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_CLEAR));
+    gpio_config(LED_GPS, (enum gpio_config_e)(GPIO_OUTPUT_PUSHPULL|GPIO_CLEAR));
 
     // check if we have a new firmware
     check_new_firmware();
