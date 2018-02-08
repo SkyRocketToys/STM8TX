@@ -6,7 +6,11 @@
 # Windows=0 means Linux environment (with native gcc, stm8flash)
 # Windows=1 means cygwin environment (with cheese.exe)
 # All versions require sdcc, sdld, echo, rm, shell, date, sed
-WINDOWS?=1
+ifdef SYSTEMROOT
+WINDOWS=1
+else
+WINDOWS=0
+endif
 
 ifeq ($(WINDOWS),1)
 #PYTHON_DIR=/cygdrive/c/Python27
@@ -29,7 +33,7 @@ CC=sdcc
 CODELOC=0x8700
 CFLAGS=-mstm8 -Iinclude -DSTM8S105=1 --opt-code-size -DCODELOC=$(CODELOC) -DBLBASE=$(BLBASE) -DBL_VERSION=$(BL_VERSION)
 CFLAGS+= -DBUILD_DATE_YEAR=$(BUILD_DATE_YEAR) -DBUILD_DATE_MONTH=$(BUILD_DATE_MONTH) -DBUILD_DATE_DAY=$(BUILD_DATE_DAY)
-CFLAGS+= -DBRD_RADIO_TYPE=$(BRD_RADIO_TYPE)
+CFLAGS+= -DBRD_RADIO_TYPE=$(BRD_RADIO_TYPE) -DSDCC
 BLBASE=0x8100
 LD=sdld
 CHIP=stm8s105c6
