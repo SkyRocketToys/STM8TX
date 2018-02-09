@@ -56,7 +56,7 @@ void adc_init(void)
 
 // -----------------------------------------------------------------------------
 /** This function returns the most recently converted data from a specified channel
-@return Returns the raw input value (not normalised). */
+@return Returns the raw input value, between 0 and 1023 (not normalised). */
 uint16_t adc_value(
 	uint8_t chan) ///< Which channel are we interested in now. See #adc_channel
 {

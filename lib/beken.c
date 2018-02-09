@@ -1287,8 +1287,12 @@ void UpdateTxData(void)
 			txInfo = BK_INFO_MIN;
 		if (txInfo == BK_INFO_BATTERY)
 		{
-	        // send tx_voltage in 0.025 volt units, giving us a range of up to 6.3V
-	        gFwInfo[BK_INFO_BATTERY] = (adc_value(4) * (uint16_t)23) / (uint16_t)156;
+			// The voltage is defined as being in 0.025 volt units (40 to a volt)
+			// According to the schematic, Vreg is 3.0 volts and the voltage divider is 0.5
+			// meaning a reading of 1023 means about 6.0v
+			// This has a value of 240, giving a ratio of 60/256
+	        // But tridges measurements give the ratio of 23/156 which is 38/256
+	        gFwInfo[BK_INFO_BATTERY] = (adc_value(4) * (uint16_t)38) / (uint16_t)256;
 		}
 		val = gFwInfo[txInfo];
 		tx->u.ctrl.data_type = txInfo;
