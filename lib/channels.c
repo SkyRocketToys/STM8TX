@@ -276,7 +276,7 @@ void fill_packet(struct srt_packet *pkt)
     switch (telem_extra_type) {
     case PKTYPE_VOLTAGE:
         // send tx_voltage in 0.025 volt units, giving us a range of up to 6.3V
-        data = adc_value(4) * 25 / 156;
+        data = (adc_value(4) * (uint16_t)23) / (uint16_t)156;
         break;
     case PKTYPE_YEAR:
         data = BUILD_DATE_YEAR-2017;
