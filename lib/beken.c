@@ -1142,7 +1142,7 @@ void beken_init(void)
 	gFwInfo[BK_INFO_FW_DAY] = 0;
 	gFwInfo[BK_INFO_MODEL] = 1;
 	gFwInfo[BK_INFO_PPS] = 0; // ... needs to be updated over time
-	gFwInfo[BK_INFO_BATTERY] = 0; // ... needs to be updated over time
+	gFwInfo[BK_INFO_BATTERY] = 0; // Will be updated over time
 	gFwInfo[BK_INFO_COUNTDOWN] = 0; // Will be updated over time
 
 	// Setup the Beken chip. Assumes that SPI is initialised by now
@@ -1285,6 +1285,11 @@ void UpdateTxData(void)
 	{
 		if (++txInfo >= BK_INFO_MAX)
 			txInfo = BK_INFO_MIN;
+		if (txInfo == BK_INFO_BATTERY)
+		{
+	        // send tx_voltage in 0.025 volt units, giving us a range of up to 6.3V
+	        gFwInfo[BK_INFO_BATTERY] = (adc_value(4) * (uint16_t)23) / (uint16_t)156;
+		}
 		val = gFwInfo[txInfo];
 		tx->u.ctrl.data_type = txInfo;
 	}
