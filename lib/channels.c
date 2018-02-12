@@ -93,13 +93,16 @@ uint16_t channel_value(
     case 2:
     case 3: {
         uint8_t stick = stick_map[chan];
-        v = adc_value(stick);
-        if (v > 1000) {
-            v = 1000;
-        }
+        v = adc_value(stick); // 0...1023
         if (stick != STICK_PITCH) {
             // fix reversals
             v = 1000 - v;
+        }
+        if (v > 1000) {
+            v = 1000;
+        }
+        if (v < 0) {
+            v = 0;
         }
         break;
     }

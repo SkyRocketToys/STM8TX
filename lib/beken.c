@@ -1268,7 +1268,7 @@ void UpdateTxData(void)
 	val = channel_value(1);
 	tx->u.ctrl.pitch = val & 0xff;
 	tx->u.ctrl.msb |= (val & 0x300) >> 4;
-	val = channel_value(0);
+	val = channel_value(2);
 	tx->u.ctrl.throttle = val & 0xff;
 	tx->u.ctrl.msb |= (val & 0x300) >> 6;
 	val = channel_value(3);
