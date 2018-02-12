@@ -31,7 +31,9 @@ Support radio protocol logical channels
 #define BUILD_DATE_DAY 8
 #endif
 
-static const uint8_t stick_map[4] = { STICK_THROTTLE, STICK_ROLL, STICK_PITCH, STICK_YAW };
+// According to http://ardupilot.org/copter/docs/common-rcmap.html
+// The channels are Roll, Pitch, Throttle, Yaw
+static const uint8_t stick_map[4] = { STICK_ROLL, STICK_PITCH, STICK_THROTTLE, STICK_YAW };
 uint8_t telem_ack_value;
 static uint8_t last_telem_ack_value;
 static uint8_t telem_ack_send_count;

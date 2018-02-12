@@ -70,11 +70,11 @@ typedef uint8_t BK_INFO_TYPE;
 /** Data for packets that are not droneid packets
 	Onair order = little-endian */
 typedef struct packetDataDeviceCtrl_s {
-	uint8_t throttle; ///< High 8 bits of the throttle joystick
-	uint8_t roll; ///< High 8 bits of the roll joystick
-	uint8_t pitch; ///< High 8 bits of the pitch joystick
-	uint8_t yaw; ///< High 8 bits of the yaw joystick
-	uint8_t lsb; ///< Low 2 bits of throttle, roll, pitch, yaw
+	uint8_t roll;     ///< Low 8 bits of the roll joystick (in mode2)
+	uint8_t pitch;    ///< Low 8 bits of the pitch joystick (in mode2)
+	uint8_t throttle; ///< Low 8 bits of the throttle joystick (in mode2)
+	uint8_t yaw;      ///< Low 8 bits of the yaw joystick (in mode2)
+	uint8_t msb;      ///< High 2 bits of roll (7..6), pitch (5..4), throttle (3..2), yaw (1..0) (in mode2)
 	uint8_t buttons_held; ///< The buttons
 	uint8_t buttons_toggled; ///< The buttons
 	uint8_t data_type; ///< Type of extra data being sent
@@ -1254,7 +1254,7 @@ void UpdateTxData(void)
 	// Base values for this packet type
 	tx->packetType = isDisconnected() ? BK_PKT_TYPE_CTRL_LOST : BK_PKT_TYPE_CTRL_FOUND; ///< The packet type
 //	tx->channel;
-	tx->u.ctrl.lsb = 0;
+	tx->u.ctrl.msb = 0;
 	tx->u.ctrl.buttons_held = get_buttons_held();
 	tx->u.ctrl.buttons_toggled = get_buttons_toggled();
 	tx->u.ctrl.data_type = 0;
@@ -1263,17 +1263,17 @@ void UpdateTxData(void)
 
 	// Put in the stick values
 	val = channel_value(0);
-	tx->u.ctrl.throttle = val >> 2;
-	tx->u.ctrl.lsb |= (val & 3) << 0;
+	tx->u.ctrl.roll = val & 0xff;
+	tx->u.ctrl.msb |= (val & 0x300) >> 2;
 	val = channel_value(1);
-	tx->u.ctrl.roll = val >> 2;
-	tx->u.ctrl.lsb |= (val & 3) << 2;
-	val = channel_value(2);
-	tx->u.ctrl.pitch = val >> 2;
-	tx->u.ctrl.lsb |= (val & 3) << 4;
+	tx->u.ctrl.pitch = val & 0xff;
+	tx->u.ctrl.msb |= (val & 0x300) >> 4;
+	val = channel_value(0);
+	tx->u.ctrl.throttle = val & 0xff;
+	tx->u.ctrl.msb |= (val & 0x300) >> 6;
 	val = channel_value(3);
-	tx->u.ctrl.yaw = val >> 2;
-	tx->u.ctrl.lsb |= (val & 3) << 6;
+	tx->u.ctrl.yaw = val & 0xff;
+	tx->u.ctrl.msb |= (val & 0x300) >> 8;
 
 	// Put in the extra data fields
 	if (gCountdown)
