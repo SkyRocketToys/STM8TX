@@ -389,11 +389,11 @@ void display_sticks(void)
 	int8_t FCC_chan = get_FCC_chan();
 	uint16_t val;
 	val = channel_value(0);
-	printf("Throttle: %d ", val+1000);
-	val = channel_value(1);
 	printf("Roll: %d ", val+1000);
-	val = channel_value(2);
+	val = channel_value(1);
 	printf("Pitch: %d ", val+1000);
+	val = channel_value(2);
+	printf("Throttle: %d ", val+1000);
 	val = channel_value(3);
 	printf("Yaw: %d ", val+1000);
 	val = get_buttons_held();
