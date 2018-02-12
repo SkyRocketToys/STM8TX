@@ -17,7 +17,7 @@
         <debug>0</debug>
         <option>
           <name>GenDeviceSelectMenu</name>
-          <state></state>
+          <state>UnspecifiedSTM8	STM8 - Unspecified</state>
         </option>
         <option>
           <name>GenCodeModel</name>
@@ -61,7 +61,7 @@
         </option>
         <option>
           <name>GenRTConfigPath</name>
-          <state></state>
+          <state>$TOOLKIT_DIR$\LIB\dlstm8smn.h</state>
         </option>
         <option>
           <name>GenLibInFormatter</name>
@@ -156,12 +156,12 @@
         </option>
         <option>
           <name>IccOptLevelSlave</name>
-          <state>1</state>
+          <state>3</state>
         </option>
         <option>
           <name>IccOptAllowList</name>
           <version>0</version>
-          <state>111110</state>
+          <state>111111</state>
         </option>
         <option>
           <name>IccGenerateDebugInfo</name>
@@ -169,7 +169,7 @@
         </option>
         <option>
           <name>IccOutputFile</name>
-          <state></state>
+          <state>$FILE_BNAME$.o</state>
         </option>
         <option>
           <name>IccCodeModel</name>
@@ -190,6 +190,8 @@
         <option>
           <name>CCDefines</name>
           <state>NDEBUG</state>
+          <state>STM8S005</state>
+          <state>BRD_RADIO_TYPE=3</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -543,7 +545,7 @@
         </option>
         <option>
           <name>IlinkOutputFile</name>
-          <state>###Unitialized###</state>
+          <state>StreamingTransmitter.out</state>
         </option>
         <option>
           <name>IlinkDebugInfoEnable</name>
@@ -983,7 +985,7 @@
         <option>
           <name>CCDefines</name>
           <state>STM8S005</state>
-          <state>PRODUCT=2</state>
+          <state>BRD_RADIO_TYPE=3</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -1777,7 +1779,7 @@
         <option>
           <name>CCDefines</name>
           <state>STM8S105</state>
-          <state>PRODUCT=3</state>
+          <state>BRD_RADIO_TYPE=2</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -2571,7 +2573,7 @@
         <option>
           <name>CCDefines</name>
           <state>STM8S105</state>
-          <state>PRODUCT=1</state>
+          <state>BRD_RADIO_TYPE=1</state>
         </option>
         <option>
           <name>CCPreprocFile</name>

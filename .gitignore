@@ -23,6 +23,7 @@ iar/Debug
 iar/Debug_Beken
 iar/Debug_CC2500
 iar/Debug_Cypress
+iar/Release
 iar/settings
 iar/*.dep
 iar/*.ewt

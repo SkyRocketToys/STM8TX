@@ -190,7 +190,7 @@
         <option>
           <name>CCDefines</name>
           <state>STM8S105</state>
-          <state>PRODUCT=2</state>
+          <state>BRD_RADIO_TYPE=3</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -985,7 +985,7 @@
           <name>CCDefines</name>
           <state>STM8S005</state>
           <state>BL_VERSION=2</state>
-          <state>PRODUCT=2</state>
+          <state>BRD_RADIO_TYPE=3</state>
           <state>NDEBUG</state>
         </option>
         <option>

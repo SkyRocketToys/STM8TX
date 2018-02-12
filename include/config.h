@@ -2,12 +2,12 @@
 // Manage configurations
 // -----------------------------------------------------------------------------
 
-#ifndef PRODUCT
-#error PRODUCT must be declared on the command line
+#ifndef BRD_RADIO_TYPE
+#error BRD_RADIO_TYPE must be declared on the command line
 #endif
 
 
-#if PRODUCT==1 // Cypress
+#if BRD_RADIO_TYPE==1 // Cypress
 #define SUPPORT_CYPRESS 1
 #define SUPPORT_BEKEN 0
 #define SUPPORT_CC2500 0
@@ -15,19 +15,20 @@
 #define SUPPORT_PROTOCOL 1 // Protocol 1 = cypress channels
 #endif
 
-#if PRODUCT==2 // Beken
+#if BRD_RADIO_TYPE==2 // TI
+#define SUPPORT_CYPRESS 0
+#define SUPPORT_BEKEN 0
+#define SUPPORT_CC2500 1
+#define SUPPORT_PROTOCOL 2 // Protocol 2 = raw channels
+#endif
+
+#if BRD_RADIO_TYPE==3 // Beken
 #define SUPPORT_CYPRESS 0
 #define SUPPORT_BEKEN 1
 #define SUPPORT_CC2500 0
 #define SUPPORT_PROTOCOL 2 // Protocol 2 = raw channels
 #endif
 
-#if PRODUCT==3 // TI
-#define SUPPORT_CYPRESS 0
-#define SUPPORT_BEKEN 0
-#define SUPPORT_CC2500 1
-#define SUPPORT_PROTOCOL 2 // Protocol 2 = raw channels
-#endif
 
 /** @file */
 
