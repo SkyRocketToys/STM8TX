@@ -48,7 +48,14 @@ Programs assumed to be installed on this machine:
 
 To build the firmware from Windows using IAR
 =============================================
+This is an internal build for development purposes, for the svn version not github.
+
+change doit_iar.bat to use directories valid on your installation.
+	* IARBUILD
+	* FW_OUTFILE
 run doit_iar.bat
 
 Programs assumed to be installed on this machine:
-* iar
+* IAR embedded workbench for STM8
+* svn (for build numbers)
+* cheese (HotGen tool included in the svn repository)
