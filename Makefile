@@ -6,38 +6,44 @@
 # Windows=0 means Linux environment (with native gcc, stm8flash)
 # Windows=1 means cygwin environment (with cheese.exe)
 # All versions require sdcc, sdld, echo, rm, shell, date, sed
-WINDOWS=1
+WINDOWS?=1
 
+ifeq ($(WINDOWS),1)
 #PYTHON_DIR=/cygdrive/c/Python27
 PYTHON_DIR=C:/Python27
+PYTHON_SCRIPTS=$(PYTHON_DIR)/Scripts/
+else
+PYTHON_SCRIPTS=/usr/local/bin/
+endif
+
 
 BUILD_DATE_YEAR=$(shell date +%Y)
 BUILD_DATE_MONTH=$(shell date +%m | sed 's/^0//g')
 BUILD_DATE_DAY=$(shell date +%d | sed 's/^0//g')
 
 BL_VERSION=2
+BRD_RADIO_TYPE?=3
 
 # -----------------------------------------------------------------------------
-PRODUCT=2
 CC=sdcc
 CODELOC=0x8700
 CFLAGS=-mstm8 -Iinclude -DSTM8S105=1 --opt-code-size -DCODELOC=$(CODELOC) -DBLBASE=$(BLBASE) -DBL_VERSION=$(BL_VERSION)
 CFLAGS+= -DBUILD_DATE_YEAR=$(BUILD_DATE_YEAR) -DBUILD_DATE_MONTH=$(BUILD_DATE_MONTH) -DBUILD_DATE_DAY=$(BUILD_DATE_DAY)
-CFLAGS+= -DPRODUCT=$(PRODUCT)
+CFLAGS+= -DBRD_RADIO_TYPE=$(BRD_RADIO_TYPE)
 BLBASE=0x8100
 LD=sdld
 CHIP=stm8s105c6
 #STLINK=stlink
 STLINK=stlinkv2
 
-ifeq ($(PRODUCT),1)
+ifeq ($(BRD_RADIO_TYPE),1)
 RADIO_MODULE=lib/cypress.c
 endif
-ifeq ($(PRODUCT),2)
-RADIO_MODULE=lib/beken.c
-endif
-ifeq ($(PRODUCT),3)
+ifeq ($(BRD_RADIO_TYPE),2)
 RADIO_MODULE=lib/cc2500.c
+endif
+ifeq ($(BRD_RADIO_TYPE),3)
+RADIO_MODULE=lib/beken.c
 endif
 
 LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c $(RADIO_MODULE)
@@ -76,7 +82,7 @@ bootloader.ihx: bootloader/main.c $(BL_RELOBJ)
 
 clean:
 	@echo Cleaning
-	@rm -f $(OBJ) $(HEX) *.map *.asm *.lst *.rst *.sym *.lk *.cdb *.ihx *.rel */*.rel *.img *.bin
+	@rm -f $(OBJ) $(HEX) *.map *.asm *.lst *.rst *.sym *.lk *.cdb *.ihx *.rel */*.rel *.img *.bin *.bin1
 
 ifeq ($(WINDOWS),1)
 # -----------------------------------------------------------------------------
@@ -98,7 +104,7 @@ else
 
 blimage: bootloader/blimage.c lib/crc.c
 	@echo Building blimage
-	gcc -Wall -o blimage -Iinclude bootloader/blimage.c lib/crc.c
+	gcc -Wall -o blimage -DBRD_RADIO_TYPE=$(BRD_RADIO_TYPE) -Iinclude bootloader/blimage.c lib/crc.c
 
 txmain.flash: txmain.ihx
 	@echo Flashing $^ to $(STLINK)
@@ -106,7 +112,7 @@ txmain.flash: txmain.ihx
 
 txmain.img: txmain.ihx blimage
 	@echo Creating txmain.bin
-	@hex2bin.py --size=14592 txmain.ihx txmain.bin
+	@python $(PYTHON_SCRIPTS)hex2bin.py --size=14592 txmain.ihx txmain.bin
 	@echo Creating txmain.img
 	@./blimage
 
@@ -128,11 +134,11 @@ bootloader.flash: bootloader.ihx
 
 combined.ihx: txmain.ihx bootloader.ihx
 	@echo Building combined.ihx
-	@python $(PYTHON_DIR)/Scripts/hex2bin.py bootloader.ihx bootloader.bin1
-	@python $(PYTHON_DIR)/Scripts/hex2bin.py --size=1792 bootloader.ihx bootloader.bin
-	@python $(PYTHON_DIR)/Scripts/hex2bin.py --size=14592 txmain.ihx txmain.bin
+	@python $(PYTHON_SCRIPTS)hex2bin.py bootloader.ihx bootloader.bin1
+	@python $(PYTHON_SCRIPTS)hex2bin.py --size=1792 bootloader.ihx bootloader.bin
+	@python $(PYTHON_SCRIPTS)hex2bin.py --size=14592 txmain.ihx txmain.bin
 	@cat bootloader.bin txmain.bin txmain.bin > combined.bin
-	@python $(PYTHON_DIR)/Scripts/bin2hex.py --offset 0x8000 combined.bin combined.ihx
+	@python $(PYTHON_SCRIPTS)bin2hex.py --offset 0x8000 combined.bin combined.ihx
 
 combined.flash: combined.ihx
 	@echo Flashing combined to $(STLINK)
