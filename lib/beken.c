@@ -26,6 +26,8 @@ enum {
 	CHANNEL_NUM_TABLES = 6
 };
 
+uint8_t dfu_buffer[128];
+
 /** \file */
 /** \addtogroup beken Beken BK2425 radio module
 @{ */
@@ -91,6 +93,7 @@ enum { SZ_DFU = 16 }; ///< Size of DFU packets
 typedef struct packetDataDeviceBind_s {
 	uint8_t bind_address[SZ_ADDRESS]; ///< The address being used by control packets
 	uint8_t hopping; ///< The hopping table in use for this connection
+	uint8_t droneid[SZ_CRC_GUID]; ///< The CRC of the drone id I last received telemetry from, or 0.
 } packetDataDeviceBind;
 
 /** Data structure for data packet transmitted from device (controller) to host (drone) */
@@ -104,17 +107,21 @@ typedef struct packetDataDevice_s {
 	} u;
 } packetFormatTx;
 
-/** Data structure for data packet transmitted from host (drone) to device (controller) */
+/** Data structure for data packet transmitted from host (drone) to device (controller) for telemetry.
+    Compare with telem_packet_cc2500 and telem_packet_cypress */
 typedef struct packetDataDrone_s {
 	BK_PKT_TYPE packetType; ///< 0: The packet type
 	uint8_t channel; ///< 1: Next channel I will broadcast on
-	uint8_t wifi; ///< 2:
-	uint8_t rssi; ///< 3:
-	uint8_t droneid[SZ_CRC_GUID]; ///< 4...7:
-	uint8_t mode; ///< 8:
-	// Telemetry data (unspecified so far)
+	uint8_t pps; ///< 2: Packets per second the drone received
+	uint8_t flags; ///< 3: Flags
+	uint8_t droneid[SZ_CRC_GUID]; ///< 4...7: CRC of the drone
+	uint8_t flight_mode; ///< 8:
+	uint8_t wifi; ///< 9: Wifi channel + 24 * tx power.
+	uint8_t note_adjust; ///< 10: note adjust for the tx buzzer (should this be sent so often?)
 } packetFormatRx;
 
+/** Data structure for data packet transmitted from host (drone) to device (controller) for over the air upgrades.
+    Compare with telem_firmware */
 typedef struct packetDataDfu_s {
 	BK_PKT_TYPE packetType; ///< 0: The packet type
 	uint8_t channel; ///< 1: Next channel I will broadcast on
@@ -130,8 +137,8 @@ typedef struct packetDataDfu_s {
 #define TX_SPEED 250u // Default transmit speed in kilobits per second.
 
 #define PACKET_LENGTH_TX_CTRL 12
-#define PACKET_LENGTH_TX_BIND 10
-#define PACKET_LENGTH_RX_TELEMETRY 9
+#define PACKET_LENGTH_TX_BIND 12
+#define PACKET_LENGTH_RX_TELEMETRY 11
 #define PACKET_LENGTH_RX_DFU 20
 #define PACKET_LENGTH_RX_MAX 20
 
@@ -413,10 +420,7 @@ typedef struct FccParams_s {
 typedef struct RadioInfo_s {
 	RadioStats stats;
 	FccParams fcc;
-	uint8_t bFreshData; // Have we received a packet since we last processed one
-	packetFormatTx pktDataTx; // Packet data to send
-	packetFormatRx pktDataRx; // Last valid packet that has been received
-	packetFormatRx pktDataRecv; // Packet data in process of being received
+	// Radio parameters
 	uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL * CHANNEL_NUM_TABLES * CHANNEL_DWELL_PACKETS
 	uint8_t lastTxPower; // 0..7
 	bool lastTxCwMode; // 0=packet, 1=carrier wave
@@ -424,6 +428,18 @@ typedef struct RadioInfo_s {
 	uint8_t TX1_Address[5]; // Base address of binding tx
 	uint8_t RX0_Address[5]; // Base address of telemetry/dfu rx
 	uint8_t RX1_Address[5]; // ditto
+	// Data to send to the drone
+	packetFormatTx pktDataTx; // Packet data to send
+	// Data received from the drone
+	uint8_t bFreshData; // Have we received a packet since we last processed one
+	packetFormatRx pktDataRecv; // Packet data in process of being received
+	packetFormatRx pktDataRx; // Last valid packet that has been received
+	uint8_t lastFlags; // Flags from the drone
+	uint8_t lastDroneid[SZ_CRC_GUID]; // CRC of the drone
+	uint8_t lastFlight_mode; //
+	uint8_t lastWifi; // Wifi channel
+	uint8_t lastTxMaxPower; // tx max power
+	uint8_t lastNote_adjust; // Note adjust for the tx buzzer
 } RadioInfo;
 
 RadioInfo beken;
@@ -1169,13 +1185,27 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 {
 	if (rx->packetType == BK_PKT_TYPE_TELEMETRY)
 	{
+		uint8_t tx;
+		uint8_t wifi;
 		beken.stats.lastTelemetryPktTime = timer_get_ms();
 
 		// Should we change channel table due to Wi-Fi changes?
-		if (rx->wifi != gLastWifiChannel)
+		tx = 0;
+		wifi = rx->wifi;
+		if (wifi >= 24*4)
+		{
+			wifi -= 24*4;
+			tx += 4;
+		}
+		while (wifi >= 24) // Argh, avoid DIV instruction within an interrupt on STM8
+		{
+			wifi -= 24;
+			++tx;
+		}
+		if (wifi != gLastWifiChannel)
 		{
 			uint8_t wanted = 0;
-			gLastWifiChannel = rx->wifi;
+			gLastWifiChannel = wifi;
 			switch (rx->wifi) {
 			case 0: wanted = 0; break;
 			case 1: case 2: case 3: case 4: case 5: wanted = 1; break;
@@ -1187,9 +1217,37 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 			gCountdown = 10;
 			gCountdownTable = wanted * CHANNEL_COUNT_LOGICAL;
 		}
+		// Remember the data for later. Process that in the main thread
+		beken.lastFlags = rx->flags;
+		{
+			uint8_t i;
+			for (i = 0; i < SZ_CRC_GUID; ++i)
+				beken.lastDroneid[i] = rx->droneid[i];
+		}
+		beken.lastFlight_mode = rx->flight_mode;
+		beken.lastWifi = wifi;
+		beken.lastTxMaxPower = tx;
+		beken.lastNote_adjust = rx->note_adjust;
 	}
 	else if (rx->packetType == BK_PKT_TYPE_DFU)
 	{
+		const packetFormatDfu* pDFU = (const packetFormatDfu*) rx;
+		uint16_t addr = (pDFU->address_hi << 8) | pDFU->address_lo;
+		uint8_t* dst = (uint8_t*) addr;
+		memcpy(&dfu_buffer[addr & 0x70], pDFU->data, 16);
+		if (addr == 0)
+		{
+			// Check to see if the EEPROM is new
+			//...
+			// Erase the EEPROM
+			//...
+		}
+		if ((addr & 0x7f) == 0x70) // End of a page
+		{
+			// Fast write the buffer to the flash
+			//...
+//			memcpy(dst, dfu_buffer, 0x80);
+		}
 		//...
 	}
 }
@@ -1305,15 +1363,15 @@ void UpdateTxData(void)
 void UpdateTxBindData(void)
 {
 	packetFormatTx* tx = &beken.pktDataTx;
+	uint8_t i;
 
 	tx->packetType = BK_PKT_TYPE_BIND;
 //	tx->channel;
-	tx->u.bind.bind_address[0] = beken.RX0_Address[0];
-	tx->u.bind.bind_address[1] = beken.RX0_Address[1];
-	tx->u.bind.bind_address[2] = beken.RX0_Address[2];
-	tx->u.bind.bind_address[3] = beken.RX0_Address[3];
-	tx->u.bind.bind_address[4] = beken.RX0_Address[4];
+	for (i = 0; i < 5; ++i)
+		tx->u.bind.bind_address[i] = beken.RX0_Address[i];
 	tx->u.bind.hopping = 0;
+	for (i = 0; i < SZ_CRC_GUID; ++i)
+		tx->u.bind.droneid[0] = beken.lastDroneid[i];
 }
 
 // ----------------------------------------------------------------------------
@@ -1351,6 +1409,14 @@ bool CheckUpdateFccParams(void)
 			BK2425_SetCarrierMode(beken.fcc.CW_mode);
 			result = true;
 //			beken_DumpRegisters();
+		}
+	}
+	else
+	{
+		if (beken.lastTxMaxPower && (beken.lastTxMaxPower != beken.lastTxPower))
+		{
+			BK2425_SetTxPower(beken.lastTxMaxPower);
+			result = true;
 		}
 	}
 	return result;
