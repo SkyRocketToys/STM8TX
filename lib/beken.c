@@ -430,16 +430,11 @@ typedef struct RadioInfo_s {
 	uint8_t RX1_Address[5]; // ditto
 	// Data to send to the drone
 	packetFormatTx pktDataTx; // Packet data to send
-	// Data received from the drone
+	// Data received from the drone. See also t_status
 	uint8_t bFreshData; // Have we received a packet since we last processed one
 	packetFormatRx pktDataRecv; // Packet data in process of being received
 	packetFormatRx pktDataRx; // Last valid packet that has been received
-	uint8_t lastFlags; // Flags from the drone
 	uint8_t lastDroneid[SZ_CRC_GUID]; // CRC of the drone
-	uint8_t lastFlight_mode; //
-	uint8_t lastWifi; // Wifi channel
-	uint8_t lastTxMaxPower; // tx max power
-	uint8_t lastNote_adjust; // Note adjust for the tx buzzer
 } RadioInfo;
 
 RadioInfo beken;
@@ -1218,16 +1213,16 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 			gCountdownTable = wanted * CHANNEL_COUNT_LOGICAL;
 		}
 		// Remember the data for later. Process that in the main thread
-		beken.lastFlags = rx->flags;
+		t_status.flags = rx->flags;
 		{
 			uint8_t i;
 			for (i = 0; i < SZ_CRC_GUID; ++i)
 				beken.lastDroneid[i] = rx->droneid[i];
 		}
-		beken.lastFlight_mode = rx->flight_mode;
-		beken.lastWifi = wifi;
-		beken.lastTxMaxPower = tx;
-		beken.lastNote_adjust = rx->note_adjust;
+		t_status.flight_mode = rx->flight_mode;
+		t_status.wifi_chan = wifi;
+		t_status.tx_max = tx;
+		t_status.note_adjust = rx->note_adjust;
 	}
 	else if (rx->packetType == BK_PKT_TYPE_DFU)
 	{
@@ -1413,9 +1408,9 @@ bool CheckUpdateFccParams(void)
 	}
 	else
 	{
-		if (beken.lastTxMaxPower && (beken.lastTxMaxPower != beken.lastTxPower))
+		if (t_status.tx_max && (t_status.tx_max != beken.lastTxPower))
 		{
-			BK2425_SetTxPower(beken.lastTxMaxPower);
+			BK2425_SetTxPower(t_status.tx_max);
 			result = true;
 		}
 	}

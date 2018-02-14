@@ -41,4 +41,6 @@ enum tune_index {
 	TONE_PENDING                      =127
 };
 
+extern uint8_t note_adjust;
+
 /** @}*/

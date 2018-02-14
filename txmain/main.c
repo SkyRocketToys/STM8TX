@@ -99,7 +99,6 @@ extern struct telem_status t_status;
 static struct telem_status last_status;
 
 static uint8_t last_mode;
-extern uint8_t note_adjust;
 
 // -----------------------------------------------------------------------------
 /* update led flashing */
