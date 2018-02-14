@@ -95,8 +95,8 @@ combined.ihx: txmain.ihx bootloader.ihx
 	@./WinTools/cheese dat2dat txmain.ihx txmain.bin
 	@rm txmain.h
 	@./WinTools/cheese extract combined.bin -pad 255 -i bootloader.bin 0 $$8700 -i txmain.bin $$8700 $$3900 -i txmain.bin $$86fa $$3900
-	@rm combined.h
 	@./WinTools/cheese dat2dat combined.bin combined.ihx -outrange $$8000 $$4000
+	@rm combined.h
 
 else
 # -----------------------------------------------------------------------------

@@ -189,8 +189,10 @@
         </option>
         <option>
           <name>CCDefines</name>
-          <state>STM8S105</state>
+          <state>STM8S005</state>
           <state>BRD_RADIO_TYPE=3</state>
+          <state>BL_VERSION=2</state>
+          <state>DEBUG</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -608,7 +610,7 @@
         </option>
         <option>
           <name>IlinkIcfFile</name>
-          <state>$PROJ_DIR$\lnkstm8_boot.icf</state>
+          <state>$TOOLKIT_DIR$\config\lnkstm8s105k6.icf</state>
         </option>
         <option>
           <name>IlinkIcfFileSlave</name>
