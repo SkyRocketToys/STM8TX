@@ -29,5 +29,7 @@ void beken_DumpRegisters(void);
 #define radio_FCC_toggle_scan beken_FCC_toggle_scan
 bool CheckUpdateFccParams(void); // Returns true if something happened
 uint8_t beken_get_tx_channel(void);
+void radio_set_pps_rssi(void);
+uint8_t get_telem_pps(void);
 
 #endif

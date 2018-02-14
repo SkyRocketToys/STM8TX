@@ -1156,7 +1156,7 @@ void beken_init(void)
 	gFwInfo[BK_INFO_FW_YM] = 0;
 	gFwInfo[BK_INFO_FW_DAY] = 0;
 	gFwInfo[BK_INFO_MODEL] = 1;
-	gFwInfo[BK_INFO_PPS] = 0; // ... needs to be updated over time
+	gFwInfo[BK_INFO_PPS] = 0; // Will be updated over time
 	gFwInfo[BK_INFO_BATTERY] = 0; // Will be updated over time
 	gFwInfo[BK_INFO_COUNTDOWN] = 0; // Will be updated over time
 
@@ -1607,6 +1607,7 @@ void radio_set_pps_rssi(void)
 	beken.telem_pps = beken.stats.numTelemPackets - beken.last_stats.numTelemPackets;
 	beken.send_pps = beken.stats.numSentPackets - beken.last_stats.numSentPackets;
 	memcpy(&beken.last_stats, &beken.stats, sizeof(beken.last_stats));
+	gFwInfo[BK_INFO_PPS] = beken.telem_pps;
 }
 
 // ----------------------------------------------------------------------------
