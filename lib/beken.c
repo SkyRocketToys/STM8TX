@@ -396,15 +396,15 @@ volatile uint8_t bkReady = 0u; // Is the beken chip ready enough for its status 
 
 /* Statistics about the radio */
 typedef struct RadioStats_s {
-	uint8_t lastRxLen;
-	uint32_t numTxPackets;
-	uint32_t numRxPackets;
-	uint8_t badRxAddress;
+	uint32_t numTxPackets; // Number of packets we have told the Beken chip to send
+	uint32_t numRxPackets; // Number of packets the Beken chip says it has received
+	uint32_t numTelemPackets; // Number of telemetry packets received
+	uint32_t numSentPackets; // Number of packets that the Beken chip acknowledges sending
 	uint32_t recvTimestampMs;
-	uint32_t numAckPackets;
-	uint32_t numSentPackets;
-	uint16_t lastTxPacketCount;
 	uint32_t lastTelemetryPktTime;
+	uint16_t lastTxPacketCount;
+	uint8_t lastRxLen;
+	uint8_t badRxAddress;
 } RadioStats;
 
 /** Parameters used by the fcc pretests */
@@ -419,8 +419,12 @@ typedef struct FccParams_s {
 
 typedef struct RadioInfo_s {
 	RadioStats stats;
+	RadioStats last_stats;
 	FccParams fcc;
+    uint8_t telem_pps;
+    uint8_t send_pps;
 	// Radio parameters
+	uint16_t bind_packets;
 	uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL * CHANNEL_NUM_TABLES * CHANNEL_DWELL_PACKETS
 	uint8_t lastTxPower; // 0..7
 	bool lastTxCwMode; // 0=packet, 1=carrier wave
@@ -1183,11 +1187,12 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 		uint8_t tx;
 		uint8_t wifi;
 		beken.stats.lastTelemetryPktTime = timer_get_ms();
+		beken.stats.numTelemPackets++;
 
 		// Should we change channel table due to Wi-Fi changes?
 		tx = 0;
 		wifi = rx->wifi;
-		if (wifi >= 24*4)
+		while (wifi >= 24*4)
 		{
 			wifi -= 24*4;
 			tx += 4;
@@ -1276,7 +1281,6 @@ void beken_irq(void)
 		{
 			beken.stats.badRxAddress++;
 		}
-		beken.stats.numAckPackets++;
 		beken.bFreshData = 1;
 		Receive_Packet((uint8_t *)&beken.pktDataRecv);
 		memcpy(&beken.pktDataRx, &beken.pktDataRecv, sizeof(beken.pktDataRx));
@@ -1408,9 +1412,9 @@ bool CheckUpdateFccParams(void)
 	}
 	else
 	{
-		if (t_status.tx_max && (t_status.tx_max != beken.lastTxPower))
+		if (t_status.tx_max && (t_status.tx_max-1 != beken.lastTxPower))
 		{
-			BK2425_SetTxPower(t_status.tx_max);
+			BK2425_SetTxPower(t_status.tx_max-1);
 			result = true;
 		}
 	}
@@ -1444,7 +1448,19 @@ void beken_timer_irq(void)
 	BK2425_ClearAckOverflow();
 
 	// Support sending binding packets
-	if (isDisconnected())
+	if (beken.bind_packets)
+	{
+		beken.bind_packets--;
+		BK2425_SwitchToIdleMode();
+		ChangeAddressTx(1); // Binding address
+		BK2425_SwitchToTxMode();
+		UpdateTxBindData();
+		beken.pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
+		beken.lastTxChannel = txChannel;
+		Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_BIND);
+		return;
+	}
+	else if (isDisconnected())
 	{
 		if (++bindTimer >= 7)
 		{
@@ -1480,10 +1496,10 @@ void beken_timer_irq(void)
 }
 
 // ----------------------------------------------------------------------------
-/** Start sending a binding packet */
+/** Start sending binding packets for 5 seconds */
 void beken_start_bind_send(void)
 {
-	//...
+	beken.bind_packets = 200 * 5;
 }
 
 // ----------------------------------------------------------------------------
@@ -1579,17 +1595,19 @@ uint8_t get_FCC_power(void)
 	return 0;
 }
 
-#if 0
+// ----------------------------------------------------------------------------
 uint8_t get_telem_pps(void)
 {
-    return 0;
+    return beken.telem_pps;
 }
 
+// ----------------------------------------------------------------------------
 void radio_set_pps_rssi(void)
 {
+	beken.telem_pps = beken.stats.numTelemPackets - beken.last_stats.numTelemPackets;
+	beken.send_pps = beken.stats.numSentPackets - beken.last_stats.numSentPackets;
+	memcpy(&beken.last_stats, &beken.stats, sizeof(beken.last_stats));
 }
-
-#endif
 
 // ----------------------------------------------------------------------------
 // For debugging - tell us the current beken register values (from bank 0)

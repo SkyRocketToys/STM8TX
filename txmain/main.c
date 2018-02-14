@@ -398,6 +398,7 @@ void display_sticks(void)
 	val = get_buttons_held();
 	printf("Buttons: %d%d%d%d%d%d ", (val&1)!=0, (val&2)!=0, (val&4)!=0, (val&8)!=0, (val&16)!=0, (val&32)!=0);
 #if SUPPORT_BEKEN
+	printf("NA:%d ", note_adjust);
 	printf("Ch:%d\r\n", beken_get_tx_channel());
 #endif
     if (FCC_chan != -1) {
@@ -448,6 +449,12 @@ void main(void)
         printf("FCC test start\r\n");
         radio_start_FCC_test();
         break;
+#if SUPPORT_BEKEN
+    case BUTTON_LEFT:
+        printf("Start bind\n");
+        radio_start_bind_send(false); // Force binding packets to be sent for 5 seconds
+        break;
+#endif
 #if SUPPORT_CC2500
     case BUTTON_LEFT:
         printf("Start bind\n");
@@ -529,12 +536,11 @@ void main(void)
     while (true) {
         bool link_ok = false;
         int8_t FCC_chan = get_FCC_chan();
-#if SUPPORT_CYPRESS
         uint8_t telem_pps;
 
         radio_set_pps_rssi();
         telem_pps = get_telem_pps();
-
+#if SUPPORT_CYPRESS
 		printf("%u: ADC=[%u %u %u %u] B:0x%x PWR:%u",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
                (unsigned)get_buttons_held(), get_tx_power());
@@ -555,6 +561,12 @@ void main(void)
             link_ok = true;
         }
 #else
+        if (FCC_chan != -1) {
+        } else if (telem_pps == 0) {
+            link_ok = false;
+        } else {
+            link_ok = true;
+        }
 		display_sticks();
 #endif
 
