@@ -571,7 +571,7 @@ void main(void)
 		display_sticks();
 #endif
 
-        status_update(link_ok);
+        status_update(link_ok); // May take a little while to play a tune or write a byte to EEPROM
 
         while (timer_get_ms() < next_ms) {
 #if SUPPORT_BEKEN
