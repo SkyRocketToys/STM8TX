@@ -53,6 +53,7 @@ enum BK_PKT_TYPE_E {
 typedef uint8_t BK_PKT_TYPE;
 
 /** The type of info being sent in control packets */
+#if 0
 enum BK_INFO_TYPE_E {
 	BK_INFO_MIN = 1,
 	BK_INFO_FW_VER = 1,
@@ -67,6 +68,7 @@ enum BK_INFO_TYPE_E {
 	BK_INFO_COUNTDOWN = 10,
 	BK_INFO_MAX
 };
+#endif
 typedef uint8_t BK_INFO_TYPE;
 
 /** Data for packets that are not droneid packets

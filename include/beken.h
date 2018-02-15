@@ -32,4 +32,20 @@ uint8_t beken_get_tx_channel(void);
 void radio_set_pps_rssi(void);
 uint8_t get_telem_pps(void);
 
+enum BK_INFO_TYPE_E {
+	BK_INFO_MIN = 1,
+	BK_INFO_FW_VER = 1,
+	BK_INFO_DFU_RX = 2,
+	BK_INFO_FW_CRC_LO = 3,
+	BK_INFO_FW_CRC_HI = 4,
+	BK_INFO_FW_YM = 5,
+	BK_INFO_FW_DAY = 6,
+	BK_INFO_MODEL = 7,
+	BK_INFO_PPS = 8,
+	BK_INFO_BATTERY = 9,
+	BK_INFO_COUNTDOWN = 10,
+	BK_INFO_MAX
+};
+extern uint16_t gFwInfo[BK_INFO_MAX];
+
 #endif

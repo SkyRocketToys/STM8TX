@@ -399,6 +399,7 @@ void display_sticks(void)
 	printf("Buttons: %d%d%d%d%d%d ", (val&1)!=0, (val&2)!=0, (val&4)!=0, (val&8)!=0, (val&16)!=0, (val&32)!=0);
 #if SUPPORT_BEKEN
 	printf("NA:%d ", note_adjust);
+	printf("PPS:%d ", gFwInfo[BK_INFO_PPS]);
 	printf("Ch:%d\r\n", beken_get_tx_channel());
 #endif
     if (FCC_chan != -1) {
