@@ -21,12 +21,15 @@
 
 #define SUPPORT_UART 1 // Output some info
 enum {
-	CHANNEL_DWELL_PACKETS = 1, // 5ms frequency changes
-	CHANNEL_COUNT_LOGICAL = 16,
-	CHANNEL_NUM_TABLES = 6
+	CHANNEL_DWELL_PACKETS =  1, ///< How many packets to send on the same frequency before changing
+	CHANNEL_COUNT_LOGICAL = 16, ///< The maximum number of entries in each frequency table
+	CHANNEL_BASE_TABLE    =  0, ///< The table used for non wifi boards
+	CHANNEL_SAFE_TABLE    =  3, ///< A table that will receive packets even if wrong
+	CHANNEL_NUM_TABLES    =  6, ///< The number of tables
+	CHANNEL_COUNT_TEST    = 16, ///< The number of test mode tables
 };
 
-uint8_t dfu_buffer[128];
+uint8_t dfu_buffer[128]; // Buffer for holding new firmware info until a write can be made.
 
 /** \file */
 /** \addtogroup beken Beken BK2425 radio module
@@ -417,6 +420,7 @@ typedef struct FccParams_s {
     uint8_t scan_count; ///< In scan mode, packet count before incrementing scan
     uint8_t channel; ///< Current frequency 8..70
     uint8_t power; ///< Current power 0..7
+	uint8_t factory_mode; ///< factory test mode 0..8
 } FccParams;
 
 typedef struct RadioInfo_s {
@@ -528,30 +532,32 @@ void SPI_Write_Buf(
 // Frequency hopping
 // ----------------------------------------------------------------------------
 
+
 uint8_t gChannelIdxMin = 0;
 uint8_t gChannelIdxMax = CHANNEL_COUNT_LOGICAL * 1 /* CHANNEL_NUM_TABLES */ * CHANNEL_DWELL_PACKETS;
 uint8_t gCountdown = 0; // For counting down to changing wifi table
 uint8_t gCountdownTable = 0;
 uint8_t gLastWifiChannel = 0;
 
-const uint8_t channelTable[CHANNEL_NUM_TABLES*CHANNEL_COUNT_LOGICAL] = {
-#if 0
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,
-#else
+const uint8_t channelTable[CHANNEL_NUM_TABLES*CHANNEL_COUNT_LOGICAL+CHANNEL_COUNT_TEST] = {
+#if 0 // Support single frequency mode (no channel hopping)
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Normal
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 1,2,3,4,5
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 6
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 7
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 8
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 9,10,11
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Test mode channels
+#else // Frequency hopping
 	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,45, // Normal
 	57,62,67,72,58,63,68,59, 64,69,60,65,70,61,66,71, // Wifi channel 1,2,3,4,5
 	62,10,67,72,63,68,11,64, 69,60,65,70,12,61,66,71, // Wifi channel 6
 	10,67,11,72,12,68,13,69, 14,65,15,70,16,66,17,71, // Wifi channel 7
 	10,70,15,20,11,71,16,21, 12,17,22,72,13,18,14,19, // Wifi channel 8
 	10,15,20,25,11,16,21,12, 17,22,13,18,23,14,19,24, // Wifi channel 9,10,11
+	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,43, // Test mode channels
 #endif
 };
-
 
 // ----------------------------------------------------------------------------
 /** Set the range of the channel indexes we are using
@@ -876,6 +882,29 @@ void beken_set_address(void)
 	beken.RX1_Address[2] = beken.RX0_Address[2] = 0x59;
 	beken.RX1_Address[3] = beken.RX0_Address[3] = (address >> 8) & 0xff;
 	beken.RX1_Address[4] = beken.RX0_Address[4] = (address) & 0xff;
+}
+
+// ----------------------------------------------------------------------------
+// Override the addresses, for the factory test mode
+void beken_set_factory_address(void)
+{
+	beken.TX0_Address[0] = beken.TX1_Address[0] = 0x34;
+	beken.TX0_Address[1] = beken.TX1_Address[1] = 0x99;
+	beken.TX0_Address[2] = beken.TX1_Address[2] = 0x59;
+	beken.TX0_Address[3] = beken.TX1_Address[3] = 0xC6;
+	beken.TX0_Address[4] = beken.TX1_Address[4] = beken.fcc.factory_mode;
+
+	beken.RX1_Address[0] = beken.RX0_Address[0] = 0x35;
+	beken.RX1_Address[1] = beken.RX0_Address[1] = 0x99;
+	beken.RX1_Address[2] = beken.RX0_Address[2] = 0x59;
+	beken.RX1_Address[3] = beken.RX0_Address[3] = 0xC6;
+	beken.RX1_Address[4] = beken.RX0_Address[4] = beken.fcc.factory_mode;
+
+	// Set the various 5 byte addresses
+	BK2425_SwitchToIdleMode();
+	SPI_Write_Buf((BK_WRITE_REG | BK_RX_ADDR_P0), beken.RX0_Address, 5); // reg 10 - Rx0 addr
+	SPI_Write_Buf((BK_WRITE_REG | BK_RX_ADDR_P1), beken.RX1_Address, 5); // REG 11 - Rx1 addr
+	SPI_Write_Buf((BK_WRITE_REG | BK_TX_ADDR), beken.TX1_Address, 5); // REG 16 - TX addr
 }
 
 // ----------------------------------------------------------------------------
@@ -1204,7 +1233,9 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 			wifi -= 24;
 			++tx;
 		}
-		if (wifi != gLastWifiChannel)
+		if ((wifi != gLastWifiChannel) // Has the knowledge about the Wi-Fi channel changed?
+			&& (!beken.fcc.factory_mode) // In factory mode, ignore wifi tables
+			&& (!beken.fcc.test_mode)) // In fcc test mode, ignore wifi tables
 		{
 			uint8_t wanted = 0;
 			gLastWifiChannel = wifi;
@@ -1525,7 +1556,13 @@ void beken_start_FCC_test(void)
 void beken_start_factory_test(
 	uint8_t test_mode) ///< The type of test to send.
 {
-	//...
+	beken.fcc.factory_mode = test_mode;
+	if (test_mode)
+	{
+		uint8_t freq = CHANNEL_COUNT_LOGICAL*CHANNEL_NUM_TABLES+(test_mode-1);
+		SetChannelRange(freq, freq+1);
+		beken_set_factory_address();
+	}
 }
 
 // ----------------------------------------------------------------------------

@@ -463,7 +463,7 @@ void main(void)
 
     delay_ms(1);
     uart2_init();
-    radio_init();
+    radio_init(); // This sets up the radio address
 
     buzzer_init();
 
