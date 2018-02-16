@@ -408,6 +408,40 @@ void display_sticks(void)
 }
 
 // -----------------------------------------------------------------------------
+// Convert the position of the joysticks into factory modes
+uint8_t detect_factory_mode(void)
+{
+	uint8_t factory_mode = 0;
+	uint16_t adc0 = adc_value(0);
+	uint16_t adc1 = adc_value(1);
+	uint16_t adc2 = adc_value(2);
+	uint16_t adc3 = adc_value(3);
+	uint16_t adc4 = adc_value(4);
+	// Left stick
+	if (adc3 > 800 && adc2 > 300 && adc2 < 700) { // yaw left (assuming mode 2)
+		factory_mode = 1;
+	} else if (adc2 > 800 && adc3 > 300 && adc3 < 700) { // throttle down
+		factory_mode = 2;
+	} else if (adc3 < 200 && adc2 > 300 && adc2 < 700) { // yaw right
+		factory_mode = 3;
+	} else if (adc2 < 200 && adc3 > 300 && adc3 < 700) { // throttle up
+		factory_mode = 4;
+	// Right stick
+	} else if (adc0 > 800 && adc1 > 300 && adc1 < 700) { // pitch up
+		factory_mode = 5;
+	} else if (adc1 > 800 && adc0 > 300 && adc0 < 700) { // roll left
+		factory_mode = 6;
+	} else if (adc0 < 200 && adc1 > 300 && adc1 < 700) { // pitch down
+		factory_mode = 7;
+	} else if (adc1 < 200 && adc0 > 300 && adc0 < 700) { // roll right
+		factory_mode = 8;
+	}
+	printf("Factory mode %u adc=[%u %u %u %u] V:%u\r\n", factory_mode,
+		adc0, adc1, adc2, adc3, adc4);
+	return factory_mode;
+}
+
+// -----------------------------------------------------------------------------
 /** Main entry point for the program */
 void main(void)
 {
@@ -465,30 +499,7 @@ void main(void)
 #endif
 
     case BUTTON_LEFT_SHOULDER: {
-        uint16_t adc0 = adc_value(0);
-        uint16_t adc1 = adc_value(1);
-        uint16_t adc2 = adc_value(2);
-        uint16_t adc3 = adc_value(3);
-        uint16_t adc4 = adc_value(4);
-        if (adc3 > 800 && adc2 > 300 && adc2 < 700) {
-            factory_mode = 1;
-        } else if (adc2 > 800 && adc3 > 300 && adc3 < 700) {
-            factory_mode = 2;
-        } else if (adc3 < 200 && adc2 > 300 && adc2 < 700) {
-            factory_mode = 3;
-        } else if (adc2 < 200 && adc3 > 300 && adc3 < 700) {
-            factory_mode = 4;
-        } else if (adc0 > 800 && adc1 > 300 && adc1 < 700) {
-            factory_mode = 5;
-        } else if (adc1 > 800 && adc0 > 300 && adc0 < 700) {
-            factory_mode = 6;
-        } else if (adc0 < 200 && adc1 > 300 && adc1 < 700) {
-            factory_mode = 7;
-        } else if (adc1 < 200 && adc0 > 300 && adc0 < 700) {
-            factory_mode = 8;
-        }
-        printf("Factory mode %u adc=[%u %u %u %u] V:%u\r\n", factory_mode,
-            adc0, adc1, adc2, adc3, adc4);
+        factory_mode = detect_factory_mode();
         radio_start_factory_test(factory_mode);
         break;
     }
@@ -542,6 +553,7 @@ void main(void)
         radio_set_pps_rssi();
         telem_pps = get_telem_pps();
 #if SUPPORT_CYPRESS
+		// Show debug information Tridge was interested in
 		printf("%u: ADC=[%u %u %u %u] B:0x%x PWR:%u",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3),
                (unsigned)get_buttons_held(), get_tx_power());
@@ -562,6 +574,7 @@ void main(void)
             link_ok = true;
         }
 #else
+		// Show debug information in slightly different format
         if (FCC_chan != -1) {
         } else if (telem_pps == 0) {
             link_ok = false;

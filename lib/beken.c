@@ -1598,17 +1598,47 @@ uint8_t get_FCC_power(void)
 }
 
 // ----------------------------------------------------------------------------
+// get the send rate in PPS
+uint8_t get_send_pps(void)
+{
+	return beken.send_pps;
+}
+
+// ----------------------------------------------------------------------------
+// Get the Return the most recently calculated packets per second value
 uint8_t get_telem_pps(void)
 {
     return beken.telem_pps;
 }
 
 // ----------------------------------------------------------------------------
+// Return fake RSSI, as beken cannot determine a value
+uint8_t get_telem_rssi(void)
+{
+	return 50;
+}
+
+// ----------------------------------------------------------------------------
+#define MS_PER_SECOND 1000u // Number of ms in a second
+#define DELTA_DIV_PPS 8u // (should be power of two)
+
 void radio_set_pps_rssi(void)
 {
-	beken.telem_pps = beken.stats.numTelemPackets - beken.last_stats.numTelemPackets;
-	beken.send_pps = beken.stats.numSentPackets - beken.last_stats.numSentPackets;
+	// Adjust for the time between calls to this routine
+	static uint32_t lastTime = 0;
+	uint32_t now = timer_get_ms();
+	uint16_t delta = now-lastTime;
+	if (delta > 2000)
+		delta = 2000;
+	if (delta < 100)
+		delta = 100;
+	delta /= DELTA_DIV_PPS; // Fit the intermediate values within 16 bits
+	lastTime = now;
+	// Find the difference in times
+	beken.telem_pps = ((beken.stats.numTelemPackets - beken.last_stats.numTelemPackets) * (MS_PER_SECOND/DELTA_DIV_PPS)) / delta;
+	beken.send_pps = ((beken.stats.numSentPackets - beken.last_stats.numSentPackets) * (MS_PER_SECOND/DELTA_DIV_PPS)) / delta;
 	memcpy(&beken.last_stats, &beken.stats, sizeof(beken.last_stats));
+	// Notify the drone
 	gFwInfo[BK_INFO_PPS] = beken.telem_pps;
 }
 
