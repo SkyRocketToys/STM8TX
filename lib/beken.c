@@ -49,9 +49,10 @@ enum BK_PKT_TYPE_E {
 	BK_PKT_TYPE_INVALID      = 0,    ///< Invalid packet from empty packets or bad CRC
 	BK_PKT_TYPE_CTRL_FOUND   = 0x10, ///< (Tx->Drone) User control - known receiver
 	BK_PKT_TYPE_CTRL_LOST    = 0x11, ///< (Tx->Drone) User control - unknown receiver
-	BK_PKT_TYPE_BIND         = 0x12, ///< (Tx->Drone) Tell drones this tx is broadcasting
+	BK_PKT_TYPE_BIND_AUTO    = 0x12, ///< (Tx->Drone) Tell drones this tx is broadcasting
 	BK_PKT_TYPE_TELEMETRY    = 0x13, ///< (Drone->Tx) Send telemetry to tx
 	BK_PKT_TYPE_DFU          = 0x14, ///< (Drone->Tx) Send new firmware to tx
+	BK_PKT_TYPE_BIND_MANUAL  = 0x15, ///< (Tx->Drone) Tell drones this tx is broadcasting
 };
 typedef uint8_t BK_PKT_TYPE;
 
@@ -534,7 +535,7 @@ void SPI_Write_Buf(
 
 
 uint8_t gChannelIdxMin = 0;
-uint8_t gChannelIdxMax = CHANNEL_COUNT_LOGICAL * 1 /* CHANNEL_NUM_TABLES */ * CHANNEL_DWELL_PACKETS;
+uint8_t gChannelIdxMax = CHANNEL_COUNT_LOGICAL * 1 * CHANNEL_DWELL_PACKETS;
 uint8_t gCountdown = 0; // For counting down to changing wifi table
 uint8_t gCountdownTable = 0;
 uint8_t gLastWifiChannel = 0;
@@ -1392,12 +1393,12 @@ void UpdateTxData(void)
 }
 
 // ----------------------------------------------------------------------------
-void UpdateTxBindData(void)
+void UpdateTxBindData(bool bAuto)
 {
 	packetFormatTx* tx = &beken.pktDataTx;
 	uint8_t i;
 
-	tx->packetType = BK_PKT_TYPE_BIND;
+	tx->packetType = bAuto ? BK_PKT_TYPE_BIND_AUTO : BK_PKT_TYPE_BIND_MANUAL;
 //	tx->channel;
 	for (i = 0; i < 5; ++i)
 		tx->u.bind.bind_address[i] = beken.RX0_Address[i];
@@ -1487,7 +1488,7 @@ void beken_timer_irq(void)
 		BK2425_SwitchToIdleMode();
 		ChangeAddressTx(1); // Binding address
 		BK2425_SwitchToTxMode();
-		UpdateTxBindData();
+		UpdateTxBindData(false);
 		beken.pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
 		beken.lastTxChannel = txChannel;
 		Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_BIND);
@@ -1501,7 +1502,7 @@ void beken_timer_irq(void)
 			BK2425_SwitchToIdleMode();
 			ChangeAddressTx(1); // Binding address
 			BK2425_SwitchToTxMode();
-			UpdateTxBindData();
+			UpdateTxBindData(true);
 			beken.pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
 			beken.lastTxChannel = txChannel;
 			Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_BIND);
