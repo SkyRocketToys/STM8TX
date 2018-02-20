@@ -28,7 +28,7 @@ void timer_init(void)
 	/** Initialise the 1ms timer on timer4. */
 	// This perihpheral requires CLK_PCKENR1 |= 0x10, which is on by default
     TIM4_PSCR = 7; // prescale 128
-    TIM4_ARR = 125;
+    TIM4_ARR = 125-1;
     TIM4_IER = TIM_IER_UIE; // enable interrupt
     TIM4_CR1 = TIM_CR1_URS | TIM_CR1_CEN;
 	TIM4_EGR = 0;
@@ -36,9 +36,9 @@ void timer_init(void)
 	/** Initialise the 1us counter on timer3 for stats. */
 	// This perihpheral requires CLK_PCKENR1 |= 0x40, which is on by default
     TIM3_IER = 0;
-    TIM3_PSCR = 5;
-    TIM3_ARRH = 0; // High byte must be written before low byte
-    TIM3_ARRL = 5;
+    TIM3_PSCR = 4; // Prescale 16
+    TIM3_ARRH = 0xff; // High byte must be written before low byte
+    TIM3_ARRL = 0xff;
     TIM3_CR1 = TIM_CR1_CEN;
 	TIM3_EGR = 0;
 	TIM3_CCMR1 = 0;
@@ -51,14 +51,14 @@ void timer_init(void)
 }
 
 // -----------------------------------------------------------------------------
-// Return the delta in time between calls to me in microseconds
+// Return the delta in time between calls to me in microseconds (up to 65ms)
 uint16_t timer_read_delta_us(void)
 {
 	uint16_t delta;
 	uint16_t now = TIM3_CNTRH; // High byte must be read before low byte
 	now <<= 8;
 	now |= TIM3_CNTRL;
-	delta = now - last_timer_us;
+	delta = now - last_timer_us; // Maths still works after wraparound, if unsigned
 	last_timer_us = now;
 	return delta;
 }

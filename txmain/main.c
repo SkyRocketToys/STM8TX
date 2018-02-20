@@ -475,9 +475,16 @@ void main(void)
     EXTI_CR1 = (1<<6) | (1<<4) | (1<<2) | (1<<0); // rising edge interrupts
 #endif
 
-    enableInterrupts();
-
     printf("BL_VERSION %u\r\n", get_bl_version());
+	// For delta time calibration
+	{
+		uint16_t dt;
+		timer_read_delta_us();
+		delay_us(10000-2); // Take 2us overhead into account
+		dt = timer_read_delta_us();
+	    printf("10000us delay = %uus\r\n", dt); // should say 10000us = 10000us
+	}
+    enableInterrupts();
 
     // wait for initial stick inputs
     delay_ms(200);

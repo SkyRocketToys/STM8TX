@@ -33,6 +33,8 @@ define block HEAP  with size = _HEAP_SIZE {};
 
 define block INTVEC with size = 0x80 { ro section .intvec };
 
+define block FFUNC { ro section AlignedFunctions };
+
 // Initialization
 initialize by copy { rw section .far.bss,
                      rw section .far.data,
@@ -81,7 +83,8 @@ place in NearData               { block HEAP,
                                   rw section .near.noinit,
                                   rw section .near_func.textrw };
 
-place at start of NearFuncCode  { block INTVEC };
+place at start of NearFuncCode  { block INTVEC,
+								  block FFUNC };
 place in NearFuncCode           { ro section __DLIB_PERTHREAD_init,
                                   ro section .far.data_init,
                                   ro section .far_func.textrw_init,

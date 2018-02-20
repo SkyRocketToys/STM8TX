@@ -1095,7 +1095,7 @@ bool Send_Packet(
 		beken.stats.numTxPackets++;
 		SPI_Write_Buf(type, pbuf, len); // Writes data to buffer A0,B0,A8
 	}
-	delta_send_packets = timer_read_delta_us();
+	delta_send_packets = timer_read_delta_us(); // Check jitter near END of interrupt
 	return returnValue;
 }
 
@@ -1474,6 +1474,8 @@ void beken_timer_irq(void)
 	if (!bkReady) // We are reinitialising the chip in the main thread
 		return;
 
+//	delta_send_packets = timer_read_delta_us(); // Check jitter near BEGINNING of interrupt (e.g. 5024...5052us)
+
 	// Change to the next (non-ignored) channel
 	if (beken.fcc.test_mode)
 	{
@@ -1513,16 +1515,18 @@ void beken_timer_irq(void)
 			UpdateTxBindData(true);
 			beken.pktDataTx.channel = txChannel; // Tell the receiver where in the sequence this was broadcast from.
 			beken.lastTxChannel = txChannel;
+			delay_us(95); // Try to remove jitter. Now it is 0.5% locally instead of nearly 5%
+//			delta_send_packets = timer_read_delta_us(); // Check jitter before transmission
 			Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_BIND);
 			return;
 		}
-		else if (bindTimer == 1)
+		else // (try to remove jitter during search) if (bindTimer == 1)
 		{
 			BK2425_SwitchToIdleMode();
 			ChangeAddressTx(0); // Unique address for this controls
 		}
 	}
-	else if (bindTimer != 99)
+	else if (bindTimer != 99) // Note: There will be slight jitter when moving into/out of telemetry range
 	{
 		bindTimer = 99;
 		BK2425_SwitchToIdleMode();
@@ -1534,7 +1538,10 @@ void beken_timer_irq(void)
 	beken.lastTxChannel = txChannel;
 	beken.stats.lastTxPacketCount++;
 	if (!beken.lastTxCwMode)
+	{
+//		delta_send_packets = timer_read_delta_us(); // Check jitter before transmission
 		Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_CTRL);
+	}
 }
 
 // ----------------------------------------------------------------------------
