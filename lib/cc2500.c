@@ -174,6 +174,8 @@ static struct {
     uint8_t telem_rssi;
 } rates;
 
+static uint8_t autobind_counter;
+
 struct telem_status t_status;
 extern uint8_t telem_ack_value;
 
@@ -474,6 +476,7 @@ static void radio_init_hw(void)
         calData[i][1] = cc2500_ReadReg(CC2500_24_FSCAL2);
         calData[i][2] = cc2500_ReadReg(CC2500_25_FSCAL1);
     }
+
     delay_ms(10);
     cc2500_Strobe(CC2500_SIDLE);
     delay_ms(10);
@@ -500,6 +503,7 @@ static void send_packet(uint8_t len, const uint8_t *packet)
 }
 
 static void send_normal_packet(void);
+static void send_bind_packet();
 
 /*
   parse an incoming telemetry packet
@@ -663,15 +667,24 @@ static void send_normal_packet(void)
     send_D16_packet();
     timer_call_after_ms(9, send_normal_packet);
 #else
-    send_SRT_packet();
-    timer_call_after_ms(9, check_rx_packet);
+    if (stats.recv_packets == 0 && autobind_counter++ == 2) {
+        /*
+          if we have never received a telemetry packet then send a
+          bind packet every 2 packets
+         */
+        send_bind_packet();
+        autobind_counter = 0;
+    } else {
+        send_SRT_packet();
+        timer_call_after_ms(9, check_rx_packet);
+    }
 #endif
 }
 
 /*
   send one bind packet
  */
-static void send_bind_packet(void)
+static void send_bind_packet()
 {
     uint8_t packet[30]; // US packet is 0x1D (29) long
     static uint8_t idx;
@@ -708,8 +721,7 @@ static void send_bind_packet(void)
     cc2500_WriteReg(CC2500_0A_CHANNR, 0);
     send_packet(sizeof(packet), packet);
 
-    bindcount++;
-    if (bindcount > 500) {
+    if (autobind_counter != 0 || bindcount++ > 500) {
         // send every 9ms
         timer_call_after_ms(9, send_normal_packet);
     } else {
