@@ -389,7 +389,7 @@ typedef unsigned long U32;
 
 /* TIM2 */
 #define TIM2_CR1	*(volatile U8*)0x5300
-#if defined STM8S105 || defined STM8S103
+#if defined STM8S005 || defined STM8S105 || defined STM8S103
 #define TIM2_IER	*(volatile U8*)0x5301
 #define TIM2_SR1	*(volatile U8*)0x5302
 #define TIM2_SR2	*(volatile U8*)0x5303
@@ -435,7 +435,7 @@ typedef unsigned long U32;
 
 
 /* TIM3 */
-#if defined STM8S105 || defined STM8S103
+#if defined STM8S005 || defined STM8S105 || defined STM8S103
 #define TIM3_CR1	*(volatile U8*)0x5320
 #define TIM3_IER	*(volatile U8*)0x5321
 #define TIM3_SR1	*(volatile U8*)0x5322

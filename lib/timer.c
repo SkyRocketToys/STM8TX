@@ -1,5 +1,9 @@
 // -----------------------------------------------------------------------------
 // Support Timer functions
+//
+// TIM2 = reserved for music output (more accurate than beep effect)
+// TIM3 = 16-bit timer for microsecond counting (65ms wraparound)
+// TIM4 = 8-bit basic timer for 1ms interrupt
 // -----------------------------------------------------------------------------
 
 #include "config.h"
@@ -16,17 +20,47 @@
 static volatile uint32_t g_time_ms;
 static volatile uint32_t g_callback_t_ms;
 static volatile timer_callback_t g_callback;
+static volatile uint16_t last_timer_us;
 
 // -----------------------------------------------------------------------------
-/** Initialise the 1ms timer on timer4. */
 void timer_init(void)
 {
-    // prescale 128
-    TIM4_PSCR = 7;
+	/** Initialise the 1ms timer on timer4. */
+	// This perihpheral requires CLK_PCKENR1 |= 0x10, which is on by default
+    TIM4_PSCR = 7; // prescale 128
     TIM4_ARR = 125;
-    // enable interrupt
-    TIM4_IER = TIM_IER_UIE;
+    TIM4_IER = TIM_IER_UIE; // enable interrupt
     TIM4_CR1 = TIM_CR1_URS | TIM_CR1_CEN;
+	TIM4_EGR = 0;
+
+	/** Initialise the 1us counter on timer3 for stats. */
+	// This perihpheral requires CLK_PCKENR1 |= 0x40, which is on by default
+    TIM3_IER = 0;
+    TIM3_PSCR = 5;
+    TIM3_ARRH = 0; // High byte must be written before low byte
+    TIM3_ARRL = 5;
+    TIM3_CR1 = TIM_CR1_CEN;
+	TIM3_EGR = 0;
+	TIM3_CCMR1 = 0;
+	TIM3_CCMR2 = 0;
+	TIM3_CCER1 = 0;
+	TIM3_CCR1H = 0;
+	TIM3_CCR1L = 0;
+	TIM3_CCR2H = 0;
+	TIM3_CCR2L = 0;
+}
+
+// -----------------------------------------------------------------------------
+// Return the delta in time between calls to me in microseconds
+uint16_t timer_read_delta_us(void)
+{
+	uint16_t delta;
+	uint16_t now = TIM3_CNTRH; // High byte must be read before low byte
+	now <<= 8;
+	now |= TIM3_CNTRL;
+	delta = now - last_timer_us;
+	last_timer_us = now;
+	return delta;
 }
 
 static uint16_t power_pin_count;

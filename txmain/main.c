@@ -387,6 +387,8 @@ void display_sticks(void)
 {
 	int8_t FCC_chan = get_FCC_chan();
 	uint16_t val;
+	val = delta_send_packets;
+	printf("Delta: %d ", val);
 	val = channel_value(0);
 	printf("Roll: %d ", val+1000);
 	val = channel_value(1);

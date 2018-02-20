@@ -49,5 +49,6 @@ enum BK_INFO_TYPE_E {
 	BK_INFO_MAX
 };
 extern uint16_t gFwInfo[BK_INFO_MAX];
+extern uint16_t volatile delta_send_packets;
 
 #endif

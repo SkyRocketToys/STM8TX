@@ -39,6 +39,7 @@ uint8_t dfu_buffer[128]; // Buffer for holding new firmware info until a write c
 // Prototypes
 void BK2425_ChangeChannel(uint8_t channelNumber);
 uint8_t LookupChannel(uint8_t idx);
+volatile uint16_t delta_send_packets;
 
 // ----------------------------------------------------------------------------
 // Packet format definition
@@ -1094,7 +1095,7 @@ bool Send_Packet(
 		beken.stats.numTxPackets++;
 		SPI_Write_Buf(type, pbuf, len); // Writes data to buffer A0,B0,A8
 	}
-
+	delta_send_packets = timer_read_delta_us();
 	return returnValue;
 }
 
@@ -1220,6 +1221,13 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 		uint8_t wifi;
 		beken.stats.lastTelemetryPktTime = timer_get_ms();
 		beken.stats.numTelemPackets++;
+
+		// If we have received enough telemetry, consider us bound
+		if (beken.bind_packets > 1)
+		{
+			if (beken.stats.numTelemPackets > 10)
+				beken.bind_packets = 1;
+		}
 
 		// Should we change channel table due to Wi-Fi changes?
 		tx = 0;
