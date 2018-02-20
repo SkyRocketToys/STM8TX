@@ -509,9 +509,11 @@ static void parse_telem_packet(const uint8_t *packet)
     const struct telem_packet_cc2500 *pkt = (const struct telem_packet_cc2500 *)packet;
     uint16_t lcrc = calc_crc(packet, sizeof(*pkt)-2);
     if (pkt->crc[0] != (lcrc>>8) || pkt->crc[1] != (lcrc&0xFF)) {
+#if 0
         printf("bad telem CRC %x %x %x %x %u\n",
                pkt->crc[0], pkt->crc[1], (lcrc>>8), (lcrc&0xFF),
                sizeof(struct telem_packet_cc2500)-2);
+#endif
         return;
     }
     switch (pkt->type) {
@@ -523,7 +525,7 @@ static void parse_telem_packet(const uint8_t *packet)
         struct telem_firmware fw;
         memcpy(&fw, &pkt->payload.fw, sizeof(fw));
         fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
-        printf("FW type=%u ofs=%u len=%u seq=%u\n", pkt->type, fw.offset, fw.len, fw.seq);
+        //printf("FW type=%u ofs=%u len=%u seq=%u\n", pkt->type, fw.offset, fw.len, fw.seq);
         if (pkt->type == TELEM_FW) {
             if (fw.offset < 16*1024 && fw.len <= 8) {
                 eeprom_flash_copy(fw.offset, &fw.data[0], fw.len);
@@ -557,7 +559,7 @@ static void check_rx_packet(void)
 
     if (ccLen & 0x80) {
         // RX FIFO overflow
-        printf("Fifo overflow %02x\n", ccLen);
+        //printf("Fifo overflow %02x\n", ccLen);
         cc2500_Strobe(CC2500_SFRX);
     } else if (ccLen == sizeof(struct telem_packet_cc2500)+2) {
         cc2500_ReadFifo(packet, ccLen);
@@ -566,7 +568,7 @@ static void check_rx_packet(void)
             got_telem = true;
         }
     } else if (ccLen != 0) {
-        printf("ccLen=%u\n", ccLen);
+        //printf("ccLen=%u\n", ccLen);
         cc2500_Strobe(CC2500_SFRX);
     }
 
@@ -648,6 +650,7 @@ static void send_SRT_packet(void)
     
     cc2500_Strobe(CC2500_SIDLE);
     cc2500_Strobe(CC2500_SFRX);
+
     send_packet(sizeof(pkt), (uint8_t *)&pkt);
 }
 
@@ -661,7 +664,7 @@ static void send_normal_packet(void)
     timer_call_after_ms(9, send_normal_packet);
 #else
     send_SRT_packet();
-    timer_call_after_ms(8, check_rx_packet);
+    timer_call_after_ms(9, check_rx_packet);
 #endif
 }
 
