@@ -140,7 +140,7 @@ uint8_t get_buttons(void)
     if (gpio_get(PIN_VIDEO_BUTTON)==0) {
         ret |= BUTTON_VIDEO;
     }
-    if (gpio_get(PIN_USER_BUTTON)==0) {
+    if (gpio_get(PIN_USER_BUTTON)==1) {
         ret |= BUTTON_USER;
     }
     return ret;
