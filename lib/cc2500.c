@@ -188,6 +188,7 @@ static uint8_t channr;
 static uint8_t chanskip;
 static uint8_t rxnum;
 static uint16_t bindcount;
+static uint8_t tx_max = 7;
 
 // telem packet handling buffer, parsed from main thread
 static bool got_telem_packet;
@@ -526,6 +527,10 @@ static void parse_telem_packet(const uint8_t *packet)
     switch (pkt->type) {
     case TELEM_STATUS: {
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
+        if (tx_max != t_status.tx_max) {
+            cc2500_SetPower(t_status.tx_max);
+            tx_max = t_status.tx_max;
+        }
         break;
     case TELEM_FW:
     case TELEM_PLAY: {
@@ -758,7 +763,7 @@ void radio_start_factory_test(uint8_t test_mode)
 
 uint8_t get_tx_power(void)
 {
-    return 0;
+    return tx_max;
 }
 
 /*
