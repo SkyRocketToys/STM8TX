@@ -189,6 +189,9 @@ static uint8_t chanskip;
 static uint8_t rxnum;
 static uint16_t bindcount;
 
+// telem packet handling buffer, parsed from main thread
+static bool got_telem_packet;
+static uint8_t telem_packet[sizeof(struct telem_packet_cc2500)+2];
 
 static const uint16_t CRCTable[] = {
         0x0000,0x1189,0x2312,0x329b,0x4624,0x57ad,0x6536,0x74bf,
@@ -530,6 +533,7 @@ static void parse_telem_packet(const uint8_t *packet)
         memcpy(&fw, &pkt->payload.fw, sizeof(fw));
         fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
         //printf("FW type=%u ofs=%u len=%u seq=%u\n", pkt->type, fw.offset, fw.len, fw.seq);
+        telem_ack_value = fw.seq;
         if (pkt->type == TELEM_FW) {
             if (fw.offset < 16*1024 && fw.len <= 8) {
                 eeprom_flash_copy(fw.offset, &fw.data[0], fw.len);
@@ -537,7 +541,6 @@ static void parse_telem_packet(const uint8_t *packet)
         } else {
             buzzer_tune_add(fw.offset, &fw.data[0], fw.len);
         }
-        telem_ack_value = fw.seq;
         break;
     }
     }
@@ -551,7 +554,6 @@ static void check_rx_packet(void)
 {
     uint8_t ccLen;
     bool matched = false;
-    bool got_telem = false;
     uint8_t packet[sizeof(struct telem_packet_cc2500)+2];
     
     do {
@@ -569,7 +571,8 @@ static void check_rx_packet(void)
         cc2500_ReadFifo(packet, ccLen);
         // first byte in FIFO is length. Last two bytes are RSSI and LQI
         if (packet[0] == sizeof(struct telem_packet_cc2500)-1) {
-            got_telem = true;
+            memcpy(telem_packet, packet, sizeof(packet));
+            got_telem_packet = true;
         }
     } else if (ccLen != 0) {
         //printf("ccLen=%u\n", ccLen);
@@ -578,20 +581,6 @@ static void check_rx_packet(void)
 
     // we start the send before we parse, so we overlap send with processing telem packet
     send_normal_packet();    
-
-    if (got_telem) {
-        uint8_t rssi_raw, rssi_dbm;
-        parse_telem_packet(&packet[0]);
-        rssi_raw = packet[ccLen-2];
-        if (rssi_raw >= 128) {
-            rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) - 82;
-        } else {
-            rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) + 65;
-        }
-        rssi_sum += rssi_dbm;
-        rssi_count++;
-        stats.recv_packets++;
-    }
 }
 
 /*
@@ -848,4 +837,34 @@ void radio_change_FCC_channel(int8_t change)
 
 void radio_FCC_toggle_scan(void)
 {
+}
+
+/*
+  check if we need to parse a telemetry packet. We do this from main
+  thread to avoid disabling interrupts for too long
+ */
+void radio_check_telem_packet(void)
+{
+    uint8_t packet[sizeof(struct telem_packet_cc2500)+2];
+    uint8_t rssi_raw, rssi_dbm;
+        
+    disableInterrupts();
+    if (!got_telem_packet) {
+        enableInterrupts();
+        return;
+    }
+    memcpy(packet, telem_packet, sizeof(packet));
+    got_telem_packet = false;
+    enableInterrupts();
+    
+    parse_telem_packet(&packet[0]);
+    rssi_raw = packet[sizeof(struct telem_packet_cc2500)];
+    if (rssi_raw >= 128) {
+        rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) - 82;
+    } else {
+        rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) + 65;
+    }
+    rssi_sum += rssi_dbm;
+    rssi_count++;
+    stats.recv_packets++;
 }
