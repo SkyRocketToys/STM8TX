@@ -163,6 +163,7 @@ static struct stats {
     uint32_t send_packets;
     uint32_t lost_packets;
     uint32_t timeouts;
+    uint8_t  autobind_send;
 } stats, last_stats;
 
 static uint32_t rssi_sum;
@@ -181,6 +182,7 @@ extern uint8_t telem_ack_value;
 
 #define NUM_CHANNELS 47
 #define MAX_CHANNEL_NUMBER 0xEB
+#define AUTOBIND_CHANNEL 100
 
 // number of channels to step in FCC test mode
 #define FCC_CHAN_STEP 10
@@ -200,7 +202,7 @@ static bool fcc_scan_mode;
 static uint8_t fcc_power = 7;
 
 // telem packet handling buffer, parsed from main thread
-static bool got_telem_packet;
+static bool got_telem_packet = false;
 static uint8_t telem_packet[sizeof(struct telem_packet_cc2500)+2];
 
 static const uint16_t CRCTable[] = {
@@ -672,14 +674,14 @@ static void send_normal_packet(void)
     send_D16_packet();
     timer_call_after_ms(9, send_normal_packet);
 #else
-    if (stats.recv_packets == 0 && autobind_counter++ == 2) {
+    if (stats.recv_packets == 0 && (autobind_counter++ & 1)) {
         /*
           if we have never received a telemetry packet then send a
           bind packet every 2 packets
          */
         send_autobind_packet();
         autobind_counter = 0;
-        timer_call_after_ms(9, send_normal_packet);
+        timer_call_after_ms(9, check_rx_packet);
     } else if (fcc_test_chan != -1) {
         cc2500_SetPower(fcc_power);
         cc2500_WriteReg(CC2500_0A_CHANNR, ((uint8_t)fcc_test_chan) * FCC_CHAN_STEP);
@@ -767,7 +769,7 @@ static void send_autobind_packet(void)
     
     cc2500_Strobe(CC2500_SIDLE);
     cc2500_Strobe(CC2500_SFRX);
-    cc2500_WriteReg(CC2500_0A_CHANNR, 0);
+    cc2500_WriteReg(CC2500_0A_CHANNR, AUTOBIND_CHANNEL);
     send_packet(sizeof(pkt), (uint8_t *)&pkt);
 }
 
