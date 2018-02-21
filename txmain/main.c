@@ -387,8 +387,10 @@ void display_sticks(void)
 {
 	int8_t FCC_chan = get_FCC_chan();
 	uint16_t val;
+#if SUPPORT_BEKEN
 	val = delta_send_packets;
 	printf("Delta: %d ", val);
+#endif
 	val = channel_value(0);
 	printf("Roll: %d ", val+1000);
 	val = channel_value(1);
@@ -452,6 +454,7 @@ void main(void)
 #endif
     uint32_t next_ms;
     uint8_t factory_mode = 0;
+    uint8_t initial_buttons;
 
     chip_init();
     led_init();
@@ -488,7 +491,12 @@ void main(void)
 
     // wait for initial stick inputs
     delay_ms(200);
-    switch (get_buttons_no_power()) {
+
+    initial_buttons = get_buttons_no_power();
+
+    printf("initial_buttons=0x%x\n", initial_buttons);
+
+    switch (initial_buttons) {
     case BUTTON_LEFT | BUTTON_RIGHT:
         printf("FCC test start\r\n");
         radio_start_FCC_test();
@@ -601,6 +609,7 @@ void main(void)
 #endif
             update_leds();
             check_stick_activity();
+            radio_check_telem_packet();
         }
         if (FCC_chan != -1) {
             next_ms += 400;

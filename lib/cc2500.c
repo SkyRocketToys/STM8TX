@@ -167,6 +167,7 @@ static struct stats {
     uint32_t send_packets;
     uint32_t lost_packets;
     uint32_t timeouts;
+    uint8_t  autobind_send;
 } stats, last_stats;
 
 static uint32_t rssi_sum;
@@ -178,10 +179,18 @@ static struct {
     uint8_t telem_rssi;
 } rates;
 
+static uint8_t autobind_counter;
+
 struct telem_status t_status;
 extern uint8_t telem_ack_value;
 
 #define NUM_CHANNELS 47
+#define MAX_CHANNEL_NUMBER 0xEB
+#define AUTOBIND_CHANNEL 100
+
+// number of channels to step in FCC test mode
+#define FCC_CHAN_STEP 10
+
 static uint8_t calData[NUM_CHANNELS][3];
 static uint8_t bindTxId[2];
 static int8_t  bindOffset;
@@ -190,7 +199,15 @@ static uint8_t channr;
 static uint8_t chanskip;
 static uint8_t rxnum;
 static uint16_t bindcount;
+static uint8_t tx_max = 7;
+static int8_t fcc_test_chan = -1;
+static bool fcc_cw_mode;
+static bool fcc_scan_mode;
+static uint8_t fcc_power = 7;
 
+// telem packet handling buffer, parsed from main thread
+static bool got_telem_packet = false;
+static uint8_t telem_packet[sizeof(struct telem_packet_cc2500)+2];
 
 static const uint16_t CRCTable[] = {
         0x0000,0x1189,0x2312,0x329b,0x4624,0x57ad,0x6536,0x74bf,
@@ -400,7 +417,7 @@ static void setup_hopping_table(void)
 
     bindHopData[0] = channel;
     for (i=1; i<NUM_CHANNELS; i++) {
-        channel = (channel+channel_spacing) % 0xEB;
+        channel = (channel+channel_spacing) % MAX_CHANNEL_NUMBER;
         val=channel;
         if ((val==0x00) || (val==0x5A) || (val==0xDC)) {
             val++;
@@ -479,6 +496,7 @@ static void radio_init_hw(void)
         calData[i][1] = cc2500_ReadReg(CC2500_24_FSCAL2);
         calData[i][2] = cc2500_ReadReg(CC2500_25_FSCAL1);
     }
+
     delay_ms(10);
     cc2500_Strobe(CC2500_SIDLE);
     delay_ms(10);
@@ -499,12 +517,15 @@ static void send_packet(uint8_t len, const uint8_t *packet)
 {
     //gpio_set(RADIO_CE);
     cc2500_Strobe(CC2500_SFTX);
-    cc2500_WriteFifo(packet, len);
+    if (len) {
+	    cc2500_WriteFifo(packet, len);
+    }
     cc2500_Strobe(CC2500_STX);
     stats.send_packets++;
 }
 
 static void send_normal_packet(void);
+static void send_autobind_packet();
 
 /*
   parse an incoming telemetry packet
@@ -522,13 +543,18 @@ static void parse_telem_packet(const uint8_t *packet)
     switch (pkt->type) {
     case TELEM_STATUS: {
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
+        if (tx_max != t_status.tx_max) {
+            cc2500_SetPower(t_status.tx_max);
+            tx_max = t_status.tx_max;
+        }
         break;
     case TELEM_FW:
     case TELEM_PLAY: {
         struct telem_firmware fw;
         memcpy(&fw, &pkt->payload.fw, sizeof(fw));
         fw.offset = ((fw.offset & 0xFF)<<8) | (fw.offset>>8);
-        printf("FW type=%u ofs=%u len=%u seq=%u\n", pkt->type, fw.offset, fw.len, fw.seq);
+        //printf("FW type=%u ofs=%u len=%u seq=%u\n", pkt->type, fw.offset, fw.len, fw.seq);
+        telem_ack_value = fw.seq;
         if (pkt->type == TELEM_FW) {
             if (fw.offset < 16*1024 && fw.len <= 8) {
                 eeprom_flash_copy(fw.offset, &fw.data[0], fw.len);
@@ -536,7 +562,6 @@ static void parse_telem_packet(const uint8_t *packet)
         } else {
             buzzer_tune_add(fw.offset, &fw.data[0], fw.len);
         }
-        telem_ack_value = fw.seq;
         break;
     }
     }
@@ -550,7 +575,6 @@ static void check_rx_packet(void)
 {
     uint8_t ccLen;
     bool matched = false;
-    bool got_telem = false;
     uint8_t packet[sizeof(struct telem_packet_cc2500)+2];
 
     do {
@@ -562,35 +586,22 @@ static void check_rx_packet(void)
 
     if (ccLen & 0x80) {
         // RX FIFO overflow
-        printf("Fifo overflow %02x\n", ccLen);
+        //printf("Fifo overflow %02x\n", ccLen);
         cc2500_Strobe(CC2500_SFRX);
     } else if (ccLen == sizeof(struct telem_packet_cc2500)+2) {
         cc2500_ReadFifo(packet, ccLen);
         // first byte in FIFO is length. Last two bytes are RSSI and LQI
         if (packet[0] == sizeof(struct telem_packet_cc2500)-1) {
-            got_telem = true;
+            memcpy(telem_packet, packet, sizeof(packet));
+            got_telem_packet = true;
         }
     } else if (ccLen != 0) {
-        printf("ccLen=%u\n", ccLen);
+        //printf("ccLen=%u\n", ccLen);
         cc2500_Strobe(CC2500_SFRX);
     }
 
     // we start the send before we parse, so we overlap send with processing telem packet
     send_normal_packet();
-
-    if (got_telem) {
-        uint8_t rssi_raw, rssi_dbm;
-        parse_telem_packet(&packet[0]);
-        rssi_raw = packet[ccLen-2];
-        if (rssi_raw >= 128) {
-            rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) - 82;
-        } else {
-            rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) + 65;
-        }
-        rssi_sum += rssi_dbm;
-        rssi_count++;
-        stats.recv_packets++;
-    }
 }
 
 #if 0
@@ -655,6 +666,7 @@ static void send_SRT_packet(void)
 
     cc2500_Strobe(CC2500_SIDLE);
     cc2500_Strobe(CC2500_SFRX);
+
     send_packet(sizeof(pkt), (uint8_t *)&pkt);
 }
 
@@ -667,15 +679,34 @@ static void send_normal_packet(void)
     send_D16_packet();
     timer_call_after_ms(9, send_normal_packet);
 #else
-    send_SRT_packet();
-    timer_call_after_ms(8, check_rx_packet);
+    if (stats.recv_packets == 0 && (autobind_counter++ & 1)) {
+        /*
+          if we have never received a telemetry packet then send a
+          bind packet every 2 packets
+         */
+        send_autobind_packet();
+        autobind_counter = 0;
+        timer_call_after_ms(9, check_rx_packet);
+    } else if (fcc_test_chan != -1) {
+        cc2500_SetPower(fcc_power);
+        cc2500_WriteReg(CC2500_0A_CHANNR, ((uint8_t)fcc_test_chan) * FCC_CHAN_STEP);
+        if (fcc_cw_mode) {
+            send_packet(0, NULL);
+        } else {
+		    send_SRT_packet();
+        }
+        timer_call_after_ms(9, check_rx_packet);
+    } else {
+        send_SRT_packet();
+        timer_call_after_ms(9, check_rx_packet);
+    }
 #endif
 }
 
 /*
   send one bind packet
  */
-static void send_bind_packet(void)
+static void send_bind_packet()
 {
     uint8_t packet[30]; // US packet is 0x1D (29) long
     static uint8_t idx;
@@ -712,14 +743,39 @@ static void send_bind_packet(void)
     cc2500_WriteReg(CC2500_0A_CHANNR, 0);
     send_packet(sizeof(packet), packet);
 
-    bindcount++;
-    if (bindcount > 500) {
+    if (autobind_counter != 0 || bindcount++ > 500) {
         // send every 9ms
         timer_call_after_ms(9, send_normal_packet);
     } else {
         // send bind every 9ms
         timer_call_after_ms(9, send_bind_packet);
     }
+}
+
+/*
+  send a SRT autobind packet
+ */
+static void send_autobind_packet(void)
+{
+    struct autobind_packet_cc2500 pkt;
+    uint16_t lcrc;
+
+    pkt.length = sizeof(pkt)-1;
+    pkt.magic1 = 0xC5;
+    pkt.magic2 = 0xA2;
+    pkt.txid[0] = bindTxId[0];
+    pkt.txid[1] = bindTxId[1];
+    pkt.txid_inverse[0] = ~bindTxId[0];
+    pkt.txid_inverse[1] = ~bindTxId[1];
+
+    lcrc = calc_crc((uint8_t *)&pkt, sizeof(pkt)-2);
+    pkt.crc[0] = lcrc>>8;
+    pkt.crc[1] = lcrc&0xFF;
+    
+    cc2500_Strobe(CC2500_SIDLE);
+    cc2500_Strobe(CC2500_SFRX);
+    cc2500_WriteReg(CC2500_0A_CHANNR, AUTOBIND_CHANNEL);
+    send_packet(sizeof(pkt), (uint8_t *)&pkt);
 }
 
 
@@ -739,6 +795,9 @@ void radio_start_bind_send(bool use_dsm2)
  */
 void radio_start_FCC_test(void)
 {
+    printf("radio_start_FCC\n");
+    fcc_test_chan = 12;
+    timer_call_after_ms(2, send_normal_packet);    
 }
 
 
@@ -761,7 +820,7 @@ void radio_start_factory_test(uint8_t test_mode)
 
 uint8_t get_tx_power(void)
 {
-    return 0;
+    return tx_max;
 }
 
 /*
@@ -805,10 +864,11 @@ uint8_t get_telem_pps(void)
 }
 
 /*
-  switch between 3 FCC test modes
+  switch between FCC test power levels
  */
 void radio_next_FCC_power(void)
 {
+    fcc_power = (fcc_power + 1) % 8;
 }
 
 /*
@@ -816,7 +876,7 @@ void radio_next_FCC_power(void)
  */
 int8_t get_FCC_chan(void)
 {
-    return -1;
+    return fcc_test_chan;
 }
 
 /*
@@ -824,7 +884,7 @@ int8_t get_FCC_chan(void)
  */
 uint8_t get_FCC_power(void)
 {
-    return 0;
+    return fcc_power;
 }
 
 /*
@@ -832,14 +892,53 @@ uint8_t get_FCC_power(void)
  */
 void radio_set_CW_mode(bool cw)
 {
+    fcc_cw_mode = cw;
 }
 
 void radio_change_FCC_channel(int8_t change)
 {
+    fcc_test_chan += change;
+    if (fcc_test_chan < 0) {
+        fcc_test_chan = (MAX_CHANNEL_NUMBER/FCC_CHAN_STEP)-1;
+    }
+    if (fcc_test_chan >= (MAX_CHANNEL_NUMBER/FCC_CHAN_STEP)) {
+        fcc_test_chan = 0;
+    }
 }
 
 void radio_FCC_toggle_scan(void)
 {
+    fcc_scan_mode = !fcc_scan_mode;
+}
+
+/*
+  check if we need to parse a telemetry packet. We do this from main
+  thread to avoid disabling interrupts for too long
+ */
+void radio_check_telem_packet(void)
+{
+    uint8_t packet[sizeof(struct telem_packet_cc2500)+2];
+    uint8_t rssi_raw, rssi_dbm;
+        
+    disableInterrupts();
+    if (!got_telem_packet) {
+        enableInterrupts();
+        return;
+    }
+    memcpy(packet, telem_packet, sizeof(packet));
+    got_telem_packet = false;
+    enableInterrupts();
+    
+    parse_telem_packet(&packet[0]);
+    rssi_raw = packet[sizeof(struct telem_packet_cc2500)];
+    if (rssi_raw >= 128) {
+        rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) - 82;
+    } else {
+        rssi_dbm = ((((uint16_t)rssi_raw) * 18) >> 5) + 65;
+    }
+    rssi_sum += rssi_dbm;
+    rssi_count++;
+    stats.recv_packets++;
 }
 
 #endif

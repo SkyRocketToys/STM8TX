@@ -72,17 +72,22 @@ void eeprom_flash_copy(
     uint8_t *ptr1;
     ptr1 = (uint8_t *)dest;
 
+    if (memcmp(data, ptr1, len) == 0) {
+        // repeated data
+        return;
+    }
+    
     progmem_unlock();
 
     FLASH_CR1 = 0;
-    FLASH_CR2 = 0x40;
-    FLASH_NCR2 = (uint8_t)(~0x40);
-    memcpy(&ptr1[0], &data[0], 4);
+    FLASH_CR2 = 0x40; // set WPRG bit
+    FLASH_NCR2 = (uint8_t)(~0x40); // inverse of WPRG bit
+    ((uint32_t *)ptr1)[0] = ((uint32_t *)data)[0];
 
     if (len > 4) {
         FLASH_CR2 = 0x40;
         FLASH_NCR2 = (uint8_t)~0x40;
-        memcpy(&ptr1[4], &data[4], 4);
+        ((uint32_t *)ptr1)[1] = ((uint32_t *)data)[1];
     }
 
     progmem_lock();

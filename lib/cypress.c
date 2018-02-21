@@ -1572,6 +1572,10 @@ void radio_FCC_toggle_scan(void)
     }
 }
 
+void radio_check_telem_packet(void)
+{
+}
+
 /** @}*/
 
 #endif

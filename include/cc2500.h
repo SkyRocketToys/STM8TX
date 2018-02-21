@@ -14,6 +14,8 @@ int8_t get_FCC_chan(void);
 uint8_t get_FCC_power(void);
 uint8_t get_telem_rssi(void);
 uint8_t get_telem_pps(void);
+void cc2500_set_pps_rssi(void);
+void radio_check_telem_packet(void);
 
 
 #define radio_init cc2500_init

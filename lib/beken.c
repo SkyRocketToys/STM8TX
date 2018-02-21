@@ -1732,6 +1732,10 @@ void beken_DumpRegisters(void)
 	BK2425_SetRBank(0);
 }
 
+// ----------------------------------------------------------------------------
+void radio_check_telem_packet(void)
+{
+}
 
 /** @}*/
 

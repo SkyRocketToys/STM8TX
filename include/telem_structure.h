@@ -82,6 +82,18 @@ struct PACKED telem_packet_cc2500 {
 };
 
 /*
+  autobind packet from TX to RX for cc2500
+ */
+struct PACKED autobind_packet_cc2500 {
+    uint8_t length;
+    uint8_t magic1; // 0xC5
+    uint8_t magic2; // 0xA2
+    uint8_t txid[2];
+    uint8_t txid_inverse[2];
+    uint8_t crc[2];
+};
+
+/*
   packet type - controls data field. We have 4 bits, giving 16 possible
   data field types
  */
@@ -94,7 +106,8 @@ enum packet_type {
     PKTYPE_TELEM_PPS  = 5,
     PKTYPE_BL_VERSION = 6,
     PKTYPE_FW_ACK     = 7,
-    PKTYPE_NUM_TYPES  = 8 // used for modulus
+    PKTYPE_WIFI_CHAN  = 8,
+    PKTYPE_NUM_TYPES  = 9 // used for modulus
 };
 
 /*

@@ -28,6 +28,7 @@ uint8_t get_telem_rssi(void);
 uint8_t get_send_pps(void);
 uint8_t get_telem_pps(void);
 void radio_set_pps_rssi(void);
+void radio_check_telem_packet(void);
 
 /** @}*/
 

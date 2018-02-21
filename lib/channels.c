@@ -108,17 +108,7 @@ uint16_t channel_value(
     }
 #if SUPPORT_PROTOCOL==1 // 2017 style channel data - force to analog
     case 4:
-        v = latched_mode_button()?1000:0;
-        if (!gpio_get(PIN_SW2)) {
-            // this allows for long-press vs short-press actions
-            v += 100;
-        }
-        break;
-    case 5:
-        v = gpio_get(PIN_SW1)==0?1000:0;
-        break;
-    case 6:
-        // encode 3 switches onto channel 7
+        // encode 3 switches onto channel 5
         v = 0;
         if (gpio_get(PIN_SW1)==0) {
             v |= 1;
@@ -126,10 +116,28 @@ uint16_t channel_value(
         if (gpio_get(PIN_SW2)==0) {
             v |= 2;
         }
-        if (gpio_get(PIN_SW6)!=0) {
+        if (gpio_get(PIN_SW3)==0) {
             v |= 4;
         }
         v *= 100;
+        break;
+    case 5:
+        // encode 3 switches onto channel 5
+        v = 0;
+        if (gpio_get(PIN_SW4)==0) {
+            v |= 1;
+        }
+        if (gpio_get(PIN_SW5)==0) {
+            v |= 2;
+        }
+        if (gpio_get(PIN_SW6)==0) {
+            v |= 4;
+        }
+        v *= 100;
+        break;
+    case 6:
+        // TX battery voltage
+        v = adc_value(4);
         break;
     case 7: {
         uint8_t tvalue=0;
