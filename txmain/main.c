@@ -345,6 +345,7 @@ void main(void)
     uint16_t counter=0;
     uint32_t next_ms;
     uint8_t factory_mode = 0;
+    uint8_t initial_buttons;
     
     chip_init();
     led_init();
@@ -371,7 +372,11 @@ void main(void)
     // wait for initial stick inputs
     delay_ms(200);
 
-    switch (get_buttons_no_power()) {
+    initial_buttons = get_buttons_no_power();
+
+    printf("initial_buttons=0x%x\n", initial_buttons);
+
+    switch (initial_buttons) {
     case BUTTON_LL | BUTTON_MODE:
         printf("FCC test start\n");
         radio_start_FCC_test();

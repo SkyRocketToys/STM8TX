@@ -180,6 +180,11 @@ struct telem_status t_status;
 extern uint8_t telem_ack_value;
 
 #define NUM_CHANNELS 47
+#define MAX_CHANNEL_NUMBER 0xEB
+
+// number of channels to step in FCC test mode
+#define FCC_CHAN_STEP 10
+
 static uint8_t calData[NUM_CHANNELS][3];
 static uint8_t bindTxId[2];
 static int8_t  bindOffset;
@@ -189,6 +194,10 @@ static uint8_t chanskip;
 static uint8_t rxnum;
 static uint16_t bindcount;
 static uint8_t tx_max = 7;
+static int8_t fcc_test_chan = -1;
+static bool fcc_cw_mode;
+static bool fcc_scan_mode;
+static uint8_t fcc_power = 7;
 
 // telem packet handling buffer, parsed from main thread
 static bool got_telem_packet;
@@ -401,7 +410,7 @@ static void setup_hopping_table(void)
     
     bindHopData[0] = channel;
     for (i=1; i<NUM_CHANNELS; i++) {
-        channel = (channel+channel_spacing) % 0xEB;
+        channel = (channel+channel_spacing) % MAX_CHANNEL_NUMBER;
         val=channel;
         if ((val==0x00) || (val==0x5A) || (val==0xDC)) {
             val++;
@@ -501,13 +510,15 @@ static void send_packet(uint8_t len, const uint8_t *packet)
 {
     //gpio_set(RADIO_CE);
     cc2500_Strobe(CC2500_SFTX);
-    cc2500_WriteFifo(packet, len);
+    if (len) {
+        cc2500_WriteFifo(packet, len);
+    }
     cc2500_Strobe(CC2500_STX);
     stats.send_packets++;
 }
 
 static void send_normal_packet(void);
-static void send_bind_packet();
+static void send_autobind_packet();
 
 /*
   parse an incoming telemetry packet
@@ -666,8 +677,18 @@ static void send_normal_packet(void)
           if we have never received a telemetry packet then send a
           bind packet every 2 packets
          */
-        send_bind_packet();
+        send_autobind_packet();
         autobind_counter = 0;
+        timer_call_after_ms(9, send_normal_packet);
+    } else if (fcc_test_chan != -1) {
+        cc2500_SetPower(fcc_power);
+        cc2500_WriteReg(CC2500_0A_CHANNR, ((uint8_t)fcc_test_chan) * FCC_CHAN_STEP);
+        if (fcc_cw_mode) {
+            send_packet(0, NULL);
+        } else {
+            send_SRT_packet();
+        }
+        timer_call_after_ms(9, check_rx_packet);
     } else {
         send_SRT_packet();
         timer_call_after_ms(9, check_rx_packet);
@@ -724,6 +745,32 @@ static void send_bind_packet()
     }
 }
 
+/*
+  send a SRT autobind packet
+ */
+static void send_autobind_packet(void)
+{
+    struct autobind_packet_cc2500 pkt;
+    uint16_t lcrc;
+
+    pkt.length = sizeof(pkt)-1;
+    pkt.magic1 = 0xC5;
+    pkt.magic2 = 0xA2;
+    pkt.txid[0] = bindTxId[0];
+    pkt.txid[1] = bindTxId[1];
+    pkt.txid_inverse[0] = ~bindTxId[0];
+    pkt.txid_inverse[1] = ~bindTxId[1];
+
+    lcrc = calc_crc((uint8_t *)&pkt, sizeof(pkt)-2);
+    pkt.crc[0] = lcrc>>8;
+    pkt.crc[1] = lcrc&0xFF;
+    
+    cc2500_Strobe(CC2500_SIDLE);
+    cc2500_Strobe(CC2500_SFRX);
+    cc2500_WriteReg(CC2500_0A_CHANNR, 0);
+    send_packet(sizeof(pkt), (uint8_t *)&pkt);
+}
+
 
 /*
   setup radio for bind on send side
@@ -741,6 +788,9 @@ void radio_start_bind_send(bool use_dsm2)
  */
 void radio_start_FCC_test(void)
 {
+    printf("radio_start_FCC\n");
+    fcc_test_chan = 12;
+    timer_call_after_ms(2, send_normal_packet);    
 }
 
 
@@ -807,10 +857,11 @@ uint8_t get_telem_pps(void)
 }
 
 /*
-  switch between 3 FCC test modes
+  switch between FCC test power levels
  */
 void radio_next_FCC_power(void)
 {
+    fcc_power = (fcc_power + 1) % 8;
 }
 
 /*
@@ -818,7 +869,7 @@ void radio_next_FCC_power(void)
  */
 int8_t get_FCC_chan(void)
 {
-    return -1;
+    return fcc_test_chan;
 }
 
 /*
@@ -826,7 +877,7 @@ int8_t get_FCC_chan(void)
  */
 uint8_t get_FCC_power(void)
 {
-    return 0;
+    return fcc_power;
 }
 
 /*
@@ -834,14 +885,23 @@ uint8_t get_FCC_power(void)
  */
 void radio_set_CW_mode(bool cw)
 {
+    fcc_cw_mode = cw;
 }
 
 void radio_change_FCC_channel(int8_t change)
 {
+    fcc_test_chan += change;
+    if (fcc_test_chan < 0) {
+        fcc_test_chan = (MAX_CHANNEL_NUMBER/FCC_CHAN_STEP)-1;
+    }
+    if (fcc_test_chan >= (MAX_CHANNEL_NUMBER/FCC_CHAN_STEP)) {
+        fcc_test_chan = 0;
+    }
 }
 
 void radio_FCC_toggle_scan(void)
 {
+    fcc_scan_mode = !fcc_scan_mode;
 }
 
 /*
