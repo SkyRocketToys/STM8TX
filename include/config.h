@@ -3,7 +3,7 @@
  */
 
 // SWn pins
-#define PIN_SW1 (GPIO_PORTD|GPIO_PIN1) // shared with SWIM
+#define PIN_SW1 (GPIO_PORTD|GPIO_PIN0) // mode
 #define PIN_SW2 (GPIO_PORTE|GPIO_PIN5) // launch/land
 #define PIN_SW3 (GPIO_PORTC|GPIO_PIN1) // GPS
 #define PIN_SW4 (GPIO_PORTA|GPIO_PIN1) // stunt
