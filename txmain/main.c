@@ -465,6 +465,7 @@ void main(void)
         while (timer_get_ms() < next_ms) {
             update_leds();
             check_stick_activity();
+            radio_check_telem_packet();
         }
         if (FCC_chan != -1) {
             next_ms += 400;
