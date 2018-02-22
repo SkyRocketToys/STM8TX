@@ -176,6 +176,7 @@ static struct {
 } rates;
 
 static uint8_t autobind_counter;
+static bool sent_autobind;
 
 struct telem_status t_status;
 extern uint8_t telem_ack_value;
@@ -200,6 +201,7 @@ extern uint8_t telem_ack_value;
 #endif
 
 #define AUTOBIND_CHANNEL 100
+#define AUTOBIND_POWER 3
 
 // number of channels to step in FCC test mode
 #define FCC_CHAN_STEP 10
@@ -595,7 +597,7 @@ static void radio_init_hw(void)
     bindTxId[1] = bind_crc&0xFF;
 
     // setup receive address
-    //cc2500_WriteReg(CC2500_09_ADDR, bindTxId[0]);
+    cc2500_WriteReg(CC2500_09_ADDR, bindTxId[0]);
     
     // use XOR of CPUID to get chanskip, giving us a bit more randomness
     bind_xor = 0;
@@ -659,8 +661,8 @@ static void parse_telem_packet(const uint8_t *packet)
     case TELEM_STATUS: {
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
         if (tx_max != t_status.tx_max) {
-            cc2500_SetPower(t_status.tx_max);
             tx_max = t_status.tx_max;
+            cc2500_SetPower(tx_max);
         }
         break;
     case TELEM_FW:
@@ -808,6 +810,12 @@ static void send_normal_packet(void)
     } else {
         channr = (channr + chanskip) % NUM_CHANNELS;
         setChannel(channr);
+        if (sent_autobind) {
+            // reset power and address
+            cc2500_SetPower(tx_max);
+            cc2500_WriteReg(CC2500_09_ADDR, bindTxId[0]);
+            sent_autobind = false;
+        }
         send_SRT_packet();
         timer_call_after_ms(INTER_PACKET_MS, check_rx_packet);
     }
@@ -904,11 +912,16 @@ static void send_autobind_packet(void)
     lcrc = calc_crc((uint8_t *)&pkt, sizeof(pkt)-2);
     pkt.crc[0] = lcrc>>8;
     pkt.crc[1] = lcrc&0xFF;
-    
+
+    // send as broadcast at low power
+    cc2500_WriteReg(CC2500_09_ADDR, 0);
+    cc2500_SetPower(AUTOBIND_POWER);
     cc2500_Strobe(CC2500_SIDLE);
     cc2500_Strobe(CC2500_SFRX);
     setHwChannel(AUTOBIND_CHANNEL);
     send_packet(sizeof(pkt), (uint8_t *)&pkt);
+
+    sent_autobind = true;    
 }
 
 
