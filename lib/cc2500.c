@@ -204,7 +204,7 @@ extern uint8_t telem_ack_value;
 // number of channels to step in FCC test mode
 #define FCC_CHAN_STEP 10
 
-static uint8_t calData[NUM_CHANNELS][3];
+static uint8_t calData[MAX_CHANNEL_NUMBER][3];
 static uint8_t bindTxId[2];
 static int8_t  bindOffset;
 static uint8_t bindHopData[NUM_CHANNELS];
@@ -389,22 +389,19 @@ static bool cc2500_Reset(void)
     return cc2500_ReadReg(CC2500_0E_FREQ1) == 0xC4; // check if reset
 }
 
-static void initialiseData(uint8_t adr)
+static void setHwChannel(uint8_t hwchan)
 {
-    cc2500_WriteReg(CC2500_0C_FSCTRL0, 0);
-    cc2500_WriteReg(CC2500_18_MCSM0, 0x8);
-    cc2500_WriteReg(CC2500_09_ADDR, adr ? 0x03 : bindTxId[0]);
-    //cc2500_WriteReg(CC2500_07_PKTCTRL1, 0x0D); // address check, no broadcast, autoflush, status enable
-    cc2500_WriteReg(CC2500_19_FOCCFG, 0x16);
+    cc2500_Strobe(CC2500_SIDLE);
+    cc2500_WriteReg(CC2500_23_FSCAL3, calData[hwchan][0]);
+    cc2500_WriteReg(CC2500_24_FSCAL2, calData[hwchan][1]);
+    cc2500_WriteReg(CC2500_25_FSCAL1, calData[hwchan][2]);
+    cc2500_WriteReg(CC2500_0A_CHANNR, hwchan);
 }
 
 static void setChannel(uint8_t channel)
 {
-    cc2500_Strobe(CC2500_SIDLE);
-    cc2500_WriteReg(CC2500_23_FSCAL3, calData[channel][0]);
-    cc2500_WriteReg(CC2500_24_FSCAL2, calData[channel][1]);
-    cc2500_WriteReg(CC2500_25_FSCAL1, calData[channel][2]);
-    cc2500_WriteReg(CC2500_0A_CHANNR, bindHopData[channel]);
+    uint8_t hwchan = bindHopData[channel];
+    setHwChannel(hwchan);
 }
 
 #if USE_D16_FORMAT
@@ -597,6 +594,9 @@ static void radio_init_hw(void)
     bindTxId[0] = bind_crc>>8;
     bindTxId[1] = bind_crc&0xFF;
 
+    // setup receive address
+    //cc2500_WriteReg(CC2500_09_ADDR, bindTxId[0]);
+    
     // use XOR of CPUID to get chanskip, giving us a bit more randomness
     bind_xor = 0;
     for (i=0; i<12; i++) {
@@ -607,11 +607,11 @@ static void radio_init_hw(void)
 
     setup_hopping_table();
 
-    for (i=0;i<NUM_CHANNELS;i++) {
+    for (i=0;i<MAX_CHANNEL_NUMBER;i++) {
         cc2500_Strobe(CC2500_SIDLE);
-        cc2500_WriteReg(CC2500_0A_CHANNR, bindHopData[i]);
+        cc2500_WriteReg(CC2500_0A_CHANNR, i);
         cc2500_Strobe(CC2500_SCAL);
-        delay_ms(1);
+        delay_ms(2);
         calData[i][0] = cc2500_ReadReg(CC2500_23_FSCAL3);
         calData[i][1] = cc2500_ReadReg(CC2500_24_FSCAL2);
         calData[i][2] = cc2500_ReadReg(CC2500_25_FSCAL1);
@@ -620,9 +620,6 @@ static void radio_init_hw(void)
     delay_ms(10);
     cc2500_Strobe(CC2500_SIDLE);
     delay_ms(10);
-    
-    // setup for sending bind packets
-    initialiseData(1);
 }
 
 // radio IRQ handler unused for cc2500
@@ -822,12 +819,16 @@ static void send_normal_packet(void)
  */
 static void send_FCC_packet(void)
 {
+    uint8_t chan = (uint8_t)fcc_test_chan;
+    chan *= FCC_CHAN_STEP;
+    cc2500_Strobe(CC2500_SIDLE);
     cc2500_SetPower(fcc_power);
-    cc2500_WriteReg(CC2500_0A_CHANNR, ((uint8_t)fcc_test_chan) * FCC_CHAN_STEP);
+    setHwChannel(chan);
     if (fcc_cw_mode) {
         send_packet(0, NULL);
         // we don't set a timeout here, instead we trigger the send again on
         // any change to channel or power
+        printf("send CW %u\n", chan);
     } else {
         send_SRT_packet();
         timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);
@@ -871,11 +872,12 @@ static void send_bind_packet()
     }
 
     cc2500_Strobe(CC2500_SIDLE);
-    cc2500_WriteReg(CC2500_0A_CHANNR, 0);
+    setHwChannel(0);
     send_packet(sizeof(packet), packet);
 
     if (autobind_counter != 0 || bindcount++ > 500) {
         // send every 9ms
+        printf("Finished bind send %u\n", bindcount);
         timer_call_after_ms(INTER_PACKET_MS, send_normal_packet);
     } else {
         // send bind every 9ms
@@ -905,7 +907,7 @@ static void send_autobind_packet(void)
     
     cc2500_Strobe(CC2500_SIDLE);
     cc2500_Strobe(CC2500_SFRX);
-    cc2500_WriteReg(CC2500_0A_CHANNR, AUTOBIND_CHANNEL);
+    setHwChannel(AUTOBIND_CHANNEL);
     send_packet(sizeof(pkt), (uint8_t *)&pkt);
 }
 
@@ -928,7 +930,6 @@ void radio_start_FCC_test(void)
 {
     printf("radio_start_FCC\n");
     fcc_test_chan = 12;
-    fcc_cw_mode = true;
     timer_call_after_ms(1, send_FCC_packet);    
 }
 
@@ -1038,6 +1039,7 @@ void radio_change_FCC_channel(int8_t change)
     if (fcc_test_chan >= (MAX_CHANNEL_NUMBER/FCC_CHAN_STEP)) {
         fcc_test_chan = 0;
     }
+    printf("set FCC chan %d\n", fcc_test_chan);
     timer_call_after_ms(1, send_FCC_packet);
 }
 
