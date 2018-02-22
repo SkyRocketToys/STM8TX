@@ -658,6 +658,11 @@ static void parse_telem_packet(const uint8_t *packet)
 #endif
         return;
     }
+    if (pkt->txid[0] != bindTxId[0] ||
+        pkt->txid[1] != bindTxId[1]) {
+        // not for us
+        return;
+    }
     switch (pkt->type) {
     case TELEM_STATUS: {
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
