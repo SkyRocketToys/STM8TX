@@ -91,8 +91,7 @@ enum packet_type {
     PKTYPE_TELEM_PPS  = 5,
     PKTYPE_BL_VERSION = 6,
     PKTYPE_FW_ACK     = 7,
-    PKTYPE_WIFI_CHAN  = 8,
-    PKTYPE_NUM_TYPES  = 9 // used for modulus
+    PKTYPE_NUM_TYPES  = 8 // used for modulus
 };
 
 /*

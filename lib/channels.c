@@ -5,6 +5,7 @@
 #include "util.h"
 #include "channels.h"
 #include "radio.h"
+#include "eeprom.h"
 
 static const uint8_t stick_map[4] = { STICK_ROLL, STICK_PITCH, STICK_THROTTLE, STICK_YAW };
 uint8_t telem_ack_value;

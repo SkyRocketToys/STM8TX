@@ -320,6 +320,9 @@ static void status_update(bool have_link)
 
     // remember wifi chan
     if (t_status.wifi_chan != last_status.wifi_chan) {
+        if (t_status.wifi_chan == 0 || t_status.wifi_chan > 14) {
+            t_status.wifi_chan = 9;
+        }
         eeprom_write(EEPROM_WIFICHAN_OFFSET, t_status.wifi_chan);
     }
 
@@ -346,9 +349,17 @@ void main(void)
     uint32_t next_ms;
     uint8_t factory_mode = 0;
     uint8_t initial_buttons;
-    
+    uint8_t wifi_chan;
     chip_init();
     led_init();
+
+    // setup default WiFI channel for radio to avoid close frequencies
+    wifi_chan = eeprom_read(EEPROM_WIFICHAN_OFFSET);
+    if (wifi_chan == 0 || wifi_chan > 14) {
+        // out of range, use default of channel 9
+        wifi_chan = 9;
+        eeprom_write(EEPROM_WIFICHAN_OFFSET, wifi_chan);
+    }
 
     // give indication of power on quickly for user
     led_mode_set(true);

@@ -180,8 +180,25 @@ static uint8_t autobind_counter;
 struct telem_status t_status;
 extern uint8_t telem_ack_value;
 
+/*
+  we are setup for a channel spacing of 0.3MHz, with channel 0 being 2403.6MHz
+
+  For D16 protocol we select 47 channels from a max of 235 channels
+
+  For SRT protocol we select 23 channels from a max of 233 channels,
+  and avoid channels near to the WiFi channel of the Sonix video board
+ */
+
+#if USE_D16_FORMAT
 #define NUM_CHANNELS 47
 #define MAX_CHANNEL_NUMBER 0xEB
+#define INTER_PACKET_MS 9
+#else
+#define NUM_CHANNELS 23
+#define MAX_CHANNEL_NUMBER 0xEB
+#define INTER_PACKET_MS 8
+#endif
+
 #define AUTOBIND_CHANNEL 100
 
 // number of channels to step in FCC test mode
@@ -200,6 +217,7 @@ static int8_t fcc_test_chan = -1;
 static bool fcc_cw_mode;
 static bool fcc_scan_mode;
 static uint8_t fcc_power = 7;
+static uint8_t last_wifi_channel;
 
 // telem packet handling buffer, parsed from main thread
 static bool got_telem_packet = false;
@@ -389,10 +407,11 @@ static void setChannel(uint8_t channel)
     cc2500_WriteReg(CC2500_0A_CHANNR, bindHopData[channel]);
 }
 
+#if USE_D16_FORMAT
 /*
   create hopping table - based on DIY-Multiprotocol-TX-Module implementation
  */
-static void setup_hopping_table(void)
+static void setup_hopping_table_D16(void)
 {
     uint8_t val;
     uint8_t channel = bindTxId[0] & 0x07;
@@ -419,6 +438,112 @@ static void setup_hopping_table(void)
         }
         bindHopData[i] = val;
     }
+}
+#endif
+
+/*
+  mapping from WiFi channel number minus 1 to cc2500 channel
+  number. WiFi channels are separated by 5MHz starting at 2412 MHz,
+  except for channel 14, which has a 12MHz separation. We represent
+  channel 14 as 255 as we want to keep this table 8 bit.
+ */
+static const uint8_t wifi_chan_map[14] = {
+    28, 44, 61, 78, 94, 111, 128, 144, 161, 178, 194, 211, 228, 255
+};
+
+/*
+  see if we have already assigned a channel
+ */
+static bool have_channel(uint8_t channel, uint8_t count, uint8_t loop)
+{
+    uint8_t i;
+    for (i=0; i<count; i++) {
+        if (bindHopData[i] == channel) {
+            return true;
+        }
+        if (loop < 5) {
+            int separation = ((int)bindHopData[i]) - (int)channel;
+            if (separation < 0) {
+                separation = -separation;
+            }
+            if (separation < 4) {
+                // try if possible to stay at least 4 channels from existing channels
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/*
+  create hopping table for SRT protocol
+ */
+static void setup_hopping_table_SRT(void)
+{
+    uint8_t val;
+    uint8_t channel = bindTxId[0] % 127;
+    uint8_t channel_spacing = bindTxId[1] % 127;
+    uint8_t i;
+    uint8_t wifi_chan = eeprom_read(EEPROM_WIFICHAN_OFFSET);
+    uint8_t cc_wifi_mid, cc_wifi_low, cc_wifi_high;
+
+    if (wifi_chan == 0 || wifi_chan > 14) {
+        wifi_chan = 9;
+    }
+    cc_wifi_mid = wifi_chan_map[wifi_chan-1];
+    if (cc_wifi_mid < 30) {
+        cc_wifi_low = 0;
+    } else {
+        cc_wifi_low = cc_wifi_mid - 30;
+    }
+    if (cc_wifi_mid > 225) {
+        cc_wifi_high = 255;
+    } else {
+        cc_wifi_high = cc_wifi_mid + 30;
+    }
+    
+    if (channel_spacing < 7) {
+        channel_spacing += 7;
+    }
+    
+    for (i=0; i<NUM_CHANNELS; i++) {
+        // loop is to prevent any possibility of non-completion
+        uint8_t loop = 0;
+        do {
+            channel = (channel+channel_spacing) % MAX_CHANNEL_NUMBER;
+            
+            if ((channel <= cc_wifi_low || channel >= cc_wifi_high) && !have_channel(channel, i, loop)) {
+                // accept if not in wifi range and not already allocated
+                break;
+            }
+        } while (loop++ < 100);
+        val=channel;
+        // channels to avoid from D16 code, not properly understood
+        if ((val==0x00) || (val==0x5A) || (val==0xDC)) {
+            val++;
+        }
+        bindHopData[i] = val;
+    }
+    last_wifi_channel = wifi_chan;
+    printf("Setup hopping for 0x%x:0x%x WiFi %u %u-%u spc:%u\n",
+           bindTxId[0], bindTxId[1],
+           wifi_chan, cc_wifi_low, cc_wifi_high, channel_spacing);
+    for (i=0; i<NUM_CHANNELS; i++) {
+        printf("%u ", bindHopData[i]);
+    }
+    printf("\n");
+}
+
+/*
+  create hopping table - based on DIY-Multiprotocol-TX-Module implementation
+ */
+static void setup_hopping_table(void)
+{
+#if USE_D16_FORMAT
+    setup_hopping_table_D16();
+#else
+    setup_hopping_table_SRT();
+#endif
 }
 
 static uint16_t calc_crc(const uint8_t *data, uint8_t len)
@@ -477,7 +602,7 @@ static void radio_init_hw(void)
     for (i=0; i<12; i++) {
         bind_xor ^= cpu_id[i];
     }
-    chanskip = (bind_xor % 46) + 1;
+    chanskip = (bind_xor % (NUM_CHANNELS-1)) + 1;
     printf("TXID %x:%x chanskip %u\n", bindTxId[0], bindTxId[1], chanskip);
 
     setup_hopping_table();
@@ -498,9 +623,6 @@ static void radio_init_hw(void)
     
     // setup for sending bind packets
     initialiseData(1);
-
-    // setup interrupt
-    gpio_config(RADIO_INT, GPIO_INPUT_FLOAT_IRQ);
 }
 
 // radio IRQ handler unused for cc2500
@@ -510,7 +632,6 @@ void radio_irq(void)
 
 static void send_packet(uint8_t len, const uint8_t *packet)
 {
-    //gpio_set(RADIO_CE);
     cc2500_Strobe(CC2500_SFTX);
     if (len) {
         cc2500_WriteFifo(packet, len);
@@ -566,7 +687,7 @@ static void parse_telem_packet(const uint8_t *packet)
 }
 
 /*
-  called 9ms after sending a packet to check if we have received a telemetry packet
+  called INTER_PACKET_MS after sending a packet to check if we have received a telemetry packet
  */
 static void check_rx_packet(void)
 {
@@ -601,6 +722,7 @@ static void check_rx_packet(void)
     send_normal_packet();    
 }
 
+#if USE_D16_FORMAT
 /*
   send a FrSky D16 packet
  */
@@ -639,6 +761,7 @@ static void send_D16_packet(void)
     cc2500_Strobe(CC2500_SFRX);
     send_packet(sizeof(packet), packet);
 }
+#endif
 
 /*
   send a SkyRocket packet
@@ -667,13 +790,15 @@ static void send_SRT_packet(void)
 
 static void send_normal_packet(void)
 {
-    channr = (channr + chanskip) % 47;
-    setChannel(channr);
-
 #if USE_D16_FORMAT
+    channr = (channr + chanskip) % NUM_CHANNELS;
+    setChannel(channr);
     send_D16_packet();
-    timer_call_after_ms(9, send_normal_packet);
+    timer_call_after_ms(INTER_PACKET_MS, send_normal_packet);
 #else
+    if (eeprom_read(EEPROM_WIFICHAN_OFFSET) != last_wifi_channel) {
+        setup_hopping_table_SRT();
+    }
     if (stats.recv_packets == 0 && (autobind_counter++ & 1)) {
         /*
           if we have never received a telemetry packet then send a
@@ -681,21 +806,31 @@ static void send_normal_packet(void)
          */
         send_autobind_packet();
         autobind_counter = 0;
-        timer_call_after_ms(9, check_rx_packet);
-    } else if (fcc_test_chan != -1) {
-        cc2500_SetPower(fcc_power);
-        cc2500_WriteReg(CC2500_0A_CHANNR, ((uint8_t)fcc_test_chan) * FCC_CHAN_STEP);
-        if (fcc_cw_mode) {
-            send_packet(0, NULL);
-        } else {
-            send_SRT_packet();
-        }
-        timer_call_after_ms(9, check_rx_packet);
+        timer_call_after_ms(INTER_PACKET_MS, check_rx_packet);
     } else {
+        channr = (channr + chanskip) % NUM_CHANNELS;
+        setChannel(channr);
         send_SRT_packet();
-        timer_call_after_ms(9, check_rx_packet);
+        timer_call_after_ms(INTER_PACKET_MS, check_rx_packet);
     }
 #endif
+}
+
+/*
+  send a FCC test packet, either CW or normal modulation
+ */
+static void send_FCC_packet(void)
+{
+    cc2500_SetPower(fcc_power);
+    cc2500_WriteReg(CC2500_0A_CHANNR, ((uint8_t)fcc_test_chan) * FCC_CHAN_STEP);
+    if (fcc_cw_mode) {
+        send_packet(0, NULL);
+        // we don't set a timeout here, instead we trigger the send again on
+        // any change to channel or power
+    } else {
+        send_SRT_packet();
+        timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);
+    }
 }
 
 /*
@@ -717,7 +852,7 @@ static void send_bind_packet()
     packet[4] = bindTxId[1];
     packet[5] = idx;
     for (i=0; i<5; i++) {
-        if (idx + i < 47) {
+        if (idx + i < NUM_CHANNELS) {
             packet[6+i] = bindHopData[idx+i];
         }
     }
@@ -740,10 +875,10 @@ static void send_bind_packet()
 
     if (autobind_counter != 0 || bindcount++ > 500) {
         // send every 9ms
-        timer_call_after_ms(9, send_normal_packet);
+        timer_call_after_ms(INTER_PACKET_MS, send_normal_packet);
     } else {
         // send bind every 9ms
-        timer_call_after_ms(9, send_bind_packet);
+        timer_call_after_ms(INTER_PACKET_MS, send_bind_packet);
     }
 }
 
@@ -781,7 +916,7 @@ void radio_start_bind_send(bool use_dsm2)
 {
     printf("radio_start_bind\n");
     setChannel(0);
-    timer_call_after_ms(2, send_bind_packet);    
+    timer_call_after_ms(1, send_bind_packet);    
 }
 
 
@@ -792,7 +927,8 @@ void radio_start_FCC_test(void)
 {
     printf("radio_start_FCC\n");
     fcc_test_chan = 12;
-    timer_call_after_ms(2, send_normal_packet);    
+    fcc_cw_mode = true;
+    timer_call_after_ms(1, send_FCC_packet);    
 }
 
 
@@ -803,7 +939,7 @@ void radio_start_send(bool use_dsm2)
 {
     printf("radio_start_send\n");
     setChannel(0);
-    timer_call_after_ms(2, send_normal_packet);    
+    timer_call_after_ms(1, send_normal_packet);    
 }
 
 /*
@@ -864,6 +1000,7 @@ uint8_t get_telem_pps(void)
 void radio_next_FCC_power(void)
 {
     fcc_power = (fcc_power + 1) % 8;
+    timer_call_after_ms(1, send_FCC_packet);
 }
 
 /*
@@ -888,6 +1025,7 @@ uint8_t get_FCC_power(void)
 void radio_set_CW_mode(bool cw)
 {
     fcc_cw_mode = cw;
+    timer_call_after_ms(1, send_FCC_packet);
 }
 
 void radio_change_FCC_channel(int8_t change)
@@ -899,11 +1037,13 @@ void radio_change_FCC_channel(int8_t change)
     if (fcc_test_chan >= (MAX_CHANNEL_NUMBER/FCC_CHAN_STEP)) {
         fcc_test_chan = 0;
     }
+    timer_call_after_ms(1, send_FCC_packet);
 }
 
 void radio_FCC_toggle_scan(void)
 {
     fcc_scan_mode = !fcc_scan_mode;
+    timer_call_after_ms(1, send_FCC_packet);
 }
 
 /*
