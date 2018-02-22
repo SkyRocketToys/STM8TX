@@ -16,6 +16,7 @@
 #include "crc.h"
 #include "timer.h"
 #include "channels.h"
+#include "eeprom.h"
 
 #if SUPPORT_BEKEN
 
@@ -30,6 +31,7 @@ enum {
 };
 
 uint8_t dfu_buffer[128]; // Buffer for holding new firmware info until a write can be made.
+uint16_t dfu_written = 0; // Positiion we have reached in writing (16 means first packet received)
 
 /** \file */
 /** \addtogroup beken Beken BK2425 radio module
@@ -1181,7 +1183,7 @@ void VerifyBekenChipID(void)
 void beken_init(void)
 {
 	// Initialise the firmware data
-	uint32_t crc = crc_crc32((const uint8_t *)0x8700, (0xc000-0x8700));
+	uint32_t crc = crc_crc32((const uint8_t *)CODELOC, (NEW_FIRMWARE_BASE-CODELOC));
 	gFwInfo[BK_INFO_FW_CRC_LO] = crc & 0xffff;
 	gFwInfo[BK_INFO_FW_CRC_HI] = (crc >> 16) & 0xffff;
 	gFwInfo[BK_INFO_FW_VER] = 0;
@@ -1273,24 +1275,40 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 	}
 	else if (rx->packetType == BK_PKT_TYPE_DFU)
 	{
+		static uint16_t lastAddr = 0xffff;
 		const packetFormatDfu* pDFU = (const packetFormatDfu*) rx;
 		uint16_t addr = (pDFU->address_hi << 8) | pDFU->address_lo;
-		uint8_t* dst = (uint8_t*) addr;
-		memcpy(&dfu_buffer[addr & 0x70], pDFU->data, 16);
-		if (addr == 0)
+
+		printf("D");
+		memcpy(&dfu_buffer[addr & 0x70], &pDFU->data[0], SZ_DFU);
+		if (addr != lastAddr)
 		{
-			// Check to see if the EEPROM is new
-			//...
-			// Erase the EEPROM
-			//...
+			printf("%u ", addr);
+			if ((addr & 0x7f) == 0x40) // Before the end of a page
+			{
+				// Perform a fast erase of the block
+				if (!eeprom_flash_erase(addr & ~0x7f))
+				{
+					dfu_written = 0xffff; // was write-protected
+					printf("e");
+				}
+				else
+					printf("E");
+			}
+			if ((addr & 0x7f) == 0x70) // End of a page
+			{
+				// Perform a fast write of the block
+				if (!eeprom_flash_write_page(addr & ~0x7f, dfu_buffer))
+				{
+					dfu_written = 0xffff; // was write-protected
+					printf("w");
+				}
+				else
+					printf("W");
+			}
+			lastAddr = addr;
+			dfu_written = addr + SZ_DFU;
 		}
-		if ((addr & 0x7f) == 0x70) // End of a page
-		{
-			// Fast write the buffer to the flash
-			//...
-//			memcpy(dst, dfu_buffer, 0x80);
-		}
-		//...
 	}
 }
 
@@ -1379,6 +1397,11 @@ void UpdateTxData(void)
 	{
 		val = gCountdown + 256 * gCountdownTable;
 		tx->u.ctrl.data_type = BK_INFO_COUNTDOWN;
+	}
+	else if (dfu_written)
+	{
+		val = dfu_written;
+		tx->u.ctrl.data_type = BK_INFO_DFU_RX;
 	}
 	else
 	{

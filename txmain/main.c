@@ -10,9 +10,9 @@
 // 0x6000..0x67FF = 2Kbtyes of internal rom bootloader
 // 0x7f00         = internal cpu registers
 // ------------------------------------
-// 0x8000 = bootloader (1.75k)
-// 0x8700 = firmware (14.25k)
-// 0xc000 = downloaded firmware for replacing the main one
+// 0x8000 = [BLBASE] bootloader (1.75k)
+// 0x8700 = [CODELOC] firmware (14.25k)
+// 0xc000 = [NEW_FIRMWARE_BASE] downloaded firmware for replacing the main one
 // 0xF900 = free
 // -----------------------------------------------------------------------------
 // Resource usage:
@@ -47,7 +47,7 @@
 
 // -----------------------------------------------------------------------------
 /* Interrupt handlers.
-	Note that the interrupt vector table is at 0x8700, not 0x8000.
+	Note that the interrupt vector table is at 0x8700 (CODELOC), not 0x8000.
 	The bootloader vector table jumps directly to this table.
  */
 
@@ -598,7 +598,7 @@ void main(void)
         } else {
             link_ok = true;
         }
-		display_sticks();
+//		display_sticks();
 #endif
 
         status_update(link_ok); // May take a little while to play a tune or write a byte to EEPROM

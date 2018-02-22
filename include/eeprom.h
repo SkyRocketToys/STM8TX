@@ -12,10 +12,13 @@ void eeprom_write(uint16_t offset, uint8_t value);
 uint8_t eeprom_read(uint16_t offset);
 void eeprom_unlock(void);
 void progmem_unlock(void);
+#define progmem_lock() eeprom_lock()
 void eeprom_lock(void);
 void eeprom_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len);
 
-#define progmem_lock() eeprom_lock()
+bool eeprom_flash_erase(uint16_t offset);
+bool eeprom_flash_write_page(uint16_t offset, const uint8_t *data);
+
 
 // Memory allocation for EEPROM
 enum {

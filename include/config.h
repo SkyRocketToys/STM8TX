@@ -209,7 +209,8 @@ RADIO_PACTL | B5
 #define PIN_VBAT (GPIOF|GPIO_PIN4)
 
 // location in flash of new firmware
-#define NEW_FIRMWARE_BASE 0xC000
+#define CODELOC           0x8700 // Where the code is copied to
+#define NEW_FIRMWARE_BASE 0xC000 // Where the code is downloaded to
 
 // stick inputs on PB2, PB3, PB1 and PB0
 

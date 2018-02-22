@@ -12,6 +12,34 @@
 Support the rewritable EEPROM on the CPU (it has many more erase cycles than the flash)
 @{ */
 
+enum {
+	FLASH_CR1_FIX   = 0x01,
+	FLASH_CR1_IE    = 0x02,
+	FLASH_CR1_AHALT = 0x04,
+	FLASH_CR1_HALT  = 0x08,
+};
+
+enum {
+	FLASH_CR2_PRG   = 0x01,
+	FLASH_CR2_FPRG  = 0x10,
+	FLASH_CR2_ERASE = 0x20,
+	FLASH_CR2_WPRG  = 0x40,
+	FLASH_CR2_OPT   = 0x80,
+};
+
+enum {
+	FLASH_IAPSR_WR_PG_DIS = 0x01,
+	FLASH_IAPSR_PUL       = 0x02,
+	FLASH_IAPSR_EOP       = 0x04,
+	FLASH_IAPSR_DUL       = 0x08,
+	FLASH_IAPSR_HVOFF     = 0x40,
+};
+
+enum {
+	FLASH_PUKR_PUK   = 0xFF,
+	FLASH_DUKR_DUK   = 0xFF,
+};
+
 // -----------------------------------------------------------------------------
 /** Unlock the EEPROM memory before writing */
 void eeprom_unlock(void)
@@ -66,7 +94,7 @@ uint8_t eeprom_read(
 void eeprom_flash_copy(
 	uint16_t offset, ///< The offset of the data within EEPROM
 	const uint8_t *data, ///< The data to write
-	uint8_t len) ///< The length of the data to write, in bytes
+	uint8_t len) ///< The length of the data to write, in bytes. Must be 4 or 8.
 {
     uint16_t dest = NEW_FIRMWARE_BASE + offset;
     uint8_t *ptr1;
@@ -76,21 +104,97 @@ void eeprom_flash_copy(
         // repeated data
         return;
     }
-    
+
     progmem_unlock();
 
     FLASH_CR1 = 0;
-    FLASH_CR2 = 0x40; // set WPRG bit
-    FLASH_NCR2 = (uint8_t)(~0x40); // inverse of WPRG bit
+    FLASH_CR2 = FLASH_CR2_WPRG; // set WPRG bit
+    FLASH_NCR2 = (uint8_t)(~FLASH_CR2_WPRG); // inverse of WPRG bit
     ((uint32_t *)ptr1)[0] = ((uint32_t *)data)[0];
 
     if (len > 4) {
-        FLASH_CR2 = 0x40;
-        FLASH_NCR2 = (uint8_t)~0x40;
+        FLASH_CR2 = FLASH_CR2_WPRG;
+        FLASH_NCR2 = (uint8_t)(~FLASH_CR2_WPRG);
         ((uint32_t *)ptr1)[1] = ((uint32_t *)data)[1];
     }
 
     progmem_lock();
+}
+
+// -----------------------------------------------------------------------------
+// Erase a page of memory at an address (3.3ms)
+// Returns true on success
+#ifdef _IAR_
+__ramfunc
+#endif
+#ifdef SDCC
+#pragma codeseg RAM_SEG
+#endif
+bool eeprom_flash_erase(
+	uint16_t offset) ///< The offset of the data within EEPROM
+{
+	uint32_t* dst = (uint32_t*) (offset + NEW_FIRMWARE_BASE);
+	bool result = false;
+
+    FLASH_PUKR = EEPROM_KEY2;
+    FLASH_PUKR = EEPROM_KEY1;
+    FLASH_CR1 = 0;
+    FLASH_CR2 = FLASH_CR2_ERASE;
+    FLASH_NCR2 = (uint8_t)(~FLASH_CR2_ERASE);
+	*dst = 0;
+	if (FLASH_IAPSR & FLASH_IAPSR_WR_PG_DIS)
+	{
+		// Error - write protected
+	}
+	else
+	{
+		// Wait until we start the operation
+		while (FLASH_IAPSR & FLASH_IAPSR_HVOFF) {}
+		// Wait until we end the operation
+		while (!(FLASH_IAPSR & FLASH_IAPSR_EOP)) {}
+		result = true;
+	}
+    FLASH_IAPSR &= ~FLASH_IAPSR_DUL;
+	return result;
+}
+
+// -----------------------------------------------------------------------------
+// Fast write a page of memory at an address (3.3ms)
+#ifdef _IAR_
+__ramfunc
+#endif
+#ifdef SDCC
+#pragma codeseg RAM_SEG
+#endif
+bool eeprom_flash_write_page(
+	uint16_t offset, ///< The offset of the data within FLASH
+	const uint8_t *data) ///< The data to write
+{
+	uint8_t len = 0x80;
+	uint8_t* dst = (uint8_t*) (offset + NEW_FIRMWARE_BASE);
+	bool result = false;
+
+    FLASH_PUKR = EEPROM_KEY2;
+    FLASH_PUKR = EEPROM_KEY1;
+    FLASH_CR1 = 0;
+    FLASH_CR2 = FLASH_CR2_FPRG;
+    FLASH_NCR2 = (uint8_t)(~FLASH_CR2_FPRG);
+	while (len--)
+		*dst++ = *data++;
+	if (FLASH_IAPSR & FLASH_IAPSR_WR_PG_DIS)
+	{
+		// Error - write protect
+	}
+	else
+	{
+		// Wait until we start the operation
+		while (!(FLASH_IAPSR & FLASH_IAPSR_HVOFF)) {}
+		// Wait until we end the operation
+		while (!(FLASH_IAPSR & FLASH_IAPSR_EOP)) {}
+		result = true;
+	}
+    FLASH_IAPSR &= ~FLASH_IAPSR_DUL;
+	return result;
 }
 
 /** @}*/
