@@ -684,6 +684,7 @@ static void parse_telem_packet(const uint8_t *packet)
     }
     }
     }
+    stats.recv_packets++;
 }
 
 /*
@@ -1073,5 +1074,4 @@ void radio_check_telem_packet(void)
     }
     rssi_sum += rssi_dbm;
     rssi_count++;
-    stats.recv_packets++;
 }
