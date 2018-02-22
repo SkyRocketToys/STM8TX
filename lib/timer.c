@@ -13,7 +13,7 @@ void timer_init(void)
 {
     // prescale 128
     TIM4_PSCR = 7;
-    TIM4_ARR = 125;
+    TIM4_ARR = 125-1;
     // enable interrupt
     TIM4_IER = TIM_IER_UIE;
     TIM4_CR1 = TIM_CR1_URS | TIM_CR1_CEN;
