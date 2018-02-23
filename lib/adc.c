@@ -20,7 +20,8 @@ void adc_irq(void)
         v = ADC_DRL;
         v |= ADC_DRH << 8;
         values[chan] = v;
-        chan = (chan + 1) % NUM_CHANS;
+        if (++chan >= NUM_CHANS) // Avoid MOD operation in interrupt
+            chan = 0;
     }
     ADC_CSR &= 0x3f; // clear EOC & AWD flags
 
