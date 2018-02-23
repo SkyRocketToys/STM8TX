@@ -446,8 +446,8 @@ typedef struct RadioInfo_s {
 	packetFormatTx pktDataTx; // Packet data to send
 	// Data received from the drone. See also t_status
 	uint8_t bFreshData; // Have we received a packet since we last processed one
-	packetFormatRx pktDataRecv; // Packet data in process of being received
-	packetFormatRx pktDataRx; // Last valid packet that has been received
+	uint8_t pktDataRecv[PACKET_LENGTH_RX_MAX]; // Packet data in process of being received
+	uint8_t pktDataRx[PACKET_LENGTH_RX_MAX]; // Last valid packet that has been received
 	uint8_t lastDroneid[SZ_CRC_GUID]; // CRC of the drone
 } RadioInfo;
 
@@ -1215,10 +1215,11 @@ void beken_init(void)
 }
 
 // ----------------------------------------------------------------------------
-void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
+void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 {
-	if (rx->packetType == BK_PKT_TYPE_TELEMETRY)
+	if (pRxData[0] == BK_PKT_TYPE_TELEMETRY)
 	{
+		const packetFormatRx* pRx = (const packetFormatRx*) pRxData;
 		uint8_t tx;
 		uint8_t wifi;
 		beken.stats.lastTelemetryPktTime = timer_get_ms();
@@ -1233,7 +1234,7 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 
 		// Should we change channel table due to Wi-Fi changes?
 		tx = 0;
-		wifi = rx->wifi;
+		wifi = pRx->wifi;
 		while (wifi >= 24*4)
 		{
 			wifi -= 24*4;
@@ -1250,7 +1251,7 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 		{
 			uint8_t wanted = 0;
 			gLastWifiChannel = wifi;
-			switch (rx->wifi) {
+			switch (pRx->wifi) {
 			case 0: wanted = 0; break;
 			case 1: case 2: case 3: case 4: case 5: wanted = 1; break;
 			case 6: wanted = 2; break;
@@ -1262,28 +1263,28 @@ void ProcessPacket(packetFormatRx* rx, uint8_t rxstd)
 			gCountdownTable = wanted * CHANNEL_COUNT_LOGICAL;
 		}
 		// Remember the data for later. Process that in the main thread
-		t_status.flags = rx->flags;
+		t_status.flags = pRx->flags;
 		{
 			uint8_t i;
 			for (i = 0; i < SZ_CRC_GUID; ++i)
-				beken.lastDroneid[i] = rx->droneid[i];
+				beken.lastDroneid[i] = pRx->droneid[i];
 		}
-		t_status.flight_mode = rx->flight_mode;
+		t_status.flight_mode = pRx->flight_mode;
 		t_status.wifi_chan = wifi;
 		t_status.tx_max = tx;
-		t_status.note_adjust = rx->note_adjust;
+		t_status.note_adjust = pRx->note_adjust;
 	}
-	else if (rx->packetType == BK_PKT_TYPE_DFU)
+	else if (pRxData[0] == BK_PKT_TYPE_DFU)
 	{
 		static uint16_t lastAddr = 0xffff;
-		const packetFormatDfu* pDFU = (const packetFormatDfu*) rx;
+		const packetFormatDfu* pDFU = (const packetFormatDfu*) pRxData;
 		uint16_t addr = (pDFU->address_hi << 8) | pDFU->address_lo;
-
-		printf("D");
+//		printf("D%u\r\n", addr);
+//		printf("D%u(%c%c%c%c%c%c%c%c", addr, pDFU->data[0], pDFU->data[1], pDFU->data[2], pDFU->data[3], pDFU->data[4], pDFU->data[5], pDFU->data[6], pDFU->data[7]);
+//		printf("%c%c%c%c%c%c%c%c)", pDFU->data[8], pDFU->data[9], pDFU->data[10], pDFU->data[11], pDFU->data[12], pDFU->data[13], pDFU->data[14], pDFU->data[15]);
 		memcpy(&dfu_buffer[addr & 0x70], &pDFU->data[0], SZ_DFU);
 		if (addr != lastAddr)
 		{
-			printf("%u ", addr);
 			if ((addr & 0x7f) == 0x40) // Before the end of a page
 			{
 				// Perform a fast erase of the block
@@ -1342,9 +1343,9 @@ void beken_irq(void)
 			beken.stats.badRxAddress++;
 		}
 		beken.bFreshData = 1;
-		Receive_Packet((uint8_t *)&beken.pktDataRecv);
-		memcpy(&beken.pktDataRx, &beken.pktDataRecv, sizeof(beken.pktDataRx));
-		ProcessPacket(&beken.pktDataRx, rxstd);
+		Receive_Packet(&beken.pktDataRecv[0]);
+		memcpy(&beken.pktDataRx[0], &beken.pktDataRecv[0], sizeof(beken.pktDataRx));
+		ProcessPacket(&beken.pktDataRx[0], rxstd);
 	}
 
 	// Clear the bits
