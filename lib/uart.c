@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // -----------------------------------------------------------------------------
 // Support UART functions
 // -----------------------------------------------------------------------------
@@ -11,6 +12,8 @@
 
 /** \addtogroup uart UART input/output
 @{ */
+
+static bool uart2_init_done;
 
 // -----------------------------------------------------------------------------
 /** Initialise UART2 for output debugging */
@@ -42,17 +45,20 @@ void uart2_init(void)
     UART2_BRR1 = 0x11;
 #endif
 #endif
+    uart2_init_done = true;
 }
 
 // -----------------------------------------------------------------------------
 /** Output a single character to UART2 */
 void uart2_putchar(char c)
 {
+    if (uart2_init_done) {
 #if SUPPORT_DEBUG_TX
 #else
-    while(!(UART2_SR & UART_SR_TXE)) ;
-    UART2_DR = c;
+		while(!(UART2_SR & UART_SR_TXE)) ;
+		UART2_DR = c;
 #endif
+	}
 }
 
 // -----------------------------------------------------------------------------
