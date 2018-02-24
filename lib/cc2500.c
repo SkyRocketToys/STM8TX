@@ -272,7 +272,12 @@ void radio_init(void)
     // setup radio CE
     gpio_config(RADIO_CE, GPIO_INPUT_FLOAT);
 
+    t_status.tx_max = tx_max;
+    
     radio_init_hw();
+
+    gpio_config(UART_RX, GPIO_OUTPUT_PUSHPULL);
+    gpio_config(UART_TX, GPIO_OUTPUT_PUSHPULL);
 }
 
 void cc2500_ReadFifo(uint8_t *dpbuffer, uint8_t len)
@@ -319,6 +324,10 @@ void cc2500_SetPower(uint8_t power)
     if (power > 7) {
         power = 7;
     }
+    // don't allow really low powers
+    if (power < 3) {
+        power = 3;
+    }
     cc2500_WriteReg(CC2500_3E_PATABLE, patable[power]);
 }
 
@@ -346,7 +355,7 @@ static const struct {
     {CC2500_02_IOCFG0,   0x1C}, // LNA_PD
     {CC2500_00_IOCFG2,   0x1B}, // PA_PD
     {CC2500_17_MCSM1,    0x03}, // CCA always, RX->IDLE, TX -> RX
-    {CC2500_18_MCSM0,    0x18}, // XOSC expire 64, cal on IDLE -> TX or RX
+    {CC2500_18_MCSM0,    0x08}, // XOSC expire 64, no auto-cal
     {CC2500_06_PKTLEN,   0x1E}, // packet length 30
     {CC2500_07_PKTCTRL1, 0x04}, // enable RSSI+LQI, no addr check, no autoflush, PQT=0
     {CC2500_08_PKTCTRL0, 0x01}, // var length mode, no CRC, FIFO enable, no whitening
@@ -356,7 +365,7 @@ static const struct {
     {CC2500_0D_FREQ2,    0x5C}, // freq control high
     {CC2500_0E_FREQ1,    0x76}, // freq control middle
     {CC2500_0F_FREQ0,    0x27}, // freq control low
-    {CC2500_10_MDMCFG4,  0x7B}, // data rate control
+    {CC2500_10_MDMCFG4,  0x4B}, // filter bandwidth 406kHz, drate 70kBaud
     {CC2500_11_MDMCFG3,  0x61}, // data rate control
     {CC2500_12_MDMCFG2,  0x13}, // 30/32 sync word bits, no manchester, GFSK, DC filter enabled
     {CC2500_13_MDMCFG1,  0x23}, // chan spacing exponent 3, preamble 4 bytes, FEC disabled
@@ -364,7 +373,7 @@ static const struct {
     {CC2500_15_DEVIATN,  0x51}, // modem deviation 25.128906kHz for 26MHz crystal
     {CC2500_19_FOCCFG,   0x16}, // frequency offset compensation
     {CC2500_1A_BSCFG,    0x6C}, // bit sync config
-    {CC2500_1B_AGCCTRL2, 0x03}, // target amplitude 33dB
+    {CC2500_1B_AGCCTRL2, 0x43}, // target amplitude 33dB
     {CC2500_1C_AGCCTRL1, 0x40}, // AGC control 2
     {CC2500_1D_AGCCTRL0, 0x91}, // AGC control 0
     {CC2500_21_FREND1,   0x56}, // frontend config1
@@ -666,10 +675,6 @@ static void parse_telem_packet(const uint8_t *packet)
     switch (pkt->type) {
     case TELEM_STATUS: {
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
-        if (tx_max != t_status.tx_max) {
-            tx_max = t_status.tx_max;
-            cc2500_SetPower(tx_max);
-        }
         break;
     case TELEM_FW:
     case TELEM_PLAY: {
@@ -700,7 +705,9 @@ static void check_rx_packet(void)
     uint8_t ccLen;
     bool matched = false;
     uint8_t packet[sizeof(struct telem_packet_cc2500)+2];
-    
+
+    //debug_pulses_start();
+
     do {
         uint8_t ccLen2;
         ccLen = cc2500_ReadReg(CC2500_3B_RXBYTES | CC2500_READ_BURST);
@@ -726,6 +733,8 @@ static void check_rx_packet(void)
 
     // we start the send before we parse, so we overlap send with processing telem packet
     send_normal_packet();    
+
+    //debug_pulses_end();
 }
 
 #if USE_D16_FORMAT
@@ -763,6 +772,11 @@ static void send_D16_packet(void)
     packet[sizeof(packet)-2] = lcrc>>8;
     packet[sizeof(packet)-1] = lcrc;
 
+    if (tx_max != t_status.tx_max) {
+        tx_max = t_status.tx_max;
+        cc2500_SetPower(tx_max);
+    }
+
     cc2500_Strobe(CC2500_SIDLE);
     cc2500_Strobe(CC2500_SFRX);
     send_packet(sizeof(packet), packet);
@@ -788,6 +802,11 @@ static void send_SRT_packet(void)
     pkt.crc[0] = lcrc>>8;
     pkt.crc[1] = lcrc&0xFF;
     
+    if (tx_max != t_status.tx_max) {
+        tx_max = t_status.tx_max;
+        cc2500_SetPower(tx_max);
+    }
+
     cc2500_Strobe(CC2500_SIDLE);
     cc2500_Strobe(CC2500_SFRX);
 
@@ -800,7 +819,6 @@ static void send_normal_packet(void)
     channr = (channr + chanskip) % NUM_CHANNELS;
     setChannel(channr);
     send_D16_packet();
-    timer_call_after_ms(INTER_PACKET_MS, send_normal_packet);
 #else
     if (eeprom_read(EEPROM_WIFICHAN_OFFSET) != last_wifi_channel) {
         setup_hopping_table_SRT();
@@ -812,9 +830,11 @@ static void send_normal_packet(void)
          */
         send_autobind_packet();
         autobind_counter = 0;
-        timer_call_after_ms(INTER_PACKET_MS, check_rx_packet);
     } else {
-        channr = (channr + chanskip) % NUM_CHANNELS;
+        channr += chanskip;
+        if (channr >= NUM_CHANNELS) {
+            channr -= NUM_CHANNELS;
+        }
         setChannel(channr);
         if (sent_autobind) {
             // reset power and address
@@ -823,7 +843,6 @@ static void send_normal_packet(void)
             sent_autobind = false;
         }
         send_SRT_packet();
-        timer_call_after_ms(INTER_PACKET_MS, check_rx_packet);
     }
 #endif
 }
@@ -892,10 +911,7 @@ static void send_bind_packet()
     if (autobind_counter != 0 || bindcount++ > 500) {
         // send every 9ms
         printf("Finished bind send %u\n", bindcount);
-        timer_call_after_ms(INTER_PACKET_MS, send_normal_packet);
-    } else {
-        // send bind every 9ms
-        timer_call_after_ms(INTER_PACKET_MS, send_bind_packet);
+        timer_call_periodic_ms(INTER_PACKET_MS, send_normal_packet);
     }
 }
 
@@ -938,7 +954,7 @@ void radio_start_bind_send(bool use_dsm2)
 {
     printf("radio_start_bind\n");
     setChannel(0);
-    timer_call_after_ms(1, send_bind_packet);    
+    timer_call_periodic_ms(INTER_PACKET_MS, send_bind_packet);    
 }
 
 
@@ -949,7 +965,7 @@ void radio_start_FCC_test(void)
 {
     printf("radio_start_FCC\n");
     fcc_test_chan = 12;
-    timer_call_after_ms(1, send_FCC_packet);    
+    timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);    
 }
 
 
@@ -960,7 +976,7 @@ void radio_start_send(bool use_dsm2)
 {
     printf("radio_start_send\n");
     setChannel(0);
-    timer_call_after_ms(1, send_normal_packet);    
+    timer_call_periodic_ms(INTER_PACKET_MS, check_rx_packet);    
 }
 
 /*
@@ -1021,7 +1037,7 @@ uint8_t get_telem_pps(void)
 void radio_next_FCC_power(void)
 {
     fcc_power = (fcc_power + 1) % 8;
-    timer_call_after_ms(1, send_FCC_packet);
+    timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);
 }
 
 /*
@@ -1046,7 +1062,7 @@ uint8_t get_FCC_power(void)
 void radio_set_CW_mode(bool cw)
 {
     fcc_cw_mode = cw;
-    timer_call_after_ms(1, send_FCC_packet);
+    timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);
 }
 
 void radio_change_FCC_channel(int8_t change)
@@ -1059,13 +1075,13 @@ void radio_change_FCC_channel(int8_t change)
         fcc_test_chan = 0;
     }
     printf("set FCC chan %d\n", fcc_test_chan);
-    timer_call_after_ms(1, send_FCC_packet);
+    timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);
 }
 
 void radio_FCC_toggle_scan(void)
 {
     fcc_scan_mode = !fcc_scan_mode;
-    timer_call_after_ms(1, send_FCC_packet);
+    timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);
 }
 
 /*
