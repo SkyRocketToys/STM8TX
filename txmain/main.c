@@ -66,6 +66,19 @@ static struct telem_status last_status;
 static uint8_t last_mode;
 extern uint8_t note_adjust;
 
+// set DEBUG_ENABLE to 0 to disable printf() on the console
+#define DEBUG_ENABLE 1
+
+#if DEBUG_ENABLE
+#define Debug(fmt, args...) do { printf(fmt, ##args); } while (0)
+#else
+#define Debug(fmt, args...)
+#endif
+
+// TIMING_DEBUG_LOOP can be used to check the timing
+// of the periodic callback code
+#define TIMING_DEBUG_LOOP 0
+
 /*
   update led flashing
  */
@@ -343,6 +356,15 @@ static void status_update(bool have_link)
     memcpy(&last_status, &t_status, sizeof(t_status));
 }
 
+#if TIMING_DEBUG_LOOP
+static void timer_check(void)
+{
+    debug_pulses_start();
+    delay_us(10);
+    debug_pulses_end();
+}
+#endif
+
 void main(void)
 {
     uint16_t counter=0;
@@ -369,6 +391,20 @@ void main(void)
     timer_init();
 
     delay_ms(1);
+
+#if TIMING_DEBUG_LOOP
+    // enable this to use uarts pins for timing debug. This allows us
+    // to analyse the timing of the periodic callback
+    gpio_config(UART_RX, GPIO_OUTPUT_PUSHPULL);
+    gpio_config(UART_TX, GPIO_OUTPUT_PUSHPULL);
+
+    timer_call_periodic_ms(8, timer_check);
+    enableInterrupts();
+    while (1) {
+        delay_ms(1000);
+    }
+#endif
+    
     uart2_init();
     radio_init();
 
@@ -455,17 +491,17 @@ void main(void)
         radio_set_pps_rssi();
 
         telem_pps = get_telem_pps();
-        
-        printf("%u: ADC=[%u %u %u %u] V:%u B:0x%x PWR:%u",
+
+        Debug("%u: ADC=[%u %u %u %u] V:%u B:0x%x PWR:%u",
                counter++, adc_value(0), adc_value(1), adc_value(2), adc_value(3), adc_value(4),
                (unsigned)get_buttons(), get_tx_power());
         if (FCC_chan != -1) {
-            printf(" FCC %d CW:%u\n", FCC_chan, fcc_CW_mode);
+            Debug(" FCC %d CW:%u\n", FCC_chan, fcc_CW_mode);
         } else if (telem_pps == 0) {
             printf(" TX:%u NOSIGNAL\n", get_send_pps());
             link_ok = false;
         } else {
-            printf(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u F:0x%x M:%u\n",
+            Debug(" TX:%u TR:%u RSSI:%u RRSSI:%u RPPS:%u F:0x%x M:%u\n",
                    get_send_pps(),
                    telem_pps,
                    get_telem_rssi(),
