@@ -82,3 +82,37 @@ uint16_t get_random16(void)
     return ((m_z << 16) + m_w) & 0xFFFF;
 }
 
+/*
+  these debug_pulses functions are used to mark timing information for
+  a logic analyser using the UART_RX pin
+ */
+static uint8_t pulse_count;
+
+void debug_pulses_start()
+{
+    uint8_t n;
+    n = (pulse_count & 0x7)+1;
+    while (n--) {
+        gpio_set(UART_RX);
+        gpio_clear(UART_RX);
+    }
+    gpio_set(UART_RX);
+}
+
+void debug_pulses_end()
+{
+    uint8_t n;
+    n = (pulse_count & 0x7)+1;
+    while (n--) {
+        gpio_clear(UART_RX);
+        gpio_set(UART_RX);
+    }
+    gpio_clear(UART_RX);
+    pulse_count++;
+    if (pulse_count == 8) {
+        pulse_count = 0;
+    }
+}
+
+
+

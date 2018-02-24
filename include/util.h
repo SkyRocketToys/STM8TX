@@ -26,3 +26,7 @@ uint16_t get_random16(void);
 void printf(const char *fmt, ...);
 
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+
+void debug_pulses_start();
+void debug_pulses_end();
+
