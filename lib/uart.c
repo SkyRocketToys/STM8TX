@@ -4,6 +4,8 @@
 #include "config.h"
 #include <uart.h>
 
+static bool uart2_init_done;
+
 void uart2_init(void)
 {
     PD_DDR |= 0x20; // Put TX line on
@@ -20,12 +22,15 @@ void uart2_init(void)
     UART2_BRR2 = 0x06;
     UART2_BRR1 = 0x11;
 #endif
+    uart2_init_done = true;
 }
 
 void uart2_putchar(char c)
 {
-    while(!(UART2_SR & UART_SR_TXE)) ;
-    UART2_DR = c;
+    if (uart2_init_done) {
+        while(!(UART2_SR & UART_SR_TXE)) ;
+        UART2_DR = c;
+    }
 }
 
 void uart2_write(const char *str)
