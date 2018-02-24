@@ -325,8 +325,8 @@ void cc2500_SetPower(uint8_t power)
         power = 7;
     }
     // don't allow really low powers
-    if (power < 3) {
-        power = 3;
+    if (power < 1) {
+        power = 1;
     }
     cc2500_WriteReg(CC2500_3E_PATABLE, patable[power]);
 }
@@ -358,15 +358,15 @@ static const struct {
     {CC2500_18_MCSM0,    0x08}, // XOSC expire 64, no auto-cal
     {CC2500_06_PKTLEN,   0x1E}, // packet length 30
     {CC2500_07_PKTCTRL1, 0x04}, // enable RSSI+LQI, no addr check, no autoflush, PQT=0
-    {CC2500_08_PKTCTRL0, 0x01}, // var length mode, no CRC, FIFO enable, no whitening
+    {CC2500_08_PKTCTRL0, 0x41}, // var length mode, no CRC, FIFO enable, whitening
     {CC2500_3E_PATABLE,  0xFF}, // ?? what are we doing to PA table here?
     {CC2500_0B_FSCTRL1,  0x0A}, // IF=253.90625kHz assuming 26MHz crystal
     {CC2500_0C_FSCTRL0,  0x00}, // freqoffs = 0
     {CC2500_0D_FREQ2,    0x5C}, // freq control high
     {CC2500_0E_FREQ1,    0x76}, // freq control middle
     {CC2500_0F_FREQ0,    0x27}, // freq control low
-    {CC2500_10_MDMCFG4,  0x4B}, // filter bandwidth 406kHz, drate 70kBaud
-    {CC2500_11_MDMCFG3,  0x61}, // data rate control
+    {CC2500_10_MDMCFG4,  0x4B}, // filter bandwidth 406kHz
+    {CC2500_11_MDMCFG3,  0x61}, // data rate 70.0kbaud
     {CC2500_12_MDMCFG2,  0x13}, // 30/32 sync word bits, no manchester, GFSK, DC filter enabled
     {CC2500_13_MDMCFG1,  0x23}, // chan spacing exponent 3, preamble 4 bytes, FEC disabled
     {CC2500_14_MDMCFG0,  0x7A}, // chan spacing 299.926757kHz for 26MHz crystal
@@ -494,7 +494,7 @@ static void setup_hopping_table_SRT(void)
     uint8_t i;
     uint8_t wifi_chan = eeprom_read(EEPROM_WIFICHAN_OFFSET);
     uint8_t cc_wifi_mid, cc_wifi_low, cc_wifi_high;
-    const uint8_t wifi_separation = 50;
+    const uint8_t wifi_separation = 65;
     
     if (wifi_chan == 0 || wifi_chan > 14) {
         wifi_chan = 9;
