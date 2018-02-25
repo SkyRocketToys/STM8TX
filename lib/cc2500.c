@@ -312,7 +312,7 @@ static void cc2500_WriteReg(uint8_t reg, uint8_t value)
 void cc2500_SetPower(uint8_t power)
 {
     const uint8_t patable[8] = {
-        0xC5, // -12dbm
+        0x50, // -30dbm (for testing)
         0x97, // -10dbm
         0x6E, // -8dbm
         0x7F, // -6dbm
@@ -321,14 +321,13 @@ void cc2500_SetPower(uint8_t power)
         0xFE, // 0dbm
         0xFF  // 1.5dbm
     };
-    if (power > 7) {
-        power = 7;
+    if (power > 8) {
+        power = 8;
     }
-    // don't allow really low powers
     if (power < 1) {
         power = 1;
     }
-    cc2500_WriteReg(CC2500_3E_PATABLE, patable[power]);
+    cc2500_WriteReg(CC2500_3E_PATABLE, patable[power-1]);
 }
 
 /*
