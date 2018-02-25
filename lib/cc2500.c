@@ -355,19 +355,19 @@ static const struct {
     {CC2500_00_IOCFG2,   0x1B}, // PA_PD
     {CC2500_17_MCSM1,    0x03}, // CCA always, RX->IDLE, TX -> RX
     {CC2500_18_MCSM0,    0x08}, // XOSC expire 64, no auto-cal
-    {CC2500_06_PKTLEN,   0x1E}, // packet length 30
-    {CC2500_07_PKTCTRL1, 0x04}, // enable RSSI+LQI, no addr check, no autoflush, PQT=0
-    {CC2500_08_PKTCTRL0, 0x41}, // var length mode, no CRC, FIFO enable, whitening
-    {CC2500_3E_PATABLE,  0xFF}, // ?? what are we doing to PA table here?
+    {CC2500_06_PKTLEN,   0x10}, // packet length 16
+    {CC2500_07_PKTCTRL1, 0x0C}, // enable RSSI+LQI, no addr check, CRC autoflush, PQT=0
+    {CC2500_08_PKTCTRL0, 0x44}, // fixed length mode, CRC, FIFO enable, whitening
+    {CC2500_3E_PATABLE,  0xFF}, // initially max power
     {CC2500_0B_FSCTRL1,  0x0A}, // IF=253.90625kHz assuming 26MHz crystal
     {CC2500_0C_FSCTRL0,  0x00}, // freqoffs = 0
     {CC2500_0D_FREQ2,    0x5C}, // freq control high
     {CC2500_0E_FREQ1,    0x76}, // freq control middle
     {CC2500_0F_FREQ0,    0x27}, // freq control low
-    {CC2500_10_MDMCFG4,  0x4B}, // filter bandwidth 406kHz
-    {CC2500_11_MDMCFG3,  0x61}, // data rate 70.0kbaud
+    {CC2500_10_MDMCFG4,  0x8C}, // filter bandwidth 203kHz
+    {CC2500_11_MDMCFG3,  0x2F}, // data rate 120kbaud
     {CC2500_12_MDMCFG2,  0x13}, // 30/32 sync word bits, no manchester, GFSK, DC filter enabled
-    {CC2500_13_MDMCFG1,  0x23}, // chan spacing exponent 3, preamble 4 bytes, FEC disabled
+    {CC2500_13_MDMCFG1,  0xA3}, // chan spacing exponent 3, preamble 4 bytes, FEC enabled
     {CC2500_14_MDMCFG0,  0x7A}, // chan spacing 299.926757kHz for 26MHz crystal
     {CC2500_15_DEVIATN,  0x51}, // modem deviation 25.128906kHz for 26MHz crystal
     {CC2500_19_FOCCFG,   0x16}, // frequency offset compensation
@@ -657,15 +657,6 @@ static void send_autobind_packet();
 static void parse_telem_packet(const uint8_t *packet)
 {
     const struct telem_packet_cc2500 *pkt = (const struct telem_packet_cc2500 *)packet;
-    uint16_t lcrc = calc_crc(packet, sizeof(*pkt)-2);
-    if (pkt->crc[0] != (lcrc>>8) || pkt->crc[1] != (lcrc&0xFF)) {
-#if 0
-        printf("bad telem CRC %x %x %x %x %u\n",
-               pkt->crc[0], pkt->crc[1], (lcrc>>8), (lcrc&0xFF),
-               sizeof(struct telem_packet_cc2500)-2);
-#endif
-        return;
-    }
     if (pkt->txid[0] != bindTxId[0] ||
         pkt->txid[1] != bindTxId[1]) {
         // not for us
@@ -797,10 +788,6 @@ static void send_SRT_packet(void)
     pkt.channr = channr;
     pkt.chanskip = chanskip;
 
-    lcrc = calc_crc((uint8_t *)&pkt, sizeof(pkt)-2);
-    pkt.crc[0] = lcrc>>8;
-    pkt.crc[1] = lcrc&0xFF;
-    
     if (tx_max != t_status.tx_max) {
         tx_max = t_status.tx_max;
         cc2500_SetPower(tx_max);
@@ -921,6 +908,7 @@ static void send_autobind_packet(void)
 {
     struct autobind_packet_cc2500 pkt;
     uint16_t lcrc;
+    uint8_t i;
 
     pkt.length = sizeof(pkt)-1;
     pkt.magic1 = 0xC5;
@@ -929,11 +917,16 @@ static void send_autobind_packet(void)
     pkt.txid[1] = bindTxId[1];
     pkt.txid_inverse[0] = ~bindTxId[0];
     pkt.txid_inverse[1] = ~bindTxId[1];
+    pkt.wifi_chan = last_wifi_channel;
+
+    for (i=0; i<sizeof(pkt.pad); i++) {
+        pkt.pad[i] = i+1;
+    }
 
     lcrc = calc_crc((uint8_t *)&pkt, sizeof(pkt)-2);
     pkt.crc[0] = lcrc>>8;
     pkt.crc[1] = lcrc&0xFF;
-
+    
     // send as broadcast at low power
     cc2500_WriteReg(CC2500_09_ADDR, 0);
     cc2500_SetPower(AUTOBIND_POWER);
