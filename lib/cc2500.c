@@ -197,8 +197,13 @@ extern uint8_t telem_ack_value;
 #else
 #define NUM_CHANNELS 23
 #define MAX_CHANNEL_NUMBER 0xEB
-#define INTER_PACKET_MS 8
+#define INTER_PACKET_MS 9
 #endif
+
+// LOST_PACKETS is used to simulate a string of lost packets which
+// allows for testing of hopping timing recovery. It is given as a
+// percentage of lost packets.
+#define LOST_PACKETS 0
 
 #define AUTOBIND_CHANNEL 100
 #define AUTOBIND_POWER 3
@@ -640,6 +645,16 @@ void radio_irq(void)
 
 static void send_packet(uint8_t len, const uint8_t *packet)
 {
+#if LOST_PACKETS
+    // simulate packet loss to test timing recovery
+    static uint8_t lost_counter;
+    if (lost_counter++ == 100) {
+        lost_counter = 0;
+    }
+    if (lost_counter < LOST_PACKETS) {
+        return;
+    }
+#endif
     cc2500_Strobe(CC2500_SFTX);
     if (len) {
         cc2500_WriteFifo(packet, len);
