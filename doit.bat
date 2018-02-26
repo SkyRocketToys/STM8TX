@@ -13,5 +13,5 @@ set PATH=%SDCC_DIR%;%CYGWIN%;%PYTHONPATH%
 bash.exe -c "echo $PATH"
 bash.exe -c "echo $PYTHONPATH"
 rem bash.exe -c "make clean"
-bash.exe -c "make combined.ihx BRD_RADIO_TYPE=3 WINDOWS=1"
+bash.exe -c "make all BRD_RADIO_TYPE=3 WINDOWS=1"
 PATH=%oldpath%

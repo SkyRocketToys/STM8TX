@@ -606,11 +606,11 @@
         </option>
         <option>
           <name>IlinkIcfOverride</name>
-          <state>0</state>
+          <state>1</state>
         </option>
         <option>
           <name>IlinkIcfFile</name>
-          <state>$TOOLKIT_DIR$\config\lnkstm8s105k6.icf</state>
+          <state>$PROJ_DIR$\lnkstm8_boot.icf</state>
         </option>
         <option>
           <name>IlinkIcfFileSlave</name>
@@ -862,20 +862,20 @@
         <option>
           <name>GenLibInFormatter</name>
           <version>0</version>
-          <state>2</state>
+          <state>6</state>
         </option>
         <option>
           <name>GenLibInFormatterDescription</name>
-          <state>Full formatting, without multibytes.</state>
+          <state>No specifier n, no float, no scan set, no assignment suppressing, without multibytes.</state>
         </option>
         <option>
           <name>GenLibOutFormatter</name>
           <version>0</version>
-          <state>2</state>
+          <state>7</state>
         </option>
         <option>
           <name>GenLibOutFormatterDescription</name>
-          <state>Full formatting, without multibytes.</state>
+          <state>No specifier a or A, no specifier n, no float, no flags.</state>
         </option>
         <option>
           <name>GenStackSize</name>
@@ -910,11 +910,11 @@
         <option>
           <name>GenMathFunctionVariant</name>
           <version>0</version>
-          <state>0</state>
+          <state>1</state>
         </option>
         <option>
           <name>GenMathFunctionDescription</name>
-          <state>Default variants of cos, sin, tan, log, log10, pow, and exp.</state>
+          <state>Smaller size, higher execution speed, less precision, smaller input range.</state>
         </option>
       </data>
     </settings>
@@ -961,7 +961,7 @@
         </option>
         <option>
           <name>IccGenerateDebugInfo</name>
-          <state>0</state>
+          <state>1</state>
         </option>
         <option>
           <name>IccOutputFile</name>

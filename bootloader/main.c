@@ -112,33 +112,33 @@ static void toggle_code(uint8_t n)
     delay_ms(1);
 }
 
+enum { SZ_DFU = 128 };
+uint8_t dfu_buffer[SZ_DFU];
+
 // ----------------------------------------------------------------------------
 // Copy the newly downloaded code to the app flash memory
-static void flash_copy(uint16_t to, uint16_t from, uint16_t size)
+static void flash_copy(
+	uint16_t to, ///< Must be a multiple of SZ_DFU. Destination address.
+	uint16_t from, ///< Any alignment. Source address.
+	uint16_t size) ///< Will be rounded up to a multiple of SZ_DFU.
 {
-    uint32_t *ptr1 = (uint32_t *)to;
-    const uint32_t *ptr2 = (const uint32_t *)from;
-    uint16_t nwords = (size+3) >> 2;
+    const uint8_t *pSrc = (const uint8_t *)from;
+    uint16_t npages = (size+SZ_DFU-1) / SZ_DFU;
 
-    progmem_unlock();
-    // copy using word mode, takes 14 seconds for 11k
+    // copy using page mode, takes 1 second for 14k
     gpio_clear(LED_GPS);
     gpio_set(LED_MODE);
 
-    while (nwords--) {
-        FLASH_CR2 |= 0x40;
-        FLASH_NCR2 &= ~0x40;
-
-        *ptr1++ = *ptr2++;
-
-        if (nwords % 64 == 0) {
-            gpio_toggle(LED_GPS);
-            gpio_toggle(LED_MODE);
-        }
-    }
+    while (npages--) {
+		memcpy(dfu_buffer, pSrc, SZ_DFU);
+		pSrc += SZ_DFU;
+		eeprom_flash_write_page((to & ~0x7f), dfu_buffer, true);
+		to += SZ_DFU;
+        gpio_toggle(LED_GPS);
+        gpio_toggle(LED_MODE);
+	}
     gpio_set(LED_GPS);
     gpio_set(LED_MODE);
-    progmem_lock();
 }
 
 

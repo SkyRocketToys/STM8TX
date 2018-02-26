@@ -50,6 +50,9 @@ WinTools\cheese.exe extract iar_combined.bin -pad 255 -i iar_boot.bin 0 $8700 -i
 del iar_combined.h
 WinTools\cheese.exe dat2dat iar_combined.bin iar_combined.ihx -outrange $8000 $4000
 del iar_combined.h
+WinTools\cheese.exe dat2dat iar_txmain.bin iar_chk.bin -outrange $8700-6 $c000-$8700+6 -checksum [crc16ardupilot] -checkdst $8700-4 -checksrc $8700+$3900/2 $3900/2 -checksrc $8700 $3900/2 -setbyte $8700-6 $39 -setbyte $8700-5 0
+del iar_chk.h
+WinTools\cheese.exe extract iar_txmain.img -i iar_chk.bin $8700-6 -1
 
 rem Move it to the right location
 copy /b %FW_INFILE% %FW_OUTFILE%

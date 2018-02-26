@@ -16,8 +16,8 @@ void progmem_unlock(void);
 void eeprom_lock(void);
 void eeprom_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len);
 
-bool eeprom_flash_erase(uint16_t offset);
-bool eeprom_flash_write_page(uint16_t offset, const uint8_t *data);
+bool eeprom_flash_erase(uint16_t addr);
+bool eeprom_flash_write_page(uint16_t addr, const uint8_t *data, bool bEraseFirst);
 
 
 // Memory allocation for EEPROM

@@ -1288,7 +1288,7 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 			if ((addr & 0x7f) == 0x40) // Before the end of a page
 			{
 				// Perform a fast erase of the block
-				if (!eeprom_flash_erase(addr & ~0x7f))
+				if (!eeprom_flash_erase((addr & ~0x7f) + NEW_FIRMWARE_BASE))
 				{
 					dfu_written = 0xffff; // was write-protected
 					printf("e");
@@ -1299,7 +1299,7 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 			if ((addr & 0x7f) == 0x70) // End of a page
 			{
 				// Perform a fast write of the block
-				if (!eeprom_flash_write_page(addr & ~0x7f, dfu_buffer))
+				if (!eeprom_flash_write_page((addr & ~0x7f) + NEW_FIRMWARE_BASE, dfu_buffer, false))
 				{
 					dfu_written = 0xffff; // was write-protected
 					printf("w");

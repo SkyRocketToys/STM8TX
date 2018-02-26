@@ -478,6 +478,7 @@ void main(void)
     EXTI_CR1 = (1<<6) | (1<<4) | (1<<2) | (1<<0); // rising edge interrupts
 #endif
 
+	printf("VERSION B\r\n");
     printf("BL_VERSION %u\r\n", get_bl_version());
 	// For delta time calibration
 	{
