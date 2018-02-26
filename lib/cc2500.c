@@ -360,7 +360,7 @@ static const struct {
     {CC2500_00_IOCFG2,   0x1B}, // PA_PD
     {CC2500_17_MCSM1,    0x03}, // CCA always, RX->IDLE, TX -> RX
     {CC2500_18_MCSM0,    0x08}, // XOSC expire 64, no auto-cal
-    {CC2500_06_PKTLEN,   0x10}, // packet length 16
+    {CC2500_06_PKTLEN,   0x0D}, // packet length 13
     {CC2500_07_PKTCTRL1, 0x0C}, // enable RSSI+LQI, no addr check, CRC autoflush, PQT=0
     {CC2500_08_PKTCTRL0, 0x44}, // fixed length mode, CRC, FIFO enable, whitening
     {CC2500_3E_PATABLE,  0xFF}, // initially max power
