@@ -72,7 +72,7 @@ typedef unsigned long U32;
  #define trap()                __trap()               /* Trap (soft IT) */
  #define wfi()                 __wait_for_interrupt() /* Wait For Interrupt */
  #define halt()                __halt()               /* Halt */
-#elif defined(SDCC)
+#elif defined(__SDCC)
  #define enableInterrupts()    {__asm__("rim\n");}    // enable interrupts
  #define disableInterrupts()   {__asm__("sim\n");}    // disable interrupts
  #define iret()                {__asm__("iret\n");}   // Interrupt routine return
@@ -186,7 +186,7 @@ typedef unsigned long U32;
  __interrupt void (a) (void)
 #endif /* _IAR_ */
 
-#ifdef SDCC
+#ifdef __SDCC
  #define INTERRUPT_HANDLER(fn, num)		void fn() __interrupt(num)
  #define INTERRUPT_DEFINITION(fn, num)	extern void fn() __interrupt(num)
 #endif

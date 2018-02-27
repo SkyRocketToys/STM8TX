@@ -1,7 +1,7 @@
 /*
   STM8S105
   bootloader to allow for over the air update of main firmware
-  written for SDCC compiler and IAR compiler
+  written for SDCC compiler 3.7.0 or better and IAR compiler 2.20.1
  */
 
 #include <stdint.h>

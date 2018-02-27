@@ -1722,6 +1722,7 @@ void radio_set_pps_rssi(void)
 // ----------------------------------------------------------------------------
 // For debugging - tell us the current beken register values (from bank 0)
 // This just prints it to the UART rather than to the console over WiFi
+#if FATCODE
 void beken_DumpRegisters(void)
 {
 	uint8_t i;
@@ -1755,6 +1756,7 @@ void beken_DumpRegisters(void)
 	}
 	BK2425_SetRBank(0);
 }
+#endif
 
 // ----------------------------------------------------------------------------
 void radio_check_telem_packet(void)

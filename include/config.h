@@ -6,6 +6,12 @@
 #error BRD_RADIO_TYPE must be declared on the command line
 #endif
 
+#ifdef __SDCC // The linker does not remove unused functions
+#define FATCODE 0
+#else
+#define FATCODE 1
+#endif
+
 
 #if BRD_RADIO_TYPE==1 // Cypress
 #define SUPPORT_CYPRESS 1

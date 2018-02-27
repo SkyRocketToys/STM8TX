@@ -130,7 +130,7 @@ void eeprom_flash_copy(
 #ifdef _IAR_
 __ramfunc
 #endif
-#ifdef SDCC
+#ifdef __SDCC
 #pragma codeseg RAM_SEG
 #endif
 bool eeprom_flash_erase(
@@ -168,7 +168,7 @@ bool eeprom_flash_erase(
 #ifdef _IAR_
 __ramfunc
 #endif
-#ifdef SDCC
+#ifdef __SDCC
 #pragma codeseg RAM_SEG
 #endif
 bool eeprom_flash_write_page(
