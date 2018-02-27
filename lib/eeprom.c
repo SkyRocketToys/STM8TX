@@ -40,6 +40,8 @@ enum {
 	FLASH_DUKR_DUK   = 0xFF,
 };
 
+#ifndef FW_BOOT
+
 // -----------------------------------------------------------------------------
 /** Unlock the EEPROM memory before writing */
 void eeprom_unlock(void)
@@ -158,6 +160,7 @@ bool eeprom_flash_erase(
     FLASH_IAPSR &= ~FLASH_IAPSR_DUL;
 	return result;
 }
+#endif
 
 // -----------------------------------------------------------------------------
 // Fast write a page of memory at an address without erasing it (3.3ms)

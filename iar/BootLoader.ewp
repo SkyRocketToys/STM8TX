@@ -1598,7 +1598,7 @@
     <name>$PROJ_DIR$\..\lib\crc.c</name>
   </file>
   <file>
-    <name>$PROJ_DIR$\..\lib\eeprom.c</name>
+    <name>$PROJ_DIR$\..\lib\eeprom_boot.c</name>
   </file>
   <file>
     <name>$PROJ_DIR$\..\lib\gpio.c</name>

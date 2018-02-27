@@ -52,7 +52,7 @@ endif
 
 LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c $(RADIO_MODULE)
 LIBSRC += lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c lib/channels.c
-BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom.c
+BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom_boot.c
 
 RELOBJ = $(LIBSRC:%.c=%.rel)
 BL_RELOBJ = $(BL_LIBSRC:%.c=%.rel)
@@ -95,11 +95,11 @@ ifeq ($(WINDOWS),1)
 
 combined.ihx: txmain.ihx bootloader.ihx
 	@echo Building combined.ihx
-	@./WinTools/cheese dat2dat bootloader.ihx bootloader.bin
-	@rm bootloader.h
-	@./WinTools/cheese dat2dat txmain.ihx txmain.bin
-	@rm txmain.h
-	@./WinTools/cheese extract combined.bin -pad 255 -i bootloader.bin 0 $$8700 -i txmain.bin $$8700 $$3900 -i txmain.bin $$86fa $$3900
+	@./WinTools/cheese dat2dat bootloader.ihx sdcc_bootloader.bin
+	@rm sdcc_bootloader.h
+	@./WinTools/cheese dat2dat txmain.ihx sdcc_txmain.bin
+	@rm sdcc_txmain.h
+	@./WinTools/cheese extract combined.bin -pad 255 -i sdcc_bootloader.bin 0 $$8700 -i sdcc_txmain.bin $$8700 $$3900 -i sdcc_txmain.bin $$86fa $$3900
 	@./WinTools/cheese dat2dat combined.bin combined.ihx -outrange $$8000 $$4000
 	@rm combined.h
 

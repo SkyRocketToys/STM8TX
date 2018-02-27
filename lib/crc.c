@@ -51,12 +51,14 @@ static uint16_t crc_crc16(const uint8_t *p, uint16_t len)
     return crc;
 }
 
+#if SUPPORT_CYPRESS
 // -----------------------------------------------------------------------------
 /** 8-bit crc */
 uint8_t crc_crc8(const uint8_t *p, uint16_t len)
 {
     return crc_crc16(p, len) & 0xFF;
 }
+#endif
 
 // -----------------------------------------------------------------------------
 /** a poor-mans crc32, re-using the crc16 table */
