@@ -213,7 +213,6 @@ extern uint8_t telem_ack_value;
 
 static uint8_t calData[MAX_CHANNEL_NUMBER][3];
 static uint8_t bindTxId[2];
-static int8_t  bindOffset;
 static uint8_t bindHopData[NUM_CHANNELS];
 static uint8_t channr;
 static uint8_t chanskip;
@@ -223,7 +222,7 @@ static uint8_t tx_max = 7;
 static int8_t fcc_test_chan = -1;
 static bool fcc_cw_mode;
 static bool fcc_scan_mode;
-static uint8_t fcc_power = 7;
+static uint8_t fcc_power = 8;
 static uint8_t last_wifi_channel;
 
 // telem packet handling buffer, parsed from main thread
@@ -853,8 +852,14 @@ static void send_normal_packet(void)
  */
 static void send_FCC_packet(void)
 {
-    uint8_t chan = (uint8_t)fcc_test_chan;
-    chan *= FCC_CHAN_STEP;
+    uint8_t chan;
+    if (fcc_test_chan == 0) {
+        chan = 0;
+    } else if (fcc_test_chan == 1) {
+        chan = MAX_CHANNEL_NUMBER/2;
+    } else {
+        chan = MAX_CHANNEL_NUMBER-1;
+    }
     cc2500_Strobe(CC2500_SIDLE);
     cc2500_SetPower(fcc_power);
     setHwChannel(chan);
@@ -971,7 +976,7 @@ void radio_start_bind_send(bool use_dsm2)
 void radio_start_FCC_test(void)
 {
     printf("radio_start_FCC\n");
-    fcc_test_chan = 12;
+    fcc_test_chan = 1;
     timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);    
 }
 
@@ -1043,7 +1048,10 @@ uint8_t get_telem_pps(void)
  */
 void radio_next_FCC_power(void)
 {
-    fcc_power = (fcc_power + 1) % 8;
+    fcc_power++;
+    if (fcc_power > 8) {
+        fcc_power = 1;
+    }
     timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);
 }
 
@@ -1074,11 +1082,8 @@ void radio_set_CW_mode(bool cw)
 
 void radio_change_FCC_channel(int8_t change)
 {
-    fcc_test_chan += change;
-    if (fcc_test_chan < 0) {
-        fcc_test_chan = (MAX_CHANNEL_NUMBER/FCC_CHAN_STEP)-1;
-    }
-    if (fcc_test_chan >= (MAX_CHANNEL_NUMBER/FCC_CHAN_STEP)) {
+    fcc_test_chan++;
+    if (fcc_test_chan >= 3) {
         fcc_test_chan = 0;
     }
     printf("set FCC chan %d\n", fcc_test_chan);

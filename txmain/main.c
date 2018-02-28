@@ -187,7 +187,7 @@ static void status_update(bool have_link)
             printf("FCC power %u\n", FCC_power);
             for (i=0; i<FCC_power; i++) {
                 buzzer_tune(TONE_RX_SEARCH);
-                delay_ms(100);
+                delay_ms(200);
             }
         }
         if (buttons == BUTTON_GPS) {
