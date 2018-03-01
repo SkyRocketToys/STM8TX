@@ -72,7 +72,7 @@ static bool temp_tune_pending;
 // mapping spreadsheet behind this
 // Everything below NOTE_C6 is the same note though
 
-#define NOTEBITS(range, divider) (((range)<<6) | divider)
+#define NOTEBITS(range, divider) ((((uint8_t)(range))<<6) | (uint8_t) divider)
 
 #define BEEP_LOW BEEP_1KHZ
 #define BEEP_MED BEEP_2KHZ

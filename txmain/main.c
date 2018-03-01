@@ -473,12 +473,18 @@ void main(void)
     buzzer_init();
 
 #if SUPPORT_BEKEN
-    EXTI_CR1 = (2<<6) | (2<<4) | (2<<2) | (2<<0); // falling edge interrupts
+    EXTI_CR1 = (2u<<6) | (2u<<4) | (2u<<2) | (2u<<0); // falling edge interrupts
 #else
-    EXTI_CR1 = (1<<6) | (1<<4) | (1<<2) | (1<<0); // rising edge interrupts
+    EXTI_CR1 = (1u<<6) | (1u<<4) | (1u<<2) | (1u<<0); // rising edge interrupts
 #endif
 
-	printf("VERSION B\r\n");
+#ifdef __SDCC
+	printf("SDCC ");
+#endif
+#ifdef _IAR_
+	printf("IAR ");
+#endif
+	printf("VERSION C\r\n");
     printf("BL_VERSION %u\r\n", get_bl_version());
 	// For delta time calibration
 	{

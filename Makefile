@@ -95,19 +95,19 @@ ifeq ($(WINDOWS),1)
 
 combined.ihx: txmain.ihx bootloader.ihx
 	@echo Building combined.ihx
-	@./WinTools/cheese dat2dat bootloader.ihx sdcc_bootloader.bin
-	@rm sdcc_bootloader.h
-	@./WinTools/cheese dat2dat txmain.ihx sdcc_txmain.bin
-	@rm sdcc_txmain.h
-	@./WinTools/cheese extract combined.bin -pad 255 -i sdcc_bootloader.bin 0 $$8700 -i sdcc_txmain.bin $$8700 $$3900 -i sdcc_txmain.bin $$86fa $$3900
-	@./WinTools/cheese dat2dat combined.bin combined.ihx -outrange $$8000 $$4000
-	@rm combined.h
+	./WinTools/cheese dat2dat bootloader.ihx sdcc_bootloader.bin
+	rm sdcc_bootloader.h
+	./WinTools/cheese dat2dat txmain.ihx sdcc_txmain.bin
+	rm sdcc_txmain.h
+	./WinTools/cheese extract combined.bin -pad 255 -i sdcc_bootloader.bin 0 34560 -i sdcc_txmain.bin 34560 14592 -i sdcc_txmain.bin 34554 14592
+	./WinTools/cheese dat2dat combined.bin combined.ihx -outrange 32768 16384
+	rm combined.h
 
 txmain.img: combined.ihx 
 	@echo Building txmain.img
-	@./WinTools/cheese.exe dat2dat combined.bin sdcc_chk.bin -outrange $$8700-6 $$c000-$$8700+6 -checksum [crc16ardupilot] -checkdst $$8700-4 -checksrc $$8700+$$3900/2 $$3900/2 -checksrc $$8700 $$3900/2 -setbyte $$8700-6 $$39 -setbyte $$8700-5 0
+	@./WinTools/cheese.exe dat2dat combined.bin sdcc_chk.bin -outrange 34560-6 49152-34560+6 -checksum [crc16ardupilot] -checkdst 34560-4 -checksrc 34560+14592/2 14592/2 -checksrc 34560 14592/2 -setbyte 34560-6 57 -setbyte 34560-5 0
 	@rm sdcc_chk.h
-	@./WinTools/cheese.exe extract txmain.img -i sdcc_chk.bin $$8700-6 -1
+	@./WinTools/cheese.exe extract txmain.img -i sdcc_chk.bin 34560-6 -1
 
 else
 # -----------------------------------------------------------------------------

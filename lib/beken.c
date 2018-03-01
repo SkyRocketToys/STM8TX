@@ -568,7 +568,7 @@ const uint8_t channelTable[CHANNEL_NUM_TABLES*CHANNEL_COUNT_LOGICAL+CHANNEL_COUN
 \return true if we changed something */
 bool SetChannelRange(
 	uint8_t min, ///< The minimum logical channel range
-	uint8_t max) ///< The maximum logical channel range
+	uint8_t max) ///< One past the maximum logical channel range
 {
 	min *= CHANNEL_DWELL_PACKETS;
 	max *= CHANNEL_DWELL_PACKETS;
@@ -1285,6 +1285,7 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 		memcpy(&dfu_buffer[addr & 0x70], &pDFU->data[0], SZ_DFU);
 		if (addr != lastAddr)
 		{
+			printf("=");
 			if ((addr & 0x7f) == 0x40) // Before the end of a page
 			{
 				// Perform a fast erase of the block
