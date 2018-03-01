@@ -9,9 +9,8 @@
 #ifdef __SDCC // The linker does not remove unused functions
 #define FATCODE 0
 #else
-#define FATCODE 1
+#define FATCODE 0
 #endif
-
 
 #if BRD_RADIO_TYPE==1 // Cypress
 #define SUPPORT_CYPRESS 1
@@ -35,6 +34,7 @@
 #define SUPPORT_PROTOCOL 2 // Protocol 2 = raw channels
 #endif
 
+#define SUPPORT_DEBUG_TX 0 // Set to 1 means toggle the UART RX (D6) on Tx
 
 /** @file */
 
@@ -224,6 +224,8 @@ RADIO_PACTL | B5
 
 #define UART_TX (GPIO_PORTD|GPIO_PIN5)
 #define UART_RX (GPIO_PORTD|GPIO_PIN6)
+#define PIN_DEBUG1 UART_TX
+#define PIN_DEBUG2 UART_RX
 
 #define PIN_BEEP (GPIO_PORTD|GPIO_PIN4)
 

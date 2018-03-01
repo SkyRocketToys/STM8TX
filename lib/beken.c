@@ -796,6 +796,7 @@ void BK2425_Initialize(
 }
 
 // ----------------------------------------------------------------------------
+#if FATCODE
 bool bRadioFast = false;
 /** Change between 250kbps and 2000kbps on the fly */
 void BK2425_SetSpeed(
@@ -812,6 +813,7 @@ void BK2425_SetSpeed(
 	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
 	bRadioFast = bFast;
 }
+#endif
 
 // ----------------------------------------------------------------------------
 /** Write a 32-bit Bank1 register */
@@ -1095,7 +1097,18 @@ bool Send_Packet(
 	if (!(fifo_sta & BK_FIFO_STATUS_TX_FULL)) // if not full, send data
 	{
 		beken.stats.numTxPackets++;
+	#if SUPPORT_DEBUG_TX
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+	#endif
 		SPI_Write_Buf(type, pbuf, len); // Writes data to buffer A0,B0,A8
+	#if SUPPORT_DEBUG_TX
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+	#endif
 	}
 	delta_send_packets = timer_read_delta_us(); // Check jitter near END of interrupt
 	return returnValue;
@@ -1322,6 +1335,15 @@ void beken_irq(void)
 	uint8_t bk_sta = SPI_Read_Reg(BK_STATUS);
 	if (bk_sta & BK_STATUS_TX_DS)
 	{
+	#if SUPPORT_DEBUG_TX
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
+	#endif
 		// Packet was sent successfully (not yet acknowledged)
 		beken.stats.numSentPackets++;
 		BK2425_SwitchToRxMode(); // Prepare to receive reply

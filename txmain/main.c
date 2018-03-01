@@ -59,10 +59,22 @@ INTERRUPT_HANDLER(ADC1_IRQHandler, 22) {
     adc_irq();
 }
 INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5) {
+#if SUPPORT_DEBUG_TX
+	gpio_set(PIN_DEBUG2);
     radio_irq();
+	gpio_clear(PIN_DEBUG2);
+#else
+    radio_irq();
+#endif
 }
 INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
+#if SUPPORT_DEBUG_TX
+	gpio_set(PIN_DEBUG2);
     timer_irq();
+	gpio_clear(PIN_DEBUG2);
+#else
+    timer_irq();
+#endif
 }
 
 // -----------------------------------------------------------------------------
@@ -105,8 +117,10 @@ static uint8_t last_mode;
 static void update_leds(void)
 {
     uint8_t tick = (timer_get_ms() >> 6) & 0xF;
+	disableInterrupts(); // Else PORTD is trashed at end of interrupt
     led_mode_set(yellow_led_pattern & (1U<<tick));
     led_gps_set(green_led_pattern & (1U<<tick));
+	enableInterrupts();
 }
 
 // -----------------------------------------------------------------------------
