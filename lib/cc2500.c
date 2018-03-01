@@ -793,7 +793,6 @@ static void send_D16_packet(void)
 static void send_SRT_packet(void)
 {
     struct srt_packet pkt;
-    uint16_t lcrc;
     fill_packet(&pkt);
 
     pkt.length = sizeof(pkt)-1;
@@ -996,6 +995,12 @@ void radio_start_send(bool use_dsm2)
  */
 void radio_start_factory_test(uint8_t test_mode)
 {
+    printf("radio_start_factory_test %u\n", test_mode);
+    bindTxId[0] = (uint8_t)(test_mode * 17);
+    bindTxId[1] = (uint8_t)(~bindTxId[0]);
+    setup_hopping_table_SRT();
+    setChannel(0);
+    timer_call_periodic_ms(INTER_PACKET_MS, check_rx_packet);    
 }
 
 uint8_t get_tx_power(void)
