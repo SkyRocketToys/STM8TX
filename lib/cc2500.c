@@ -186,7 +186,7 @@ extern uint8_t telem_ack_value;
 
   For D16 protocol we select 47 channels from a max of 235 channels
 
-  For SRT protocol we select 23 channels from a max of 233 channels,
+  For SRT protocol we select 23 channels from a max of 235 channels,
   and avoid channels near to the WiFi channel of the Sonix video board
  */
 
