@@ -1356,6 +1356,8 @@ void beken_irq(void)
 	{
 		// We have received a packet
 		uint8_t rxstd = 0;
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
 		// Which pipe (address) have we received this packet on?
 		if ((bk_sta & BK_STATUS_RX_MASK) == BK_STATUS_RX_P_0)
 		{
@@ -1366,9 +1368,23 @@ void beken_irq(void)
 			beken.stats.badRxAddress++;
 		}
 		beken.bFreshData = 1;
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
 		Receive_Packet(&beken.pktDataRecv[0]);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
 		memcpy(&beken.pktDataRx[0], &beken.pktDataRecv[0], sizeof(beken.pktDataRx));
 		ProcessPacket(&beken.pktDataRx[0], rxstd);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
+		gpio_set(PIN_DEBUG1);
+		gpio_clear(PIN_DEBUG1);
 	}
 
 	// Clear the bits
@@ -1587,12 +1603,20 @@ void beken_timer_irq(void)
 	if (!beken.lastTxCwMode)
 	{
 //		delta_send_packets = timer_read_delta_us(); // Check jitter before transmission
-#if SUPPORT_DEBUG_LOSE
+#if SUPPORT_DEBUG_LOSE_BURST
 		// Support losing several packets in a row
 		static uint8_t cnt_lose_packets = 0;
 		if (++cnt_lose_packets >= 100)
 			cnt_lose_packets = 0;
-		if (cnt_lose_packets < SUPPORT_DEBUG_LOSE)
+		if (cnt_lose_packets < SUPPORT_DEBUG_LOSE_BURST)
+			return;
+#endif
+#if SUPPORT_DEBUG_LOSE_RANDOM
+		// Support losing several packets in a row
+		static uint32_t cnt_random = 0;
+		cnt_random = (cnt_random * 214013ul+2531011ul) & 0x7ffffffful; // Linear congruential pseudo random number generator
+		uint16_t r = (cnt_random >> 16); // 0..32767 random number
+		if (SUPPORT_DEBUG_LOSE_RANDOM*328u > r) // Does this packet fail?
 			return;
 #endif
 		Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_CTRL);
