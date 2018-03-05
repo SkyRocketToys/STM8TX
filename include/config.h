@@ -35,6 +35,7 @@
 #endif
 
 #define SUPPORT_DEBUG_TX 0 // Set to 1 means toggle the UART RX (D6) on Tx
+#define SUPPORT_DEBUG_LOSE 0 // Set to non-zero means lose several packets periodically (every 0.5 seconds, i.e. percent)
 
 /** @file */
 

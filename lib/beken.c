@@ -1587,6 +1587,14 @@ void beken_timer_irq(void)
 	if (!beken.lastTxCwMode)
 	{
 //		delta_send_packets = timer_read_delta_us(); // Check jitter before transmission
+#if SUPPORT_DEBUG_LOSE
+		// Support losing several packets in a row
+		static uint8_t cnt_lose_packets = 0;
+		if (++cnt_lose_packets >= 100)
+			cnt_lose_packets = 0;
+		if (cnt_lose_packets < SUPPORT_DEBUG_LOSE)
+			return;
+#endif
 		Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_CTRL);
 	}
 }
