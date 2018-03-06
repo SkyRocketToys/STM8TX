@@ -60,18 +60,18 @@ INTERRUPT_HANDLER(ADC1_IRQHandler, 22) {
 }
 INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5) {
 #if SUPPORT_DEBUG_TX
-	gpio_set(PIN_DEBUG2);
+	SET_DEBUG2();
     radio_irq();
-	gpio_clear(PIN_DEBUG2);
+	CLEAR_DEBUG2();
 #else
     radio_irq();
 #endif
 }
 INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23) {
 #if SUPPORT_DEBUG_TX
-	gpio_set(PIN_DEBUG2);
+	SET_DEBUG2();
     timer_irq();
-	gpio_clear(PIN_DEBUG2);
+	CLEAR_DEBUG2();
 #else
     timer_irq();
 #endif

@@ -543,7 +543,7 @@ uint8_t gCountdown = 0; // For counting down to changing wifi table
 uint8_t gCountdownTable = 0;
 uint8_t gLastWifiChannel = 0;
 
-const uint8_t channelTable[CHANNEL_NUM_TABLES*CHANNEL_COUNT_LOGICAL+CHANNEL_COUNT_TEST] = {
+const uint8_t channelTable[256] = {
 #if 0 // Support single frequency mode (no channel hopping)
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Normal
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 1,2,3,4,5
@@ -552,6 +552,7 @@ const uint8_t channelTable[CHANNEL_NUM_TABLES*CHANNEL_COUNT_LOGICAL+CHANNEL_COUN
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 8
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 9,10,11
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Test mode channels
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Reserved
 #else // Frequency hopping
 	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,45, // Normal
 	57,62,67,72,58,63,68,59, 64,69,60,65,70,61,66,71, // Wifi channel 1,2,3,4,5
@@ -560,6 +561,7 @@ const uint8_t channelTable[CHANNEL_NUM_TABLES*CHANNEL_COUNT_LOGICAL+CHANNEL_COUN
 	10,70,15,20,11,71,16,21, 12,17,22,72,13,18,14,19, // Wifi channel 8
 	10,15,20,25,11,16,21,12, 17,22,13,18,23,14,19,24, // Wifi channel 9,10,11
 	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,43, // Test mode channels
+	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,43, // Reserved
 #endif
 };
 
@@ -1098,16 +1100,16 @@ bool Send_Packet(
 	{
 		beken.stats.numTxPackets++;
 	#if SUPPORT_DEBUG_TX
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
 	#endif
 		SPI_Write_Buf(type, pbuf, len); // Writes data to buffer A0,B0,A8
 	#if SUPPORT_DEBUG_TX
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
 	#endif
 	}
 	delta_send_packets = timer_read_delta_us(); // Check jitter near END of interrupt
@@ -1336,13 +1338,13 @@ void beken_irq(void)
 	if (bk_sta & BK_STATUS_TX_DS)
 	{
 	#if SUPPORT_DEBUG_TX
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
 	#endif
 		// Packet was sent successfully (not yet acknowledged)
 		beken.stats.numSentPackets++;
@@ -1356,8 +1358,8 @@ void beken_irq(void)
 	{
 		// We have received a packet
 		uint8_t rxstd = 0;
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
 		// Which pipe (address) have we received this packet on?
 		if ((bk_sta & BK_STATUS_RX_MASK) == BK_STATUS_RX_P_0)
 		{
@@ -1368,23 +1370,23 @@ void beken_irq(void)
 			beken.stats.badRxAddress++;
 		}
 		beken.bFreshData = 1;
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
 		Receive_Packet(&beken.pktDataRecv[0]);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
 		memcpy(&beken.pktDataRx[0], &beken.pktDataRecv[0], sizeof(beken.pktDataRx));
 		ProcessPacket(&beken.pktDataRx[0], rxstd);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
-		gpio_set(PIN_DEBUG1);
-		gpio_clear(PIN_DEBUG1);
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
+		SET_DEBUG1();
+		CLEAR_DEBUG1();
 	}
 
 	// Clear the bits
