@@ -15,6 +15,8 @@
 #include "beken.h"
 
 /** \addtogroup timer Timer routines
+Support Timer4 as a 1ms timer with interrupts
+Support Timer3 as a 1us timer freerunning
 @{ */
 
 static volatile uint32_t g_time_ms;

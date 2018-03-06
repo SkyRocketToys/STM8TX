@@ -13,6 +13,7 @@
 #include "uart.h"
 
 /** \addtogroup spi SPI interface to radio chip
+Support communicating with the radio chip using the SPI bus with hardware support.
 @{ */
 
 static bool forced_chip_select = false;

@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------
-// Support EEPROM reading/writing
+// Support EEPROM and FLASH reading/writing
 // -----------------------------------------------------------------------------
 
 #include "config.h"
@@ -8,8 +8,8 @@
 #include <string.h>
 
 // -----------------------------------------------------------------------------
-/** \addtogroup eeprom EEPROM reading/writing (NOT flash)
-Support the rewritable EEPROM on the CPU (it has many more erase cycles than the flash)
+/** \addtogroup eeprom EEPROM and FLASH reading/writing
+Support the rewritable EEPROM and FLASH on the CPU (EEPROM has many more erase cycles than FLASH)
 @{ */
 
 enum {
