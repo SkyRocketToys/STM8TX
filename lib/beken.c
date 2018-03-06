@@ -1527,7 +1527,7 @@ void UpdateTxBindData(bool bAuto)
 //	tx->channel;
 	for (i = 0; i < 5; ++i)
 		tx->u.bind.bind_address[i] = beken.RX0_Address[i];
-	tx->u.bind.hopping = 0;
+	tx->u.bind.hopping = beken.hopping_current;
 	for (i = 0; i < SZ_CRC_GUID; ++i)
 		tx->u.bind.droneid[0] = beken.lastDroneid[i];
 }
