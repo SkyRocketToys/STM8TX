@@ -72,7 +72,8 @@ enum BK_INFO_TYPE_E {
 	BK_INFO_MODEL = 7,
 	BK_INFO_PPS = 8,
 	BK_INFO_BATTERY = 9,
-	BK_INFO_COUNTDOWN = 10,
+	BK_INFO_COUNTDOWN = 10, // Countdown to wifi change
+	BK_INFO_HOPPING = 11, // Countdown to hopping change
 	BK_INFO_MAX
 };
 #endif
@@ -108,7 +109,7 @@ typedef struct packetDataDeviceBind_s {
 /** Data structure for data packet transmitted from device (controller) to host (drone) */
 typedef struct packetDataDevice_s {
 	BK_PKT_TYPE packetType; ///< The packet type
-	uint8_t channel; ///< Next channel I will broadcast on
+	uint8_t channel; ///< The channel this packet is being broadcast on
 	union packetDataDevice_u ///< The variant part of the packets
 	{
 		packetDataDeviceCtrl ctrl; ///< Control packets
@@ -120,13 +121,14 @@ typedef struct packetDataDevice_s {
     Compare with telem_packet_cc2500 and telem_packet_cypress */
 typedef struct packetDataDrone_s {
 	BK_PKT_TYPE packetType; ///< 0: The packet type
-	uint8_t channel; ///< 1: Next channel I will broadcast on
+	uint8_t channel; ///< 1: The channel this packet is being broadcast on
 	uint8_t pps; ///< 2: Packets per second the drone received
 	uint8_t flags; ///< 3: Flags
 	uint8_t droneid[SZ_CRC_GUID]; ///< 4...7: CRC of the drone
 	uint8_t flight_mode; ///< 8:
 	uint8_t wifi; ///< 9: Wifi channel + 24 * tx power.
 	uint8_t note_adjust; ///< 10: note adjust for the tx buzzer (should this be sent so often?)
+	uint8_t hopping; ///< 11: desired adaptive hopping table for even packets (0,2,4,6,8,10,12,14)
 } packetFormatRx;
 
 /** Data structure for data packet transmitted from host (drone) to device (controller) for over the air upgrades.
@@ -147,7 +149,7 @@ typedef struct packetDataDfu_s {
 
 #define PACKET_LENGTH_TX_CTRL 12
 #define PACKET_LENGTH_TX_BIND 12
-#define PACKET_LENGTH_RX_TELEMETRY 11
+#define PACKET_LENGTH_RX_TELEMETRY 12
 #define PACKET_LENGTH_RX_DFU 20
 #define PACKET_LENGTH_RX_MAX 20
 
@@ -405,10 +407,10 @@ volatile uint8_t bkReady = 0u; // Is the beken chip ready enough for its status 
 
 /* Statistics about the radio */
 typedef struct RadioStats_s {
-	uint32_t numTxPackets; // Number of packets we have told the Beken chip to send
-	uint32_t numRxPackets; // Number of packets the Beken chip says it has received
-	uint32_t numTelemPackets; // Number of telemetry packets received
-	uint32_t numSentPackets; // Number of packets that the Beken chip acknowledges sending
+	uint32_t numTxPackets; ///< Number of packets we have told the Beken chip to send
+	uint32_t numRxPackets; ///< Number of packets the Beken chip says it has received
+	uint32_t numTelemPackets; ///< Number of telemetry packets received
+	uint32_t numSentPackets; ///< Number of packets that the Beken chip acknowledges sending
 	uint32_t recvTimestampMs;
 	uint32_t lastTelemetryPktTime;
 	uint16_t lastTxPacketCount;
@@ -427,28 +429,37 @@ typedef struct FccParams_s {
 	uint8_t factory_mode; ///< factory test mode 0..8
 } FccParams;
 
+/** Internal variables for the radio */
 typedef struct RadioInfo_s {
 	RadioStats stats;
 	RadioStats last_stats;
 	FccParams fcc;
-    uint8_t telem_pps;
-    uint8_t send_pps;
+    uint8_t telem_pps; ///< Packets Per Second of telemetry received
+    uint8_t send_pps; ///< Packets Per Second our beken chip admits to have sent
 	// Radio parameters
-	uint16_t bind_packets;
-	uint8_t lastTxChannel; // 0..CHANNEL_COUNT_LOGICAL * CHANNEL_NUM_TABLES * CHANNEL_DWELL_PACKETS
-	uint8_t lastTxPower; // 0..7
-	bool lastTxCwMode; // 0=packet, 1=carrier wave
-	uint8_t TX0_Address[5]; // Base address of ctrl tx
-	uint8_t TX1_Address[5]; // Base address of binding tx
-	uint8_t RX0_Address[5]; // Base address of telemetry/dfu rx
-	uint8_t RX1_Address[5]; // ditto
+	uint16_t bind_packets; ///< Number of manual binding packets remaining to send
+	uint8_t lastTxChannel; ///< 0..CHANNEL_COUNT_LOGICAL * CHANNEL_NUM_TABLES * CHANNEL_DWELL_PACKETS (+0x80)
+	uint8_t lastTxPower; ///< 0..7
+	bool lastTxCwMode; ///< 0=packet, 1=carrier wave
+	uint8_t TX0_Address[5]; ///< Base address of ctrl tx
+	uint8_t TX1_Address[5]; ///< Base address of binding tx
+	uint8_t RX0_Address[5]; ///< Base address of telemetry/dfu rx
+	uint8_t RX1_Address[5]; ///< (Dummy) Base address of telemetry/dfu rx
 	// Data to send to the drone
-	packetFormatTx pktDataTx; // Packet data to send
+	packetFormatTx pktDataTx; ///< Packet data to send
 	// Data received from the drone. See also t_status
-	uint8_t bFreshData; // Have we received a packet since we last processed one
 	uint8_t pktDataRecv[PACKET_LENGTH_RX_MAX]; // Packet data in process of being received
 	uint8_t pktDataRx[PACKET_LENGTH_RX_MAX]; // Last valid packet that has been received
 	uint8_t lastDroneid[SZ_CRC_GUID]; // CRC of the drone
+	// Adaptive frequency hopping
+	uint8_t channel_idx_min; // Bounds for lastTxChannel
+	uint8_t channel_idx_max; // Bounds for lastTxChannel
+	uint8_t wifi_current;
+	uint8_t wifi_wanted;
+	uint8_t wifi_wanted_countdown; // For counting down to changing wifi table
+	uint8_t hopping_current; // What we are using for sending
+	uint8_t hopping_wanted; // What the drone wants us to use
+	uint8_t hopping_wanted_countdown; // For counting down to changing adaptive table
 } RadioInfo;
 
 RadioInfo beken;
@@ -537,14 +548,18 @@ void SPI_Write_Buf(
 // ----------------------------------------------------------------------------
 
 
-uint8_t gChannelIdxMin = 0;
-uint8_t gChannelIdxMax = CHANNEL_COUNT_LOGICAL * 1 * CHANNEL_DWELL_PACKETS;
-uint8_t gCountdown = 0; // For counting down to changing wifi table
-uint8_t gCountdownTable = 0;
-uint8_t gLastWifiChannel = 0;
-
 const uint8_t channelTable[256] = {
 #if 0 // Support single frequency mode (no channel hopping)
+	// Normal frequencies
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Normal
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 1,2,3,4,5
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 6
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 7
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 8
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 9,10,11
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Test mode channels
+	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Reserved
+	// Alternative frequencies
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Normal
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 1,2,3,4,5
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Wifi channel 6
@@ -554,6 +569,7 @@ const uint8_t channelTable[256] = {
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Test mode channels
 	23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23, // Reserved
 #else // Frequency hopping
+	// Normal frequencies
 	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,45, // Normal
 	57,62,67,72,58,63,68,59, 64,69,60,65,70,61,66,71, // Wifi channel 1,2,3,4,5
 	62,10,67,72,63,68,11,64, 69,60,65,70,12,61,66,71, // Wifi channel 6
@@ -562,6 +578,15 @@ const uint8_t channelTable[256] = {
 	10,15,20,25,11,16,21,12, 17,22,13,18,23,14,19,24, // Wifi channel 9,10,11
 	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,43, // Test mode channels
 	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,43, // Reserved
+	// Alternative frequencies
+	15,10,62,21,67,44,41,38, 52,56,47,57,30,35,41,14, // Normal
+	15,10,62,21,67,44,41,38, 52,56,47,57,30,35,41,14, // Wifi channel 1,2,3,4,5
+	15,10,62,21,67,44,41,38, 52,56,47,57,30,35,41,14, // Wifi channel 6
+	15,10,62,21,67,44,41,38, 52,56,47,57,30,35,41,14, // Wifi channel 7
+	15,10,62,21,67,44,41,38, 52,56,47,57,30,35,41,14, // Wifi channel 8
+	15,10,62,21,67,44,41,38, 52,56,47,57,30,35,41,14, // Wifi channel 9,10,11
+	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,43, // Test mode channels (as normal)
+	46,41,31,52,36,13,72,69, 21,56,16,26,61,66,10,43, // Reserved (as normal)
 #endif
 };
 
@@ -574,10 +599,10 @@ bool SetChannelRange(
 {
 	min *= CHANNEL_DWELL_PACKETS;
 	max *= CHANNEL_DWELL_PACKETS;
-	if ((gChannelIdxMin != min) || (gChannelIdxMax != max))
+	if ((beken.channel_idx_min != min) || (beken.channel_idx_max != max))
 	{
-		gChannelIdxMin = min;
-		gChannelIdxMax = max;
+		beken.channel_idx_min = min;
+		beken.channel_idx_max = max;
 		return true;
 	}
 	return false;
@@ -593,29 +618,43 @@ uint8_t LookupChannel(
 }
 
 // ----------------------------------------------------------------------------
+// Which bits correspond to each channel within a table, for adaptive frequencies
+const uint8_t channel_bit_table[16] = {
+	0x01, 0, 0x02, 0, 0x04, 0, 0x08, 0,
+	0x10, 0, 0x20, 0, 0x40, 0, 0x80, 0
+};
+
+// ----------------------------------------------------------------------------
 /** Channel hopping algorithm implementation.
 	Calculate the next channel to use for transmission and change to it
 	\return The next value of the logical channel index. */
 uint8_t NextChannelIndex(
 	uint8_t seq) ///< The current value of the logical channel index
 {
-	if (gCountdown)
+	if (beken.wifi_wanted_countdown)
 	{
-		if (--gCountdown == 0)
+		if (--beken.wifi_wanted_countdown == 0)
 		{
-			SetChannelRange(gCountdownTable, gCountdownTable + CHANNEL_COUNT_LOGICAL);
-			seq = gCountdownTable;
-			printf("Switched to table %d\r\n", gCountdownTable);
+			SetChannelRange(beken.wifi_wanted, beken.wifi_wanted + CHANNEL_COUNT_LOGICAL);
+			seq = beken.wifi_wanted;
+			printf("Switched to table %d\r\n", beken.wifi_wanted);
 			return seq;
 		}
 	}
+	else if (beken.hopping_wanted_countdown)
 	{
-		++seq;
-		if (seq >= gChannelIdxMax)
-			seq = gChannelIdxMin;
-		else if (seq < gChannelIdxMin)
-			seq = gChannelIdxMin;
+		if (--beken.hopping_wanted_countdown == 0)
+		{
+			beken.hopping_current = beken.hopping_wanted;
+			printf("[A%d] ", beken.hopping_current);
+		}
 	}
+	seq = (seq + 1) & ~0x80; // Get rid of the alternative bit
+	if ((seq >= beken.channel_idx_max) || (seq < beken.channel_idx_min))
+		seq = beken.channel_idx_min;
+	// Support adaptive frequency hopping
+	if (beken.hopping_current & channel_bit_table[seq & 15])
+		seq |= 0x80;
 	return seq;
 }
 
@@ -1197,6 +1236,9 @@ void VerifyBekenChipID(void)
 /** Initialise the Beken radio chip */
 void beken_init(void)
 {
+	beken.channel_idx_min = 0;
+	beken.channel_idx_max = CHANNEL_COUNT_LOGICAL * 1 * CHANNEL_DWELL_PACKETS;
+
 	// Initialise the firmware data
 	uint32_t crc = crc_crc32((const uint8_t *)CODELOC, (NEW_FIRMWARE_BASE-CODELOC));
 	gFwInfo[BK_INFO_FW_CRC_LO] = crc & 0xffff;
@@ -1260,12 +1302,12 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 			wifi -= 24;
 			++tx;
 		}
-		if ((wifi != gLastWifiChannel) // Has the knowledge about the Wi-Fi channel changed?
+		if ((wifi != beken.wifi_current) // Has the knowledge about the Wi-Fi channel changed?
 			&& (!beken.fcc.factory_mode) // In factory mode, ignore wifi tables
 			&& (!beken.fcc.test_mode)) // In fcc test mode, ignore wifi tables
 		{
 			uint8_t wanted = 0;
-			gLastWifiChannel = wifi;
+			beken.wifi_current = wifi;
 			switch (pRx->wifi) {
 			case 0: wanted = 0; break;
 			case 1: case 2: case 3: case 4: case 5: wanted = 1; break;
@@ -1274,8 +1316,8 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 			case 8: wanted = 4; break;
 			default: wanted = 5; break;
 			}
-			gCountdown = 10;
-			gCountdownTable = wanted * CHANNEL_COUNT_LOGICAL;
+			beken.wifi_wanted_countdown = 10;
+			beken.wifi_wanted = wanted * CHANNEL_COUNT_LOGICAL;
 		}
 		// Remember the data for later. Process that in the main thread
 		t_status.flags = pRx->flags;
@@ -1288,6 +1330,12 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 		t_status.wifi_chan = wifi;
 		t_status.tx_max = tx;
 		t_status.note_adjust = pRx->note_adjust;
+		if (pRx->hopping != beken.hopping_wanted)
+		{
+			beken.hopping_wanted = pRx->hopping;
+			beken.hopping_wanted_countdown = 10;
+			gFwInfo[BK_INFO_HOPPING] = pRx->hopping * 256; // At zero time, this is live
+		}
 	}
 	else if (pRxData[0] == BK_PKT_TYPE_DFU)
 	{
@@ -1369,7 +1417,6 @@ void beken_irq(void)
 		{
 			beken.stats.badRxAddress++;
 		}
-		beken.bFreshData = 1;
 		SET_DEBUG1();
 		CLEAR_DEBUG1();
 		Receive_Packet(&beken.pktDataRecv[0]);
@@ -1435,10 +1482,15 @@ void UpdateTxData(void)
 	tx->u.ctrl.msb |= (val & 0x300) >> 8;
 
 	// Put in the extra data fields
-	if (gCountdown)
+	if (beken.wifi_wanted_countdown)
 	{
-		val = gCountdown + 256 * gCountdownTable;
+		val = beken.wifi_wanted_countdown + 256 * beken.wifi_wanted;
 		tx->u.ctrl.data_type = BK_INFO_COUNTDOWN;
+	}
+	else if (beken.hopping_wanted_countdown)
+	{
+		val = beken.hopping_wanted_countdown + 256 * beken.hopping_wanted;
+		tx->u.ctrl.data_type = BK_INFO_HOPPING;
 	}
 	else if (dfu_written)
 	{
@@ -1714,7 +1766,7 @@ uint8_t get_tx_power(void)
 }
 
 // ----------------------------------------------------------------------------
-/** Get the current FCC channel */
+/** Get the current (FCC test mode) channel */
 int8_t get_FCC_chan(void)
 {
 	if (beken.fcc.test_mode)
@@ -1732,21 +1784,21 @@ uint8_t get_FCC_power(void)
 }
 
 // ----------------------------------------------------------------------------
-// get the send rate in PPS
+/** get the send rate in PPS (packets per second) */
 uint8_t get_send_pps(void)
 {
 	return beken.send_pps;
 }
 
 // ----------------------------------------------------------------------------
-// Get the Return the most recently calculated packets per second value
+/** Return the most recently calculated packets per second value */
 uint8_t get_telem_pps(void)
 {
     return beken.telem_pps;
 }
 
 // ----------------------------------------------------------------------------
-// Return fake RSSI, as beken cannot determine a value
+/** For Beken, return fake RSSI, as Beken cannot determine a value accurately. */
 uint8_t get_telem_rssi(void)
 {
 	return 50;
@@ -1777,8 +1829,8 @@ void radio_set_pps_rssi(void)
 }
 
 // ----------------------------------------------------------------------------
-// For debugging - tell us the current beken register values (from bank 0)
-// This just prints it to the UART rather than to the console over WiFi
+/** For debugging - tell us the current beken register values (from bank 0)
+   This just prints it to the UART rather than to the console over WiFi */
 #if FATCODE
 void beken_DumpRegisters(void)
 {
@@ -1816,6 +1868,7 @@ void beken_DumpRegisters(void)
 #endif
 
 // ----------------------------------------------------------------------------
+/** Placeholder. On the beken chip the processing is done in interrupts instead. */
 void radio_check_telem_packet(void)
 {
 }
