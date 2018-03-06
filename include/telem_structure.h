@@ -66,9 +66,7 @@ struct PACKED telem_packet_cypress {
     } payload;
 };
 
-/*
-  telemetry packet from RX to TX for cc2500
- */
+/** telemetry packet from RX to TX for cc2500 */
 struct PACKED telem_packet_cc2500 {
     uint8_t length;
     uint8_t type;
@@ -81,22 +79,18 @@ struct PACKED telem_packet_cc2500 {
     uint8_t crc[2];
 };
 
-/*
-  autobind packet from TX to RX for cc2500
- */
+/** autobind packet from TX to RX for cc2500 */
 struct PACKED autobind_packet_cc2500 {
     uint8_t length;
-    uint8_t magic1; // 0xC5
-    uint8_t magic2; // 0xA2
+    uint8_t magic1; ///< 0xC5
+    uint8_t magic2; ///< 0xA2
     uint8_t txid[2];
     uint8_t txid_inverse[2];
     uint8_t crc[2];
 };
 
-/*
-  packet type - controls data field. We have 4 bits, giving 16 possible
-  data field types
- */
+/** packet type - controls data field.
+    We have 4 bits, giving 16 possible data field types */
 enum packet_type {
     PKTYPE_VOLTAGE    = 0,
     PKTYPE_YEAR       = 1,
@@ -107,24 +101,22 @@ enum packet_type {
     PKTYPE_BL_VERSION = 6,
     PKTYPE_FW_ACK     = 7,
     PKTYPE_WIFI_CHAN  = 8,
-    PKTYPE_NUM_TYPES  = 9 // used for modulus
+    PKTYPE_NUM_TYPES  = 9 ///< used for modulus
 };
 
-/*
-  skyrocket specific packet for cc2500
- */
+/** Skyrocket specific packet for cc2500 */
 struct PACKED srt_packet {
-    uint8_t length;     // required for cc2500 FIFO
-    uint8_t txid[2];    // The address (16 bits)
-    uint8_t version:4;  // protocol version
-    uint8_t pkt_type:4; // packet type
+    uint8_t length;     ///< required for cc2500 FIFO
+    uint8_t txid[2];    ///< The address (16 bits)
+    uint8_t version:4;  ///< protocol version
+    uint8_t pkt_type:4; ///< packet type
     uint8_t chan1;
     uint8_t chan2;
     uint8_t chan3;
     uint8_t chan4;
     uint8_t chan_high;
-    uint8_t data;       // data according to pkt_type
-    uint8_t buttons;    // see channels.h
+    uint8_t data;       ///< data according to pkt_type
+    uint8_t buttons;    ///< see channels.h
     uint8_t channr;
     uint8_t chanskip;
     uint8_t crc[2];

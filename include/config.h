@@ -51,25 +51,25 @@ B0 | CH4 = ROLL   | (mode2) RightHorizontal
 B1 | CH3 = PITCH  | (mode2) RightVertical
 B2 | CH1 = THROTTLE | (mode2) LeftVertical
 B3 | CH2 = YAW    | (mode2) LeftHorizontal
-B4 | PWR          |
-B5 | RADIO_PACTL  |
+B4 | PWR          | power
+B5 | RADIO_PACTL  | radio
 C1 | BUTTON_GPS   | (SW3)
 C2 | USER         | (SW6)
-C3 | RADIO_IRQ    |
-C4 | RADIO_CS     |
-C5 | RADIO_SCK    |
-C6 | RADIO_MOSI   |
-C7 | RADIO_MISO   |
+C3 | RADIO_IRQ    | radio
+C4 | RADIO_CS     | radio
+C5 | RADIO_SCK    | radio
+C6 | RADIO_MOSI   | radio
+C7 | RADIO_MISO   | radio
 D0 | BUTTON_MODE  | (SW1)
-D1 | SWIM         |
-D2 | RADIO_CE     |
-D3 | LED_GPS      |
-D4 | BEEP         |
-D5 | UART_TX      |
-D6 | UART_RX      |
-D7 | LED_MODE     |
+D1 | SWIM         | debug
+D2 | RADIO_CE     | radio
+D3 | LED_GPS      | LED
+D4 | BEEP         | sound
+D5 | UART_TX      | debug
+D6 | UART_RX      | debug
+D7 | LED_MODE     | LED
 E5 | BUTTON_LL    | (SW2)
-F4 | VBAT_SENSE   |
+F4 | VBAT_SENSE   | battery
 */
 
 /** \section PCB layout from 2016 Spiderman Tx.
@@ -108,27 +108,25 @@ The schematic "Streaming and Streaming with GPS Drone button board" v0.1 says
 \section pins GPIO pins
 Meaning | Port2018 | Port2016
 --------|----------|---------
-SWIM    | D1 | D1
-UART_TX | D5 | D5
-UART_RX | D6 | none
-
+SWIM         | D1 | D1
+UART_TX      | D5 | D5
+UART_RX      | D6 | none
 PWR          | B4 | D6
 LED_MODE     | D7 | D7
 LED_GPS      | D3 | none
-
-USER | C2 |
+USER         | C2 |
 BUTTON_STUNT | A1 | none
 BUTTON_VIDEO | A2 | none
 BUTTON_MODE  | D0 | none
 BUTTON_LL    | E5 | none
 BUTTON_GPS   | C1 | none
-ROW1 | none | C1
-ROW2 | none | C2
-ROW3 | none | C3
-ROW4 | none | C4
-COL1 | none | D0
-COL2 | none | D2
-COL3 | none | D3
+ROW1         | none | C1
+ROW2         | none | C2
+ROW3         | none | C3
+ROW4         | none | C4
+COL1         | none | D0
+COL2         | none | D2
+COL3         | none | D3
 
 Analog input
 CH4/ROLL     | B0 | B0
@@ -138,13 +136,13 @@ CH2/YAW      | B3 | B3
 VBAT_SENSE   | F5 | none
 
 SPI
-RADIO_SCK  | C5 | C5
-RADIO_MOSI | C6 | C6
-RADIO_MISO | C7 | C7
-RADIO_IRQ  | C3 | B5
-RADIO_CS   | C4 | E5
-RADIO_CE   | C2 | D2
-RADIO_PACTL | B5
+RADIO_SCK    | C5 | C5
+RADIO_MOSI   | C6 | C6
+RADIO_MISO   | C7 | C7
+RADIO_IRQ    | C3 | B5
+RADIO_CS     | C4 | E5
+RADIO_CE     | C2 | D2
+RADIO_PACTL  | B5 |
 
 */
 

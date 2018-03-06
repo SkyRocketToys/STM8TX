@@ -124,9 +124,9 @@ void eeprom_flash_copy(
 }
 
 // -----------------------------------------------------------------------------
-// Erase a page of memory at an address (3.3ms)
-// Returns true on success
-// used for OTA update (Beken)
+/** Erase a page of memory at an address (3.3ms)
+    used for OTA update (Beken)
+    \return Returns true on success, false on failure. */
 #ifdef _IAR_
 __ramfunc
 #endif
@@ -163,8 +163,9 @@ bool eeprom_flash_erase(
 #endif
 
 // -----------------------------------------------------------------------------
-// Fast write a page of memory at an address without erasing it (3.3ms)
-// used for OTA update (Beken)
+/** Fast write a page of memory at an address without erasing it (3.3ms)
+    used for OTA update (Beken)
+    \return Returns true on success, false on failure. */
 #ifdef _IAR_
 __ramfunc
 #endif

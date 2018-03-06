@@ -20,7 +20,7 @@ static struct gpio_regs *gpio = (struct gpio_regs *)0x5000;
 // -----------------------------------------------------------------------------
 /** Configure one or more pins on a port */
 void gpio_config(
-	uint16_t pins, ///< One or more pins to configure on a single specified GPIO port. See #gpio_pins
+	uint16_t pins, ///< One or more pins to configure on a single specified GPIO port. See #gpio_pins_e
 	enum gpio_config_e config) ///< The configuration format wanted for the specified pin(s)
 {
     uint8_t port = (pins >> 8);
@@ -55,7 +55,7 @@ void gpio_config(
 // -----------------------------------------------------------------------------
 /** Set one or more pins on a port high. Assumes the port is configured for output. */
 void gpio_set(
-	uint16_t pins) ///< One or more pins to set high on a single specified GPIO port. See #gpio_pins
+	uint16_t pins) ///< One or more pins to set high on a single specified GPIO port. See #gpio_pins_e
 {
     uint8_t port = (pins >> 8);
     uint8_t pin = pins & 0xFF;
@@ -66,7 +66,7 @@ void gpio_set(
 // -----------------------------------------------------------------------------
 /** Set one or more pins on a port low. Assumes the port is configured for output. */
 void gpio_clear(
-	uint16_t pins) ///< One or more pins to set low on a single specified GPIO port. See #gpio_pins
+	uint16_t pins) ///< One or more pins to set low on a single specified GPIO port. See #gpio_pins_e
 {
     uint8_t port = (pins >> 8);
     uint8_t pin = pins & 0xFF;
@@ -77,7 +77,7 @@ void gpio_clear(
 // -----------------------------------------------------------------------------
 /** Toggle one or more pins on a port between high and low.  Assumes the port is configured for output. */
 void gpio_toggle(
-	uint16_t pins) ///< One or more pins to toggle between high and low on a single specified GPIO port. See #gpio_pins
+	uint16_t pins) ///< One or more pins to toggle between high and low on a single specified GPIO port. See #gpio_pins_e
 {
     uint8_t port = (pins >> 8);
     uint8_t pin = pins & 0xFF;
@@ -91,7 +91,7 @@ void gpio_toggle(
 	Assumes the port is configured for digital input.
 	\return true if at least one specified GPIO pin is high (false if all are low). */
 bool gpio_get(
-	uint16_t pin) ///< One or more pins to test on a single specified GPIO port. See #gpio_pins
+	uint16_t pin) ///< One or more pins to test on a single specified GPIO port. See #gpio_pins_e
 {
     uint8_t port = (pin >> 8);
     struct gpio_regs *g = &gpio[(uint8_t)port];
