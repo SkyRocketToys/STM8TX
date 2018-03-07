@@ -37,6 +37,7 @@
 #define SUPPORT_DEBUG_TX 0 // Set to 1 means toggle the UART RX (D6) on Tx
 #define SUPPORT_DEBUG_LOSE_BURST 0 // (0..100) Set to non-zero means burst error: lose several packets periodically (every 0.5 seconds, i.e. percent)
 #define SUPPORT_DEBUG_LOSE_RANDOM 0 // (0..100) Set to non-zero means "random" error: lose a percentage of packets.
+#define SUPPORT_DEBUG_LOSE_FREQ 0 // (0..100) Set to non-zero means "random" error on certain frequencies: lose a percentage of packets.
 
 /** @file */
 

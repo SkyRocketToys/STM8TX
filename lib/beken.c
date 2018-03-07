@@ -1665,13 +1665,24 @@ void beken_timer_irq(void)
 		if (cnt_lose_packets < SUPPORT_DEBUG_LOSE_BURST)
 			return;
 #endif
-#if SUPPORT_DEBUG_LOSE_RANDOM
-		// Support losing several packets in a row
+#if SUPPORT_DEBUG_LOSE_FREQ || SUPPORT_DEBUG_LOSE_RANDOM
 		static uint32_t cnt_random = 0;
 		cnt_random = (cnt_random * 214013ul+2531011ul) & 0x7ffffffful; // Linear congruential pseudo random number generator
 		uint16_t r = (cnt_random >> 16); // 0..32767 random number
+#endif
+#if SUPPORT_DEBUG_LOSE_RANDOM
+		// Support losing several packets in a row
 		if (SUPPORT_DEBUG_LOSE_RANDOM*328u > r) // Does this packet fail?
 			return;
+#endif
+#if SUPPORT_DEBUG_LOSE_FREQ
+		// Support losing several packets in a row
+		uint8_t f = LookupChannel(txChannel);
+		if ((f >= 20 && f <= 40))
+		{
+			if (SUPPORT_DEBUG_LOSE_FREQ*328u > r) // Does this packet fail?
+				return;
+		}
 #endif
 		Send_Packet(BK_WR_TX_PLOAD, (uint8_t *)&beken.pktDataTx, PACKET_LENGTH_TX_CTRL);
 	}
