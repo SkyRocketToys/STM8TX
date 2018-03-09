@@ -30,6 +30,7 @@ BRD_RADIO_TYPE?=3
 
 # -----------------------------------------------------------------------------
 CC=sdcc
+AS=sdasstm8
 CODELOC=0x8700
 CFLAGS=-mstm8 -Iinclude -DSTM8S105=1 --opt-code-size -DCODELOC=$(CODELOC) -DBLBASE=$(BLBASE) -DBL_VERSION=$(BL_VERSION)
 CFLAGS+= -DBUILD_DATE_YEAR=$(BUILD_DATE_YEAR) -DBUILD_DATE_MONTH=$(BUILD_DATE_MONTH) -DBUILD_DATE_DAY=$(BUILD_DATE_DAY)
@@ -52,10 +53,11 @@ endif
 
 LIBSRC=lib/util.c lib/gpio.c lib/uart.c lib/printfl.c lib/adc.c lib/spi.c $(RADIO_MODULE)
 LIBSRC += lib/timer.c lib/eeprom.c lib/buzzer.c lib/crc.c lib/channels.c
+LIBASRC = lib/asm_flash.s
 BL_LIBSRC=lib/gpio.c lib/crc.c lib/eeprom_boot.c
 
-RELOBJ = $(LIBSRC:%.c=%.rel)
-BL_RELOBJ = $(BL_LIBSRC:%.c=%.rel)
+RELOBJ = $(LIBSRC:%.c=%.rel) $(LIBASRC:%.s=%.rel)
+BL_RELOBJ = $(BL_LIBSRC:%.c=%.rel) $(LIBASRC:%.s=%.rel)
 
 # -----------------------------------------------------------------------------
 all: combined.ihx txmain.img
@@ -76,6 +78,10 @@ lib/%.rel: lib/%.c
 	@echo Building lib source $^
 	@$(CC) -c $(CFLAGS) $^ -o lib/$*.rel
 
+lib/%.rel: lib/%.s
+	@echo Building lib source $^
+	@$(AS) -ol $^ 
+	
 %.ihx: %/main.c $(RELOBJ)
 	@echo Building binary $* at $(CODELOC)
 	@$(CC) $(CFLAGS) --code-loc $(CODELOC) -o $*.ihx --out-fmt-ihx $^

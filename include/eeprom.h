@@ -11,8 +11,6 @@
 void eeprom_write(uint16_t offset, uint8_t value);
 uint8_t eeprom_read(uint16_t offset);
 void eeprom_unlock(void);
-void progmem_unlock(void);
-#define progmem_lock() eeprom_lock()
 void eeprom_lock(void);
 void eeprom_flash_copy(uint16_t offset, const uint8_t *data, uint8_t len);
 
