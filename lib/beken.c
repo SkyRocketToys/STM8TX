@@ -637,7 +637,7 @@ uint8_t NextChannelIndex(
 		{
 			SetChannelRange(beken.wifi_wanted, beken.wifi_wanted + CHANNEL_COUNT_LOGICAL);
 			seq = beken.wifi_wanted;
-			printf("Switched to table %d\r\n", beken.wifi_wanted);
+			printf("Table %d\r\n", beken.wifi_wanted);
 			return seq;
 		}
 	}
@@ -719,6 +719,7 @@ void BK2425_SwitchToIdleMode(void)
 
 // ----------------------------------------------------------------------------
 /** Switch the Beken radio to Sleep mode */
+#if FATCODE
 void BK2425_SwitchToSleepMode(void)
 {
 	uint8_t value;
@@ -739,6 +740,7 @@ void BK2425_SwitchToSleepMode(void)
 	// Stay low
 	BEKEN_CE_LOW();
 }
+#endif
 
 // ----------------------------------------------------------------------------
 /** Set which register bank we are accessing on the Beken spi chip */

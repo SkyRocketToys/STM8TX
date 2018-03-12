@@ -98,7 +98,7 @@ void timer_irq(void)
             }
             if (power_pin_count > POWER_OFF_MS) { // Force power off
                 // clear power control - this should kill the cpu (once the user releases the button)
-				printf("ForcePwrOff\r\n");
+				printf("PwrOff\r\n");
 				buzzer_silent();
                 gpio_clear(PIN_POWER);
 				// We are now waiting for the user to release the power button

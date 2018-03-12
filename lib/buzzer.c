@@ -42,6 +42,7 @@ static uint16_t bpm;
 
 // -----------------------------------------------------------------------------
 // List of RTTTL tones, stored as a table of const strings.
+#if FATCODE
 static const char * const tune[TONE_NUMBER_OF_TUNES] = {
     "Startup:d=8,o=6,b=480:a,d7,c7,a,d7,c7,a,d7,16d7,16c7,16d7,16c7,16d7,16c7,16d7,16c7",  // TONE_STARTUP_TUNE
     "Error:d=4,o=6,b=400:8a,8a,8a,p,a,a,a,p",                                              // TONE_ERROR_TUNE
@@ -57,6 +58,23 @@ static const char * const tune[TONE_NUMBER_OF_TUNES] = {
     "video:d=4,o=6,b=600:8b",                                                              // TONE_VIDEO
     "disarm:d=4,o=6,b=400:8c,p,8c"                                                         // TONE_DISARM
 };
+#else // Reduce name size to fit into FLASH
+static const char * const tune[TONE_NUMBER_OF_TUNES] = {
+    "a:d=8,o=6,b=480:a,d7,c7,a,d7,c7,a,d7,16d7,16c7,16d7,16c7,16d7,16c7,16d7,16c7",  // TONE_STARTUP_TUNE
+    "b:d=4,o=6,b=400:8a,8a,8a,p,a,a,a,p",                                            // TONE_ERROR_TUNE
+    "c:d=4,o=6,b=400:8e,8e,a",                                                       // TONE_NOTIFY_POSITIVE_TUNE
+    "d:d=1,o=4,b=2048:b",                                                            // TONE_RX_SEARCH
+    "e:d=4,o=6,b=400:8d,8d,a",                                                       // TONE_LOITER
+    "f:d=4,o=6,b=400:8e,8e,8e,c",                                                    // TONE_ALT_HOLD
+    "g:d=4,o=6,b=400:8c,8c,8c,d,8c,8c,8c,d",                                         // TONE_RTL
+    "h:d=4,o=6,b=400:d,4b,4b,4b,4b",                                                 // TONE_LAND
+    "i:d=4,o=6,b=400:4c,4b,4a",                                                      // TONE_OTHER_MODE
+    "j:d=4,o=1,b=512:d,d,d,d",                                                       // TONE_BATT_WARNING
+    "k:d=4,o=6,b=512:8c,8c,8c,8c,8c",                                                // TONE_INACTIVITY
+    "l:d=4,o=6,b=600:8b",                                                            // TONE_VIDEO
+    "m:d=4,o=6,b=400:8c,p,8c"                                                        // TONE_DISARM
+};
+#endif
 
 static const char *tune_ptr;
 
@@ -299,7 +317,7 @@ static bool init_tune(void)
 
     have_name = (tune_ptr[tune_pos] != ':');
     if (have_name) {
-        printf("Playing tune '");
+        printf("Tune '");
     }
 
     tune_comp = false;

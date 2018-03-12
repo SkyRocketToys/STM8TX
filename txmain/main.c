@@ -155,7 +155,7 @@ static void check_stick_activity(void)
         // power off
         if (timer_get_ms() - last_link_ms < 1500 &&
             (t_status.flags & TELEM_FLAG_ARMED) == 0) {
-			printf("DisarmedPwrOff\r\n");
+			printf("Disarmed\r\n");
             disableInterrupts();
 			buzzer_silent();
             gpio_clear(PIN_POWER);
@@ -269,7 +269,7 @@ static void status_update(bool have_link)
         uint8_t time_since_activity_s = time_since_activity >> 10;
         if (time_since_activity_s > 180) {
             // clear power control
-            printf("BoredPowerOff\r\n");
+            printf("Bored\r\n");
             disableInterrupts();
 			buzzer_silent();
             gpio_clear(PIN_POWER);
@@ -459,6 +459,8 @@ uint8_t detect_factory_mode(void)
 	return factory_mode;
 }
 
+extern uint8_t dfu_buffer[128];
+
 // -----------------------------------------------------------------------------
 /** Main entry point for the program */
 void main(void)
@@ -498,7 +500,7 @@ void main(void)
 #ifdef _IAR_
 	printf("IAR ");
 #endif
-	printf("VERSION C\r\n");
+	printf("VERSION A\r\n");
     printf("BL_VERSION %u\r\n", get_bl_version());
 	// For delta time calibration
 	{
@@ -509,6 +511,12 @@ void main(void)
 	    printf("10000us delay = %uus\r\n", dt); // should say 10000us = 10000us
 	}
     enableInterrupts();
+
+#if 0
+	strcpy(dfu_buffer, "Testing Testing 123");
+	eeprom_flash_erase(0xF000);
+	eeprom_flash_write_page(0xF000, dfu_buffer, false);
+#endif
 
     // wait for initial stick inputs
     delay_ms(200);
