@@ -2,6 +2,9 @@
 
 <workspace>
   <project>
+    <path>$WS_DIR$\Blank.ewp</path>
+  </project>
+  <project>
     <path>$WS_DIR$\BootLoader.ewp</path>
   </project>
   <project>
