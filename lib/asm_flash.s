@@ -30,6 +30,7 @@ _rom_eeprom_flash_erase:
         LDW       X, (0x03, sp) ; Calling convention for SDCC
 
         ; Setup the operation
+		SIM
         MOV       FLASH_PUKR, #EEPROM_KEY2
         MOV       FLASH_PUKR, #EEPROM_KEY1
         MOV       FLASH_CR1, #0x0
@@ -46,8 +47,8 @@ _rom_eeprom_flash_erase:
         ; Was this written to a write protected area?
         BTJT      FLASH_IAPSR, #0x0, efe_fail
         ; Wait for writing to start
-efe_1:
-        BTJT      FLASH_IAPSR, #0x6, efe_1
+;efe_1:
+;        BTJT      FLASH_IAPSR, #0x6, efe_1
         ; Wait for writing to finish
 efe_2:
         BTJF      FLASH_IAPSR, #0x2, efe_2
@@ -55,12 +56,14 @@ efe_2:
         ; Success
         BRES      FLASH_IAPSR, #0x3
         LD        A, #1
+		RIM
         RET
 
 efe_fail:
         ; Failure
         BRES      FLASH_IAPSR, #0x3
         LD        A, #0
+		RIM
         RET
 
 
@@ -77,6 +80,7 @@ _rom_eeprom_flash_write_page:
         LDW       Y, (5, sp) ; Calling convention for SDCC
         LD        A, (7, sp) ; Calling convention for SDCC
 
+		SIM
         MOV       TEMP1, #0x80
 
         ; Setup the operation
@@ -109,8 +113,8 @@ efwp_loop:
         ; Was this written to a write protected area?
         BTJT      FLASH_IAPSR, #0, efwp_fail
         ; Wait for writing to start
-efwp_4:
-        BTJF      FLASH_IAPSR, #6, efwp_4
+;efwp_4:
+;        BTJF      FLASH_IAPSR, #6, efwp_4
         ; Wait for writing to finish
 efwp_5:
         BTJF      FLASH_IAPSR, #2, efwp_5
@@ -118,10 +122,12 @@ efwp_5:
         ; Succeed
         BRES      FLASH_IAPSR, #3
         LD        A, #1
+		RIM
         RET
 
 efwp_fail:
         ; Fail
         BRES      FLASH_IAPSR, #3
         LD        A, #0
+		RIM
         RET
