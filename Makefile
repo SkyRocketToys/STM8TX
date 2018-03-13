@@ -118,7 +118,7 @@ txmain.img: combined.ihx
 	@echo Building txmain.img
 	@./WinTools/cheese.exe dat2dat combined.bin sdcc_chk.bin -outrange 34560-6 49152-34560+6 -checksum [crc16ardupilot] -checkdst 34560-4 -checksrc 34560+14592/2 14592/2 -checksrc 34560 14592/2 -setbyte 34560-6 57 -setbyte 34560-5 0
 	@rm sdcc_chk.h
-	@./WinTools/cheese.exe extract txmain.img -i sdcc_chk.bin 34560-6 -1
+	@./WinTools/cheese.exe extract txmain.img -i sdcc_chk.bin 34560-6 14598
 
 else
 # -----------------------------------------------------------------------------
