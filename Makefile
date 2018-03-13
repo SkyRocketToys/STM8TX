@@ -108,6 +108,11 @@ combined.ihx: txmain.ihx bootloader.ihx
 	./WinTools/cheese extract combined.bin -pad 255 -i sdcc_bootloader.bin 0 34560 -i sdcc_txmain.bin 34560 14592 -i sdcc_txmain.bin 34554 14592
 	./WinTools/cheese dat2dat combined.bin combined.ihx -outrange 32768 16384
 	rm combined.h
+	@./WinTools/cheese.exe dat2dat combined.bin sdcc_test.bin -outrange 34560-6 49152-34560+6 -checksum [crc16ardupilot] -checkdst 34560-4 -checksrc 34560+14592/2 14592/2 -checksrc 34560 14592/2 -setbyte 34560-6 57 -setbyte 34560-5 0
+	@rm sdcc_test.h
+	./WinTools/cheese extract testboot.bin -pad 255 -i sdcc_bootloader.bin 0 49152 -i sdcc_test.bin 34554 14720
+	./WinTools/cheese dat2dat testboot.bin testboot.ihx -outrange 32768 31104
+	rm testboot.h
 
 txmain.img: combined.ihx 
 	@echo Building txmain.img

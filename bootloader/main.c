@@ -178,7 +178,7 @@ static void check_new_firmware(void)
 
 	// Verify the copy
     calc_crc3 = crc_crc32((const uint8_t *)CODELOC, new_size);
-    if (new_crc == calc_crc3) {
+    if (new_crc != calc_crc3) {
         toggle_code(9); // Failed verification
         return;
     }

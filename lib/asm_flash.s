@@ -80,6 +80,7 @@ _rom_eeprom_flash_write_page:
         LDW       Y, (5, sp) ; Calling convention for SDCC
         LD        A, (7, sp) ; Calling convention for SDCC
 
+		PUSH      CC
 		SIM
         MOV       TEMP1, #0x80
 
@@ -122,12 +123,12 @@ efwp_5:
         ; Succeed
         BRES      FLASH_IAPSR, #3
         LD        A, #1
-		RIM
+		POP       CC
         RET
 
 efwp_fail:
         ; Fail
         BRES      FLASH_IAPSR, #3
         LD        A, #0
-		RIM
+		POP       CC
         RET
