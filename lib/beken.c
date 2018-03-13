@@ -1249,8 +1249,8 @@ void beken_init(void)
 	gFwInfo[BK_INFO_FW_CRC_HI] = (crc >> 16) & 0xffff;
 	gFwInfo[BK_INFO_FW_VER] = 0;
 	gFwInfo[BK_INFO_DFU_RX] = 0;
-	gFwInfo[BK_INFO_FW_YM] = 0;
-	gFwInfo[BK_INFO_FW_DAY] = 0;
+	gFwInfo[BK_INFO_FW_YM] = (*((const uint8_t*)0xF986))+256u*(*((const uint8_t*)0xF987));
+	gFwInfo[BK_INFO_FW_DAY] = (*((const uint8_t*)0xF988))+256u*(*((const uint8_t*)0xF989));
 	gFwInfo[BK_INFO_MODEL] = 1;
 	gFwInfo[BK_INFO_PPS] = 0; // Will be updated over time
 	gFwInfo[BK_INFO_BATTERY] = 0; // Will be updated over time
@@ -1274,6 +1274,9 @@ void beken_init(void)
 	gpio_config(RADIO_INT, GPIO_INPUT_PULLUP_IRQ);
 	BK2425_SwitchToRxMode();
 }
+
+typedef void (*simple_function)(void);
+static const simple_function reboot = (simple_function) 0x8000;
 
 // ----------------------------------------------------------------------------
 void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
@@ -1352,6 +1355,19 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 		memcpy(&dfu_buffer[addr & 0x70], &pDFU->data[0], SZ_DFU);
 		if (addr != lastAddr)
 		{
+			if (addr == 2)
+			{
+				// Reboot
+				disableInterrupts();
+			#if defined(__SDCC)
+				{__asm__("ldw x,#0x7ff\n");}
+				{__asm__("ldw sp,x\n");} // Should set stack to 0x7ff here
+			#else
+				asm("ldw x,#0x7ff\n");
+				asm("ldw sp,x\n"); // Should set stack to 0x7ff here
+			#endif
+				(*reboot)();
+			}
 			printf("=");
 			if ((addr & 0x7f) == 0x40) // Before the end of a page
 			{
