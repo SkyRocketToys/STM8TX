@@ -87,7 +87,7 @@ static void update_leds(void)
     uint8_t tick = (timer_get_ms() >> 6) & 0xF;
     disableInterrupts();
     led_mode_set(yellow_led_pattern & (1U<<tick));
-    led_gps_set(green_led_pattern & (1U<<tick));
+    led_gps_set(!(green_led_pattern & (1U<<tick)));
     enableInterrupts();
 }
 
