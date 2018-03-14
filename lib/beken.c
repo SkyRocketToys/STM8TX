@@ -1357,16 +1357,19 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 		{
 			if (addr == 2)
 			{
-				// Reboot
-				disableInterrupts();
-			#if defined(__SDCC)
-				{__asm__("ldw x,#0x7ff\n");}
-				{__asm__("ldw sp,x\n");} // Should set stack to 0x7ff here
-			#else
-				asm("ldw x,#0x7ff\n");
-				asm("ldw sp,x\n"); // Should set stack to 0x7ff here
-			#endif
-				(*reboot)();
+				 if (lastAddr != 0xffff)
+				 {
+					// Reboot
+					disableInterrupts();
+				#if defined(__SDCC)
+					{__asm__("ldw x,#0x7ff\n");}
+					{__asm__("ldw sp,x\n");} // Should set stack to 0x7ff here
+				#else
+					asm("ldw x,#0x7ff\n");
+					asm("ldw sp,x\n"); // Should set stack to 0x7ff here
+				#endif
+					(*reboot)();
+				 }
 			}
 			printf("=");
 			if ((addr & 0x7f) == 0x40) // Before the end of a page
