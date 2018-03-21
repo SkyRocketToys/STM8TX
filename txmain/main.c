@@ -430,12 +430,15 @@ void main(void)
         printf("FCC test start\n");
         radio_start_FCC_test();
         break;
-        
+
+#if 0
+        // don't do anything special for bind button held down, just use autobind
     case BUTTON_LL:
         printf("Start bind\n");
         eeprom_write(EEPROM_DSMPROT_OFFSET, 1);
         radio_start_bind_send(true);
         break;
+#endif
 
     case BUTTON_STUNT: {
         uint16_t adc0 = adc_value(0);
