@@ -1384,6 +1384,7 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 				}
 				else
 					printf("E");
+				timer_count_skip(3);
 			}
 			if ((addr & 0x7f) == 0x70) // End of a page
 			{
@@ -1395,6 +1396,7 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 				}
 				else
 					printf("W");
+				timer_count_skip(3); // Improve speed of DFU by resynching
 			}
 			lastAddr = addr;
 			dfu_written = addr + SZ_DFU;

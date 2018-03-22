@@ -70,7 +70,9 @@ static bool activate_power_pin;
 bool power_off_disarm = false;
 #if SUPPORT_BEKEN
 static uint8_t radio_timer_count;
+void timer_count_skip(uint8_t skip) { radio_timer_count += skip; }
 #endif
+
 
 // -----------------------------------------------------------------------------
 /** The interrupt function for the timer IRQ.
