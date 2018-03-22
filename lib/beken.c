@@ -1357,10 +1357,10 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 		memcpy(&dfu_buffer[addr & 0x70], &pDFU->data[0], SZ_DFU);
 		if (addr != lastAddr)
 		{
-			if (addr == 2)
+			if (addr == 2) // Reboot command
 			{
-				 if (lastAddr != 0xffff)
-				 {
+				if (lastAddr != 0xffff) // Not the first command since reboot
+				{
 					// Reboot
 					disableInterrupts();
 				#if defined(__SDCC)
@@ -1371,7 +1371,9 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 					asm("ldw sp,x\n"); // Should set stack to 0x7ff here
 				#endif
 					(*reboot)();
-				 }
+				}
+				dfu_written = 0;
+				return;
 			}
 			printf("=");
 			if ((addr & 0x7f) == 0x40) // Before the end of a page
