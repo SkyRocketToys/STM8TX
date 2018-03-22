@@ -31,3 +31,5 @@ iar/settings
 iar/*.dep
 iar/*.ewt
 iar/*.ewd
+
+iar/date.h

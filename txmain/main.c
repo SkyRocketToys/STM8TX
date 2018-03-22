@@ -502,6 +502,7 @@ void main(void)
 #endif
 	printf("VERSION A\r\n");
     printf("BL_VERSION %u\r\n", get_bl_version());
+	printf("%d-%d-%d\r\n", BUILD_DATE_YEAR, BUILD_DATE_MONTH, BUILD_DATE_DAY);
 	// For delta time calibration
 	{
 		uint16_t dt;

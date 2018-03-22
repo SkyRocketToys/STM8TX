@@ -1249,8 +1249,10 @@ void beken_init(void)
 	gFwInfo[BK_INFO_FW_CRC_HI] = (crc >> 16) & 0xffff;
 	gFwInfo[BK_INFO_FW_VER] = 0;
 	gFwInfo[BK_INFO_DFU_RX] = 0;
-	gFwInfo[BK_INFO_FW_YM] = (*((const uint8_t*)0xF986))+256u*(*((const uint8_t*)0xF987));
-	gFwInfo[BK_INFO_FW_DAY] = (*((const uint8_t*)0xF988))+256u*(*((const uint8_t*)0xF989));
+//	gFwInfo[BK_INFO_FW_YM] = (*((const uint8_t*)0xF986))+256u*(*((const uint8_t*)0xF987));
+//	gFwInfo[BK_INFO_FW_DAY] = (*((const uint8_t*)0xF988))+256u*(*((const uint8_t*)0xF989));
+	gFwInfo[BK_INFO_FW_YM] = (BUILD_DATE_YEAR-2017)*256u+BUILD_DATE_MONTH;
+	gFwInfo[BK_INFO_FW_DAY] = (BUILD_DATE_DAY)*256u;
 	gFwInfo[BK_INFO_MODEL] = 1;
 	gFwInfo[BK_INFO_PPS] = 0; // Will be updated over time
 	gFwInfo[BK_INFO_BATTERY] = 0; // Will be updated over time

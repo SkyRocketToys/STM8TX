@@ -15,6 +15,9 @@ for /f "delims=" %%a in ('wmic OS Get localdatetime ^| find "."') do set dt=%%a
 set year=%dt:~0,4%
 set month=%dt:~4,2%
 set day=%dt:~6,2%
+echo #define BUILD_DATE_YEAR %year% >iar\date.h
+echo #define BUILD_DATE_MONTH %month% >>iar\date.h
+echo #define BUILD_DATE_DAY %day% >>iar\date.h
 if %month%==01 set month=jan
 if %month%==02 set month=feb
 if %month%==03 set month=mar

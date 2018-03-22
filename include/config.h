@@ -10,6 +10,7 @@
 #define FATCODE 0
 #else
 #define FATCODE 0
+#include "../iar/date.h"
 #endif
 
 #if BRD_RADIO_TYPE==1 // Cypress
