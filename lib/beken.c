@@ -835,6 +835,7 @@ void BK2425_Initialize(
 	/********************switch back to Bank0 register access******************/
 	BK2425_SetRBank(0);
 	BK2425_SwitchToRxMode(); // switch to RX mode
+	BK2425_SetTxPower(BEKEN_MAX_POWER-1);
 	bkReady = 1;
 }
 
@@ -1328,6 +1329,9 @@ void ProcessPacket(const uint8_t* pRxData, uint8_t rxstd)
 			beken.wifi_wanted_countdown = 10;
 			beken.wifi_wanted = wanted * CHANNEL_COUNT_LOGICAL;
 		}
+		// Stick to FCC limits - ignore the user using the web interface
+		if (tx > BEKEN_MAX_POWER)
+			tx = BEKEN_MAX_POWER;
 		// Remember the data for later. Process that in the main thread
 		t_status.flags = pRx->flags;
 		{

@@ -1,5 +1,6 @@
 #if SUPPORT_BEKEN
 #define SUPPORT_RSSI 0
+#define BEKEN_MAX_POWER 5 // Limit the power to 5 out of 8 (1 based) for FCC compliance
 
 void beken_init(void);
 void beken_irq();
@@ -34,6 +35,7 @@ uint8_t get_send_pps(void);
 void radio_set_pps_rssi(void);
 uint8_t get_telem_pps(void);
 void radio_check_telem_packet(void);
+void BK2425_SetTxPower(uint8_t power);
 
 enum BK_INFO_TYPE_E {
 	BK_INFO_MIN = 1,
