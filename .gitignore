@@ -33,3 +33,4 @@ iar/*.ewt
 iar/*.ewd
 
 iar/date.h
+*.zip
