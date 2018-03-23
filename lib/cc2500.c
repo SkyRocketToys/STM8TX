@@ -1129,3 +1129,9 @@ void radio_check_telem_packet(void)
     rssi_sum += rssi_dbm;
     rssi_count++;
 }
+
+// return total telemetry packets received
+uint32_t get_recv_packets()
+{
+    return stats.recv_packets;
+}

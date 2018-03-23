@@ -183,6 +183,16 @@ void fill_packet(struct srt_packet *pkt)
         telem_extra_type = PKTYPE_FW_ACK;
     }
 
+    /*
+      if we have never received a valid telemetry packet then always
+      send the pps value.  The receiver needs the PPS before it can
+      start sending telemetry so it can detect double binds, so we
+      need to maximise the chance of it getting the value
+    */
+    if (get_recv_packets() == 0) {
+        telem_extra_type = PKTYPE_TELEM_PPS;
+    }
+
     switch (telem_extra_type) {
     case PKTYPE_VOLTAGE:
         // send tx_voltage in 0.025 volt units, giving us a range of up to 6.3V
