@@ -355,42 +355,38 @@ static const struct {
     uint8_t reg;
     uint8_t value;
 } radio_config[] = {
-    {CC2500_02_IOCFG0,   0x1C}, // LNA_PD
-    {CC2500_00_IOCFG2,   0x1B}, // PA_PD
-    {CC2500_17_MCSM1,    0x03}, // CCA always, RX->IDLE, TX -> RX
-    {CC2500_18_MCSM0,    0x08}, // XOSC expire 64, no auto-cal
-    {CC2500_06_PKTLEN,   0x0D}, // packet length 13
-    {CC2500_07_PKTCTRL1, 0x0C}, // enable RSSI+LQI, no addr check, CRC autoflush, PQT=0
-    {CC2500_08_PKTCTRL0, 0x44}, // fixed length mode, CRC, FIFO enable, whitening
-    {CC2500_3E_PATABLE,  0xFF}, // initially max power
-    {CC2500_0B_FSCTRL1,  0x0A}, // IF=253.90625kHz assuming 26MHz crystal
-    {CC2500_0C_FSCTRL0,  0x00}, // freqoffs = 0
-    {CC2500_0D_FREQ2,    0x5C}, // freq control high
-    {CC2500_0E_FREQ1,    0x76}, // freq control middle
-    {CC2500_0F_FREQ0,    0x27}, // freq control low
-    {CC2500_10_MDMCFG4,  0x8C}, // filter bandwidth 203kHz
-    {CC2500_11_MDMCFG3,  0x2F}, // data rate 120kbaud
-    {CC2500_12_MDMCFG2,  0x13}, // 30/32 sync word bits, no manchester, GFSK, DC filter enabled
-    {CC2500_13_MDMCFG1,  0xA3}, // chan spacing exponent 3, preamble 4 bytes, FEC enabled
-    {CC2500_14_MDMCFG0,  0x7A}, // chan spacing 299.926757kHz for 26MHz crystal
-    {CC2500_15_DEVIATN,  0x51}, // modem deviation 57.12kHz for 26MHz crystal
-    {CC2500_19_FOCCFG,   0x16}, // frequency offset compensation
-    {CC2500_1A_BSCFG,    0x6C}, // bit sync config
-    {CC2500_1B_AGCCTRL2, 0x43}, // target amplitude 33dB
-    {CC2500_1C_AGCCTRL1, 0x40}, // AGC control 2
-    {CC2500_1D_AGCCTRL0, 0x91}, // AGC control 0
-    {CC2500_21_FREND1,   0x56}, // frontend config1
-    {CC2500_22_FREND0,   0x10}, // frontend config0
-    {CC2500_23_FSCAL3,   0xA9}, // frequency synth cal3
-    {CC2500_24_FSCAL2,   0x0A}, // frequency synth cal2
-    {CC2500_25_FSCAL1,   0x00}, // frequency synth cal1
-    {CC2500_26_FSCAL0,   0x11}, // frequency synth cal0
-    {CC2500_29_FSTEST,   0x59}, // test bits
-    {CC2500_2C_TEST2,    0x88}, // test settings
-    {CC2500_2D_TEST1,    0x31}, // test settings
-    {CC2500_2E_TEST0,    0x0B}, // test settings
+    // config for both TX and RX (from SmartRF Studio)
+    // setup for MSK at 120kbaud, FEC enabled, whitening enabled, base freq 2403.999756MHz
+    // channel spacing 299.926758, crystal 26MHz, RX filter bw 203.125kHz
+    {CC2500_06_PKTLEN,   0x0D},
+    {CC2500_07_PKTCTRL1, 0x0C},
+    {CC2500_08_PKTCTRL0, 0x44},
+    {CC2500_0B_FSCTRL1,  0x0A},
+    {CC2500_0D_FREQ2,    0x5C},
+    {CC2500_0E_FREQ1,    0x76},
+    {CC2500_0F_FREQ0,    0x27},
+    {CC2500_11_MDMCFG3,  0x2F},
+    {CC2500_12_MDMCFG2,  0x73},
+    {CC2500_13_MDMCFG1,  0xA3},
+    {CC2500_14_MDMCFG0,  0x7A},
+    {CC2500_15_DEVIATN,  0x70},
+    {CC2500_17_MCSM1,    0x03},
+    {CC2500_18_MCSM0,    0x08},
+    {CC2500_19_FOCCFG,   0x16},
+    {CC2500_1B_AGCCTRL2, 0x43},
+    {CC2500_23_FSCAL3,   0xEA},
+    {CC2500_25_FSCAL1,   0x00},
+    {CC2500_26_FSCAL0,   0x11},
+    {CC2500_2B_AGCTEST,  0x3E},
     {CC2500_03_FIFOTHR,  0x07}, // TX fifo threashold 33, RX fifo threshold 32
     {CC2500_09_ADDR,     0x00}, // device address 0 (broadcast)
+    
+    // config specific to TX
+    {CC2500_00_IOCFG2,   0x1B},
+    {CC2500_02_IOCFG0,   0x1C},
+    {CC2500_17_MCSM1,    0x03}, // CCA always, RX->IDLE, TX -> RX
+    {CC2500_18_MCSM0,    0x08}, // XOSC expire 64, no auto-cal
+    {CC2500_3E_PATABLE,  0x50}, // initially low power
 };
 
 /*
