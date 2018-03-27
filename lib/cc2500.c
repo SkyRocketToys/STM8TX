@@ -373,7 +373,7 @@ static const struct {
     {CC2500_12_MDMCFG2,  0x13}, // 30/32 sync word bits, no manchester, GFSK, DC filter enabled
     {CC2500_13_MDMCFG1,  0xA3}, // chan spacing exponent 3, preamble 4 bytes, FEC enabled
     {CC2500_14_MDMCFG0,  0x7A}, // chan spacing 299.926757kHz for 26MHz crystal
-    {CC2500_15_DEVIATN,  0x51}, // modem deviation 25.128906kHz for 26MHz crystal
+    {CC2500_15_DEVIATN,  0x51}, // modem deviation 57.12kHz for 26MHz crystal
     {CC2500_19_FOCCFG,   0x16}, // frequency offset compensation
     {CC2500_1A_BSCFG,    0x6C}, // bit sync config
     {CC2500_1B_AGCCTRL2, 0x43}, // target amplitude 33dB
