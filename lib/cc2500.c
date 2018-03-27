@@ -206,7 +206,7 @@ extern uint8_t telem_ack_value;
 #define LOST_PACKETS 0
 
 #define AUTOBIND_CHANNEL 100
-#define AUTOBIND_POWER 3
+#define AUTOBIND_POWER 1
 
 // number of channels to step in FCC test mode
 #define FCC_CHAN_STEP 10
@@ -316,14 +316,14 @@ static void cc2500_WriteReg(uint8_t reg, uint8_t value)
 void cc2500_SetPower(uint8_t power)
 {
     const uint8_t patable[8] = {
-        0x50, // -30dbm (for testing)
+        0x50, // -30dbm (for testing and autobind)
+        0x55, // -16dBm,
+        0x8D, // -14dBm,
+        0xC6, // -12dBm,
         0x97, // -10dbm
         0x6E, // -8dbm
         0x7F, // -6dbm
         0xA9, // -4dbm
-        0xBB, // -2dbm
-        0xFE, // 0dbm
-        0xFF  // 1.5dbm
     };
     if (power > 8) {
         power = 8;
