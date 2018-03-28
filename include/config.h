@@ -6,10 +6,13 @@
 #error BRD_RADIO_TYPE must be declared on the command line
 #endif
 
-#ifdef __SDCC // The linker does not remove unused functions
+#ifdef __SDCC_REVISION // The linker does not remove unused functions
 #define FATCODE 0
 #else
 #define FATCODE 0
+#endif
+
+#ifdef __IAR_SYSTEMS_ICC__
 #include "../iar/date.h"
 #endif
 
