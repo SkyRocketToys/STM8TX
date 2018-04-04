@@ -196,8 +196,7 @@ enum control_mode_t {
     THROW =        18,  ///< throw to launch mode using inertial/GPS system, no pilot input
     AVOID_ADSB =   19,  ///< automatic avoidance of obstacles in the macro scale - e.g. full-sized aircraft
     GUIDED_NOGPS = 20,  ///< guided mode but only accepts attitude and altitude
-    FLOWHOLD     = 21,  ///< hold with flow sensor
-    FLOWHOLD2    = 22,  ///< hold with flow sensor
+    FLOWHOLD     = 22,  ///< hold with flow sensor
 };
 
 static bool fcc_CW_mode;
@@ -215,6 +214,8 @@ static void status_update(bool have_link)
     uint8_t FCC_power = get_FCC_power();
     uint8_t buttons = get_buttons_held();
     uint8_t desired_mode;
+    uint8_t flight_mode = t_status.flight_mode & 0x7f;
+    uint8_t profile = t_status.flight_mode >> 7;
 
     if (FCC_chan != -1) {
         yellow_led_pattern = LED_PATTERN_FCC;
@@ -292,37 +293,39 @@ static void status_update(bool have_link)
     last_link_ms = now;
 
     if (t_status.flight_mode != last_status.flight_mode) {
-        switch (t_status.flight_mode) {
-        case ALT_HOLD:
-            buzzer_tune(TONE_ALT_HOLD);
-            break;
-        case LOITER:
-            buzzer_tune(TONE_LOITER);
-            break;
-        case RTL:
-            buzzer_tune(TONE_RTL);
-            break;
-        case LAND:
-            buzzer_tune(TONE_LAND);
-            break;
-        default:
-            buzzer_tune(TONE_OTHER_MODE);
-            break;
+        if (flight_mode == FLOWHOLD || flight_mode == ALT_HOLD) {
+            // for the primary mdoes we use profile number to choose buzzer tone
+            buzzer_tune(profile?TONE_LOITER:TONE_ALT_HOLD);            
+        } else {
+            switch (flight_mode) {
+            case LOITER:
+                buzzer_tune(TONE_LOITER);
+                break;
+            case RTL:
+                buzzer_tune(TONE_RTL);
+                break;
+            case LAND:
+                buzzer_tune(TONE_LAND);
+                break;
+            default:
+                buzzer_tune(TONE_OTHER_MODE);
+                break;
+            }
         }
-        last_mode = last_status.flight_mode;
+        last_mode = flight_mode;
         played_tone = true;
     }
 
     // cope with hybrid mode for mode display
-    if (t_status.flight_mode == ALT_HOLD && (t_status.flags & TELEM_FLAG_HYBRID) != 0) {
+    if (flight_mode == ALT_HOLD && (t_status.flags & TELEM_FLAG_HYBRID) != 0) {
         desired_mode = LOITER;
     } else {
-        desired_mode = t_status.flight_mode;
+        desired_mode = flight_mode;
     }
 
     if (desired_mode == THROW && (t_status.flags & TELEM_FLAG_ARMED)) {
         green_led_pattern = LED_PATTERN_RAPID;
-    } else if (desired_mode == ALT_HOLD || desired_mode == FLOWHOLD || desired_mode == FLOWHOLD2) {
+    } else if (desired_mode == ALT_HOLD || desired_mode == FLOWHOLD) {
         // GPS LED always off in "indoor" mode
         green_led_pattern = LED_PATTERN_OFF;
     } else {
@@ -344,16 +347,10 @@ static void status_update(bool have_link)
             last_batt_warn_ms = now;
             buzzer_tune(TONE_BATT_WARNING);
         }
-    } else if (desired_mode == FLOWHOLD || desired_mode == FLOWHOLD2) {
-        // indoor mode LED short blink
-        yellow_led_pattern = LED_PATTERN_HIGH;
-    } else if (desired_mode == ALT_HOLD ||
-               (t_status.flight_mode == LAND && last_mode == ALT_HOLD)) {
-        // indoor mode LED on
-        yellow_led_pattern = LED_PATTERN_SOLID;
-    } else {
-        // indoor mode LED off
+    } else if (profile == 0) {
         yellow_led_pattern = LED_PATTERN_OFF;
+    } else {
+        yellow_led_pattern = LED_PATTERN_SOLID;
     }
 
     // check for disarm tone
@@ -617,7 +614,7 @@ void main(void)
                    t_status.rssi,
                    t_status.pps,
                    t_status.flags,
-                   t_status.flight_mode);
+                   t_status.flight_mode&0x7f);
             link_ok = true;
         }
 #else
