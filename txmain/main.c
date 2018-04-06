@@ -308,9 +308,9 @@ static void status_update(bool have_link)
             buzzer_tune(TONE_BATT_WARNING);
         }
     } else if (profile == 0) {
-        yellow_led_pattern = LED_PATTERN_OFF;
-    } else {
         yellow_led_pattern = LED_PATTERN_SOLID;
+    } else {
+        yellow_led_pattern = LED_PATTERN_OFF;
     }
 
     // check for disarm tone
