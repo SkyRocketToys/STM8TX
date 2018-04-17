@@ -205,7 +205,7 @@ static void status_update(bool have_link)
         }
         if (buttons == BUTTON_STUNT) {
             radio_FCC_toggle_scan();
-            buzzer_tune(TONE_RX_SEARCH);
+            buzzer_tune(TONE_LOITER);
         }
         return;
     }

@@ -222,6 +222,7 @@ static uint8_t tx_max = 7;
 static int8_t fcc_test_chan = -1;
 static bool fcc_cw_mode;
 static bool fcc_scan_mode;
+static uint8_t fcc_scan_count;
 static uint8_t fcc_power = 8;
 static uint8_t last_wifi_channel;
 
@@ -848,7 +849,17 @@ static void send_normal_packet(void)
 static void send_FCC_packet(void)
 {
     uint8_t chan;
-    if (fcc_test_chan == 0) {
+    if (fcc_scan_mode) {
+        if (fcc_cw_mode || fcc_scan_count++ == 110) {
+            // change in 2MHz increments
+            fcc_test_chan += 6;
+            fcc_scan_count = 0;
+        }
+        if (fcc_test_chan >= MAX_CHANNEL_NUMBER) {
+            fcc_test_chan = 0;
+        }
+        chan = fcc_test_chan;
+    } else if (fcc_test_chan == 0) {
         chan = 0;
     } else if (fcc_test_chan == 1) {
         chan = MAX_CHANNEL_NUMBER/2;
@@ -863,6 +874,10 @@ static void send_FCC_packet(void)
         // we don't set a timeout here, instead we trigger the send again on
         // any change to channel or power
         printf("send CW %u\n", chan);
+        if (fcc_scan_mode) {
+            // in scan mode we change once a second
+            timer_call_after_ms(1000, send_FCC_packet);
+        }
     } else {
         send_SRT_packet();
         timer_call_after_ms(INTER_PACKET_MS, send_FCC_packet);
