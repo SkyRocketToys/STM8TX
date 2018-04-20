@@ -876,14 +876,14 @@ static void send_FCC_packet(void)
     uint8_t chan;
     if (fcc_scan_mode) {
         if (fcc_cw_mode || fcc_scan_count++ == 110) {
-            // change in 2MHz increments
-            fcc_test_chan += 6;
+            // change over hopping frequencies at 1Hz
+            fcc_test_chan++;
+            if (fcc_test_chan == NUM_CHANNELS) {
+                fcc_test_chan = 0;
+            }
             fcc_scan_count = 0;
         }
-        if (fcc_test_chan >= MAX_CHANNEL_NUMBER) {
-            fcc_test_chan = 0;
-        }
-        chan = fcc_test_chan;
+        chan = bindHopData[fcc_test_chan];
     } else if (fcc_test_chan == 0) {
         chan = 0;
     } else if (fcc_test_chan == 1) {
