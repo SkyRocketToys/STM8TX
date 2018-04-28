@@ -139,6 +139,8 @@ static void check_stick_activity(void)
 #define LED_PATTERN_BLINK4 0xFFFC
 #define LED_PATTERN_RAPID  0xAAAA
 #define LED_PATTERN_FCC    0x1000
+#define LED_PATTERN_PROF2  0xFFFE
+#define LED_PATTERN_PROF3  0x0001
 
 enum control_mode_t {
     STABILIZE =     0,  // manual airframe angle with manual throttle
@@ -317,9 +319,9 @@ static void status_update(bool have_link)
     } else if (profile == 1) {
         yellow_led_pattern = LED_PATTERN_OFF;
     } else if (profile == 2) {
-        yellow_led_pattern = LED_PATTERN_BLINK4;
+        yellow_led_pattern = LED_PATTERN_PROF2;
     } else if (profile == 3) {
-        yellow_led_pattern = LED_PATTERN_LOW;
+        yellow_led_pattern = LED_PATTERN_PROF3;
     } else {
         yellow_led_pattern = LED_PATTERN_RAPID;
     }
