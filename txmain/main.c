@@ -136,6 +136,7 @@ static void check_stick_activity(void)
 #define LED_PATTERN_BLINK1 0xFF00
 #define LED_PATTERN_BLINK2 0xFFF0
 #define LED_PATTERN_BLINK3 0xF0F0
+#define LED_PATTERN_BLINK4 0xFFFC
 #define LED_PATTERN_RAPID  0xAAAA
 #define LED_PATTERN_FCC    0x1000
 
@@ -177,8 +178,8 @@ static void status_update(bool have_link)
     uint8_t FCC_power = get_FCC_power();
     uint8_t buttons = get_buttons();
     uint8_t desired_mode;
-    uint8_t flight_mode = t_status.flight_mode & 0x7f;
-    uint8_t profile = t_status.flight_mode >> 7;
+    uint8_t flight_mode = t_status.flight_mode & 0x3f;
+    uint8_t profile = t_status.flight_mode >> 6;
     
     if (FCC_chan != -1) {
         yellow_led_pattern = LED_PATTERN_FCC;
@@ -255,7 +256,11 @@ static void status_update(bool have_link)
     if (t_status.flight_mode != last_status.flight_mode) {
         if (flight_mode == FLOWHOLD || flight_mode == ALT_HOLD) {
             // for the primary mdoes we use profile number to choose buzzer tone
-            buzzer_tune(profile?TONE_LOITER:TONE_ALT_HOLD);            
+            buzzer_tune((profile&1)?TONE_LOITER:TONE_ALT_HOLD);            
+            if (profile & 2) {
+                // double tone for profile bank 2
+                buzzer_tune((profile&1)?TONE_LOITER:TONE_ALT_HOLD);
+            }
         } else {
             switch (flight_mode) {
             case LOITER:
@@ -309,8 +314,14 @@ static void status_update(bool have_link)
         }
     } else if (profile == 0) {
         yellow_led_pattern = LED_PATTERN_SOLID;
-    } else {
+    } else if (profile == 1) {
         yellow_led_pattern = LED_PATTERN_OFF;
+    } else if (profile == 2) {
+        yellow_led_pattern = LED_PATTERN_BLINK4;
+    } else if (profile == 3) {
+        yellow_led_pattern = LED_PATTERN_LOW;
+    } else {
+        yellow_led_pattern = LED_PATTERN_RAPID;
     }
 
     // check for disarm tone
