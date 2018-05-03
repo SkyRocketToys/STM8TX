@@ -534,7 +534,7 @@ void main(void)
         bool link_ok = false;
         int8_t FCC_chan = get_FCC_chan();
 
-        if (pps_counter >= 8) // Check the PPS every 800ms
+        if (pps_counter >= 10) // Check the PPS every 1000ms
         {
             pps_counter = 0;
             radio_set_pps_rssi();
