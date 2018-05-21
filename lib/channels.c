@@ -12,6 +12,7 @@ uint8_t telem_ack_value;
 static uint8_t last_telem_ack_value;
 static uint8_t telem_ack_send_count;
 static uint8_t telem_extra_type;
+extern struct telem_status_cc2500 t_status;
 
 extern uint8_t get_bl_version(void);
 
@@ -176,6 +177,11 @@ void fill_packet(struct srt_packet *pkt)
     // cycle between data types
     telem_extra_type = (telem_extra_type+1) % PKTYPE_NUM_TYPES;
 
+    if (telem_extra_type >= PKTYPE_RXID1 && t_status.rxid[0] == 0 && t_status.rxid[1] == 0) {
+        // rxid not available yet
+        telem_extra_type = 0;
+    }
+
     // ack data gets priority when there is new data to make OTA
     // updates faster
     if (telem_ack_value != last_telem_ack_value ||
@@ -215,6 +221,12 @@ void fill_packet(struct srt_packet *pkt)
         break;
     case PKTYPE_BL_VERSION:
         data = get_bl_version();
+        break;
+    case PKTYPE_RXID1:
+        data = t_status.rxid[0];
+        break;
+    case PKTYPE_RXID2:
+        data = t_status.rxid[1];
         break;
     case PKTYPE_FW_ACK: {
         if (last_telem_ack_value != telem_ack_value) {

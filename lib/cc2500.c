@@ -178,7 +178,7 @@ static struct {
 static uint8_t autobind_counter;
 static bool sent_autobind;
 
-struct telem_status t_status;
+struct telem_status_cc2500 t_status;
 extern uint8_t telem_ack_value;
 
 /*
@@ -700,8 +700,15 @@ static void parse_telem_packet(const uint8_t *packet)
     }
     switch (pkt->type) {
     case TELEM_STATUS: {
+        if ((t_status.rxid[0] != 0 || t_status.rxid[1] != 0) &&
+            (t_status.rxid[0] != pkt->payload.status.rxid[0] ||
+             t_status.rxid[1] != pkt->payload.status.rxid[1])) {
+            // it's a double bind, reject packet
+            return;
+        }
         memcpy(&t_status, &pkt->payload.status, sizeof(t_status));
         break;
+    }
     case TELEM_FW:
     case TELEM_PLAY: {
         struct telem_firmware fw;
@@ -717,7 +724,6 @@ static void parse_telem_packet(const uint8_t *packet)
             buzzer_tune_add(fw.offset, &fw.data[0], fw.len);
         }
         break;
-    }
     }
     }
     stats.recv_packets++;

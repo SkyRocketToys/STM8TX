@@ -60,8 +60,8 @@ static uint32_t last_batt_warn_ms;
 extern bool power_off_disarm;
 static uint32_t last_link_ms;
 
-extern struct telem_status t_status;
-static struct telem_status last_status;
+extern struct telem_status_cc2500 t_status;
+static struct telem_status_cc2500 last_status;
 
 static uint8_t last_mode;
 extern uint8_t note_adjust;
