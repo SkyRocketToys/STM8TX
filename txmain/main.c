@@ -170,19 +170,13 @@ static uint8_t video_tone_counter;
 /*
    notify user when we have link, flight mode changes etc
  */
-static void status_update(bool have_link)
+static void status_update_fcc(void)
 {
-    static bool last_have_link;
     uint32_t now = timer_get_ms();
-    bool played_tone = false;
-    
     int8_t FCC_chan = get_FCC_chan();
     uint8_t FCC_power = get_FCC_power();
     uint8_t buttons = get_buttons();
-    uint8_t desired_mode;
-    uint8_t flight_mode = t_status.flight_mode & 0x3f;
-    uint8_t profile = t_status.flight_mode >> 6;
-    
+
     if (FCC_chan != -1) {
         yellow_led_pattern = LED_PATTERN_FCC;
         green_led_pattern = LED_PATTERN_FCC;
@@ -212,14 +206,36 @@ static void status_update(bool have_link)
         }
         return;
     }
+}
+
+/*
+   notify user when we have link, flight mode changes etc
+ */
+static void status_update(bool have_link)
+{
+    // Every 100ms
+    static bool last_have_link = false;
+    static uint8_t counter = ~0;
+    uint32_t now = timer_get_ms();
+    bool played_tone = false;
     
-    if (have_link) {
-        if (!last_have_link) {
-            last_have_link = true;
-            buzzer_tune(TONE_NOTIFY_POSITIVE_TUNE);            
+    int8_t FCC_chan = get_FCC_chan();
+    uint8_t FCC_power = get_FCC_power();
+    uint8_t desired_mode;
+    uint8_t flight_mode = t_status.flight_mode & 0x3f;
+    uint8_t profile = t_status.flight_mode >> 6;
+
+    ++counter;
+    if ((counter & 7) == 0) // Every 800ms
+    {
+        if (have_link) {
+            if (!last_have_link) {
+                last_have_link = true;
+                buzzer_tune(TONE_NOTIFY_POSITIVE_TUNE);            
+            }
+        } else {
+            last_have_link = false;
         }
-    } else {
-        last_have_link = false;
     }
 
     // play pending tune (if any)
@@ -233,18 +249,20 @@ static void status_update(bool have_link)
     
     if (!last_have_link) {
         uint32_t time_since_activity = now - last_stick_activity;
-        uint8_t time_since_activity_s = time_since_activity >> 10;
-        if (time_since_activity_s > 180) {
+        uint8_t time_since_activity_s = time_since_activity >> 10; // Approximately in seconds
+        if (time_since_activity_s > 180) { // 3 minutes ish
             // clear power control
             printf("powering off\n");
             gpio_clear(PIN_POWER);            
         }
-        if (time_since_activity_s > 170) {
+        if (time_since_activity_s > 170) { // About to switch off
             buzzer_tune(TONE_INACTIVITY);            
             yellow_led_pattern = LED_PATTERN_RAPID;
             green_led_pattern = LED_PATTERN_RAPID;
-        } else {
-            buzzer_tune(TONE_RX_SEARCH);
+        } else { // Normal
+            if ((counter & 7) == 0) { // Every 800ms
+                buzzer_tune(TONE_RX_SEARCH);
+            }
             yellow_led_pattern = LED_PATTERN_HIGH;
             green_led_pattern = LED_PATTERN_LOW;
         }
@@ -334,13 +352,23 @@ static void status_update(bool have_link)
         played_tone = true;
     }
     
-    if (!played_tone && (t_status.flags & TELEM_FLAG_VIDEO)) {
-        video_tone_counter++;
-        if (video_tone_counter == 2) {
-            video_tone_counter = 0;
-            buzzer_tune(TONE_VIDEO);
-            played_tone = true;
+    // Check for photo/video tone
+    if (t_status.flags & TELEM_FLAG_VIDEO)
+    {
+        if (!played_tone) {
+            video_tone_counter++;
+            if (video_tone_counter == 10) { // Beep once per second if it is held
+                video_tone_counter = 0;
+            }
+            if (video_tone_counter == 2) { // require at least two telemetry packets (100ms apart) saying video mode is enabled
+                buzzer_tune(TONE_VIDEO);
+                played_tone = true;
+            }
         }
+    }
+    else
+    {
+        video_tone_counter = 0;
     }
 
     // remember wifi chan
@@ -384,6 +412,9 @@ void main(void)
     uint8_t factory_mode = 0;
     uint8_t initial_buttons;
     uint8_t wifi_chan;
+    uint8_t link_bad_counter = 5*8;
+    uint8_t pps_counter = 99; // Calculate it first time round
+
     chip_init();
     led_init();
 
@@ -503,8 +534,11 @@ void main(void)
         bool link_ok = false;
         int8_t FCC_chan = get_FCC_chan();
 
-        radio_set_pps_rssi();
-
+        if (pps_counter >= 10) // Check the PPS every 1000ms
+        {
+            pps_counter = 0;
+            radio_set_pps_rssi();
+        }
         telem_pps = get_telem_pps();
 
         Debug("%u: ADC=[%u %u %u %u] V:%u B:0x%x PWR:%u",
@@ -526,8 +560,21 @@ void main(void)
                    t_status.flight_mode&0x7F);
             link_ok = true;
         }
+        if (link_ok) {
+            link_bad_counter = 0;
+        } else {
+            link_bad_counter++;
+            if (link_bad_counter > 5*8) { // Saturate the counter at 4 seconds
+                link_bad_counter = 5*8;
+            }
+        }
 
-        status_update(link_ok);
+        if (FCC_chan != -1) {
+            status_update_fcc();
+        }
+        else {
+            status_update(link_bad_counter < 5*8); // May take a little while to write a byte to EEPROM
+        }
         
         while (timer_get_ms() < next_ms) {
             update_leds();
@@ -536,8 +583,10 @@ void main(void)
         }
         if (FCC_chan != -1) {
             next_ms += 400;
+            pps_counter += 4;
         } else {
-            next_ms += 1000;
+            next_ms += 100; // was 800ms but we want sounds to be more responsive
+            pps_counter += 1;
         }
     }
 }
